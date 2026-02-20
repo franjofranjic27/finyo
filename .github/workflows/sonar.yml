@@ -1,20 +1,19 @@
-name: SonarCloud Analysis
-
+name: SonarQube
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  sonar:
+  build:
     if: github.actor != 'dependabot[bot]'
+    name: Build and analyze
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: finyo-api
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,8 +33,14 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Build, test, and analyze
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build, test and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./mvnw verify sonar:sonar
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=franjofranjic27_finyo
