@@ -1,44 +1,41 @@
-#name: SonarQube Analysis
-#
-#on:
-#  push:
-#    branches: [main]
-#  pull_request:
-#    types: [opened, synchronize, reopened]
-#
-#jobs:
-#  sonar:
-#    if: github.actor != 'dependabot[bot]'
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0   # full history required for blame/new-code detection
-#
-#      - uses: pnpm/action-setup@v4
-#
-#      - uses: actions/setup-node@v4
-#        with:
-#          node-version: "22"
-#          cache: "pnpm"
-#          cache-dependency-path: |
-#            services/agent/pnpm-lock.yaml
-#            services/rag/pnpm-lock.yaml
-#
-#      - name: Install agent dependencies
-#        run: cd services/agent && pnpm install
-#
-#      - name: Install RAG dependencies
-#        run: cd services/rag && pnpm install
-#
-#      - name: Run agent tests with coverage
-#        run: cd services/agent && pnpm test:coverage
-#
-#      - name: Run RAG tests with coverage
-#        run: cd services/rag && pnpm test:coverage
-#
-#      - name: SonarQube Scan
-#        uses: SonarSource/sonarqube-scan-action@v6
-#        env:
-#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonar:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: finyo-api
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Build, test, and analyze
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./mvnw verify sonar:sonar

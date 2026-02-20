@@ -14,7 +14,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class FinyoApiApplicationIT {
 
     @Container
-    @ServiceConnection(name = "postgres")
+    @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
 
     @Test

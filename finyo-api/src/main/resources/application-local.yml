@@ -1,0 +1,9 @@
+# Local development profile
+# Activate with: -Dspring.profiles.active=local
+# Datasource: Docker Compose postgres (localhost:5432/finyo)
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
