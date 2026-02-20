@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: finyo-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/finyo
+    username: finyo
+    password: finyo

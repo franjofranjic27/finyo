@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Enforces Conventional Commits format defined in CLAUDE.md
+commit_msg=$(cat "$1")
+
+pattern='^(feat|fix|refactor|docs|chore|test|ci|build)(\([a-zA-Z0-9_/-]+\))?: .{1,72}'
+
+if ! printf '%s' "$commit_msg" | grep -qE "$pattern"; then
+  echo ""
+  echo "  ERROR: Commit message does not follow the project convention."
+  echo ""
+  echo "  Expected format:  <type>(<scope>): <short summary>"
+  echo "  Types: feat | fix | refactor | docs | chore | test | ci | build"
+  echo ""
+  echo "  Example:  feat(api): add transaction listing endpoint"
+  echo ""
+  exit 1
+fi
