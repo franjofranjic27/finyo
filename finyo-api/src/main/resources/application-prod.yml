@@ -1,0 +1,16 @@
+# Production profile
+# Activate with: SPRING_PROFILES_ACTIVE=prod
+# All DB_* environment variables must be set — no defaults intentionally.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

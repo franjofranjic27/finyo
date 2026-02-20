@@ -2,6 +2,18 @@ spring:
   application:
     name: finyo-api
   datasource:
-    url: jdbc:postgresql://localhost:5432/finyo
-    username: finyo
-    password: finyo
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/finyo}
+    username: ${DB_USERNAME:finyo}
+    password: ${DB_PASSWORD:finyo}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
