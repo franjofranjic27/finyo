@@ -12,7 +12,7 @@
     <artifactId>finyo-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>finyo-api</name>
-    <description>finyo-api</description>
+    <description>finyo-api - personal finance planner</description>
     <url/>
     <licenses>
         <license/>
@@ -75,6 +75,63 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- OAuth2 Resource Server (JWT) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- Bean Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Caching -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- Actuator — exposes /actuator/health used by Docker healthcheck and load balancers -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- CSV parsing -->
+        <dependency>
+            <groupId>com.univocity</groupId>
+            <artifactId>univocity-parsers</artifactId>
+            <version>2.9.1</version>
+        </dependency>
+
+        <!-- Excel import -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
+        <!-- RSS parsing -->
+        <dependency>
+            <groupId>com.rometools</groupId>
+            <artifactId>rome</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <!-- Spring Shell CLI -->
+        <!-- spring-shell 4.0.0 aligns with Spring Boot 4.x / Spring Framework 7.x -->
+        <dependency>
+            <groupId>org.springframework.shell</groupId>
+            <artifactId>spring-shell-starter</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -101,7 +158,6 @@
             <scope>test</scope>
         </dependency>
 
-<!--        TestContainers -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>

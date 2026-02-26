@@ -15,5 +15,57 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:-admin}
+      KC_DB: dev-mem
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  finyo-api:
+    build:
+      context: ./finyo-api
+      dockerfile: Dockerfile
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/finyo
+      DB_USERNAME: finyo
+      DB_PASSWORD: finyo
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/finyo
+      KEYCLOAK_JWK_URI: http://keycloak:8080/realms/finyo/protocol/openid-connect/certs
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  finyo-ui:
+    build:
+      context: ./finyo-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      finyo-api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
