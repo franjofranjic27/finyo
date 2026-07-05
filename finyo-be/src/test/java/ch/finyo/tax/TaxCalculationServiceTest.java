@@ -694,6 +694,36 @@ class TaxCalculationServiceTest {
         assertThat(result.get(0).getCommuneName()).isEqualTo("Rapperswil-Jona");
     }
 
+    @Test
+    void getCommunes_falls_back_to_latest_seeded_year_when_requested_year_has_no_data() {
+        TaxCommuneMultiplier latest = TaxCommuneMultiplier.builder()
+                .id(1L).taxYear(2026).cantonCode("SG")
+                .communeName("St. Gallen").bfsNumber(3203)
+                .multiplier(new BigDecimal("1.44"))
+                .build();
+        when(communeMultiplierRepository.findByTaxYearAndCantonCodeOrderByCommuneNameAsc(2028, "SG"))
+                .thenReturn(List.of());
+        when(communeMultiplierRepository.findTopByCantonCodeOrderByTaxYearDesc("SG"))
+                .thenReturn(Optional.of(latest));
+        when(communeMultiplierRepository.findByTaxYearAndCantonCodeOrderByCommuneNameAsc(2026, "SG"))
+                .thenReturn(List.of(latest));
+
+        List<TaxCommuneMultiplier> result = service.getCommunes(2028, "SG");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTaxYear()).isEqualTo(2026);
+    }
+
+    @Test
+    void getCommunes_returns_empty_when_canton_has_no_data_at_all() {
+        when(communeMultiplierRepository.findByTaxYearAndCantonCodeOrderByCommuneNameAsc(2025, "ZH"))
+                .thenReturn(List.of());
+        when(communeMultiplierRepository.findTopByCantonCodeOrderByTaxYearDesc("ZH"))
+                .thenReturn(Optional.empty());
+
+        assertThat(service.getCommunes(2025, "ZH")).isEmpty();
+    }
+
     // -------------------------------------------------------------------------
     // Church tax
     //

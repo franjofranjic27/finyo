@@ -178,8 +178,19 @@ public class TaxCalculationService {
     }
 
     public List<TaxCommuneMultiplier> getCommunes(int taxYear, String cantonCode) {
-        return communeMultiplierRepository
-                .findByTaxYearAndCantonCodeOrderByCommuneNameAsc(taxYear, cantonCode.toUpperCase());
+        String canton = cantonCode.toUpperCase();
+        List<TaxCommuneMultiplier> communes = communeMultiplierRepository
+                .findByTaxYearAndCantonCodeOrderByCommuneNameAsc(taxYear, canton);
+        if (communes.isEmpty()) {
+            // No data for the requested year yet (e.g. future years) — serve the
+            // latest seeded year so the commune picker is never empty.
+            communes = communeMultiplierRepository
+                    .findTopByCantonCodeOrderByTaxYearDesc(canton)
+                    .map(latest -> communeMultiplierRepository
+                            .findByTaxYearAndCantonCodeOrderByCommuneNameAsc(latest.getTaxYear(), canton))
+                    .orElse(communes);
+        }
+        return communes;
     }
 
     // -------------------------------------------------------------------------

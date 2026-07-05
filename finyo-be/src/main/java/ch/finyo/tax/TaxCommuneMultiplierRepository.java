@@ -10,4 +10,6 @@ public interface TaxCommuneMultiplierRepository extends JpaRepository<TaxCommune
     List<TaxCommuneMultiplier> findByTaxYearAndCantonCodeOrderByCommuneNameAsc(int taxYear, String cantonCode);
 
     Optional<TaxCommuneMultiplier> findByTaxYearAndBfsNumber(int taxYear, int bfsNumber);
+
+    Optional<TaxCommuneMultiplier> findTopByCantonCodeOrderByTaxYearDesc(String cantonCode);
 }

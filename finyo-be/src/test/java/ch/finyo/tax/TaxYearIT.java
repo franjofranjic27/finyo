@@ -30,9 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (/api/v1/tax/years and the backward-compatible /api/v1/tax/calculate).
  *
  * Runs against a real PostgreSQL Testcontainer with all Flyway migrations
- * applied, so the seeded SG rate tables (V10/V11) and church multipliers
- * (V15, e.g. St. Gallen BFS 3203: protestant 0.24 / roman-catholic 0.26)
- * are available to the calculation.
+ * applied, so the seeded SG rate tables (V10/V11) and the official commune
+ * multipliers (V17, e.g. St. Gallen BFS 3203 in 2025: roman-catholic 0.26,
+ * protestant NULL — the city spans several protestant Kirchgemeinden with
+ * diverging Steuerfüsse) are available to the calculation.
  *
  * Focus areas:
  *   1. Full lifecycle: upsert → list → detail → status transitions →
@@ -441,17 +442,17 @@ class TaxYearIT extends BaseIntegrationTest {
         JsonNode result = objectMapper.readTree(response);
         assertThat(decimal(result, "churchTax")).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(decimal(result, "communalTax"))
-                .as("seeded St. Gallen multiplier (V11) must still produce communal tax")
+                .as("seeded St. Gallen multiplier (V17) must still produce communal tax")
                 .isGreaterThan(BigDecimal.ZERO);
     }
 
     /**
-     * V15 seeds church multipliers for St. Gallen (BFS 3203: protestant 0.24).
-     * A protestant tax payer in that commune must see a positive church tax
-     * that is part of the total and appears in the breakdown.
+     * St. Gallen 2025 has NO uniform protestant Steuerfuss (three Kirchgemeinden
+     * with diverging values → column is NULL in V17). A protestant affiliation
+     * must then simply yield zero church tax instead of failing.
      */
     @Test
-    void calculate_with_protestant_affiliation_and_seeded_commune_returns_positive_church_tax() throws Exception {
+    void calculate_with_protestant_affiliation_and_null_multiplier_returns_zero_church_tax() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
                 "taxYear", 2025,
                 "cantonCode", "SG",
@@ -459,6 +460,55 @@ class TaxYearIT extends BaseIntegrationTest {
                 "civilStatus", "SINGLE",
                 "numberOfChildren", 0,
                 "churchAffiliation", "PROTESTANT",
+                "grossEmploymentIncome", 100000
+        ));
+
+        String response = mockMvc.perform(post("/api/v1/tax/calculate").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(decimal(objectMapper.readTree(response), "churchTax"))
+                .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    /**
+     * The commune picker must never be empty for years beyond the seeded data:
+     * /communes falls back to the latest seeded year (2026, without Wil which
+     * has no legally binding Steuerfuss yet).
+     */
+    @Test
+    void communes_endpoint_falls_back_to_latest_seeded_year_for_future_years() throws Exception {
+        mockMvc.perform(get("/api/v1/tax/communes")
+                        .param("canton", "SG").param("year", "2029")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(74))
+                .andExpect(jsonPath("$[0].taxYear").value(2026));
+
+        mockMvc.perform(get("/api/v1/tax/communes")
+                        .param("canton", "SG").param("year", "2025")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(75));
+    }
+
+    /**
+     * V17 seeds official church multipliers for St. Gallen (BFS 3203 in 2025:
+     * roman-catholic 0.26). A roman-catholic tax payer in that commune must
+     * see a positive church tax that is part of the total and appears in the
+     * breakdown.
+     */
+    @Test
+    void calculate_with_roman_catholic_affiliation_and_seeded_commune_returns_positive_church_tax() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of(
+                "taxYear", 2025,
+                "cantonCode", "SG",
+                "bfsNumber", 3203,
+                "civilStatus", "SINGLE",
+                "numberOfChildren", 0,
+                "churchAffiliation", "ROMAN_CATHOLIC",
                 "grossEmploymentIncome", 100000
         ));
 
