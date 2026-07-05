@@ -8,6 +8,10 @@ const oidcConfig = {
   post_logout_redirect_uri: window.location.origin,
   scope: 'openid profile email',
   automaticSilentRenew: true,
+  // strip ?code=…&state=… from the URL after the redirect from Keycloak
+  onSigninCallback: () => {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  },
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
