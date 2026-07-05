@@ -46,17 +46,17 @@
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:3000/*",
+        "http://localhost:3001/*",
         "http://localhost:5173/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173"
       ],
-      "postLogoutRedirectUris": [
-        "http://localhost:3000"
-      ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000##http://localhost:3001"
       },
       "protocol": "openid-connect"
     },
@@ -67,7 +67,7 @@
       "publicClient": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "secret": "finyo-cli-secret",
       "protocol": "openid-connect",
