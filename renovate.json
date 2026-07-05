@@ -1,6 +1,116 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Europe/Zurich",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "semanticCommitType": "build",
+  "semanticCommitScope": "deps",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Backend-Commits mit Scope api",
+      "matchManagers": ["maven"],
+      "semanticCommitScope": "api"
+    },
+    {
+      "description": "Frontend-Commits mit Scope ui",
+      "matchManagers": ["npm"],
+      "semanticCommitScope": "ui"
+    },
+    {
+      "description": "Workflow-Commits mit Scope ci, patch/minor/digest automergen",
+      "matchManagers": ["github-actions"],
+      "semanticCommitScope": "ci",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Docker-Images (compose + Dockerfiles) mit Scope infra",
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "semanticCommitScope": "infra"
+    },
+    {
+      "description": "Spring Boot nie automergen und 3 Tage abwarten (zieht das halbe Dependency-Management mit)",
+      "matchPackageNames": ["org.springframework.boot:**"],
+      "automerge": false,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Maven-Patch-Updates bei gruenem CI automergen (verify inkl. Integrationstests)",
+      "matchManagers": ["maven"],
+      "matchUpdateTypes": ["patch"],
+      "matchPackageNames": ["!org.springframework.boot:**"],
+      "automerge": true
+    },
+    {
+      "description": "Testcontainers gemeinsam aktualisieren",
+      "matchPackageNames": ["org.testcontainers:**"],
+      "groupName": "testcontainers"
+    },
+    {
+      "description": "React-Kern gemeinsam aktualisieren",
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "groupName": "react"
+    },
+    {
+      "description": "Radix/shadcn-Primitives gruppieren (sonst ein PR pro Komponente)",
+      "matchPackageNames": ["@radix-ui/**", "lucide-react", "class-variance-authority"],
+      "groupName": "shadcn ui"
+    },
+    {
+      "description": "Tailwind gemeinsam aktualisieren",
+      "matchPackageNames": ["tailwindcss", "@tailwindcss/**", "tailwind-merge"],
+      "groupName": "tailwind"
+    },
+    {
+      "description": "Vitest inkl. Coverage-Provider und Playwright gruppieren (Peer-Versionen muessen passen)",
+      "matchPackageNames": ["vitest", "@vitest/**", "jsdom", "@testing-library/**", "@playwright/test"],
+      "groupName": "frontend testing"
+    },
+    {
+      "description": "JS-Dev-Toolchain (Lint/Build) gruppieren und minor/patch automergen",
+      "matchDepTypes": ["devDependencies"],
+      "matchPackageNames": ["eslint", "eslint-**", "typescript-eslint", "typescript", "vite", "@vitejs/**", "globals"],
+      "groupName": "js dev tooling",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "@types/* automergen",
+      "matchPackageNames": ["@types/**"],
+      "groupName": "type definitions",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Postgres-Major nur bewusst (Datenmigration noetig)",
+      "matchPackageNames": ["postgres"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Keycloak-Major nur bewusst (Realm-Import/Config pruefen)",
+      "matchPackageNames": ["quay.io/keycloak/keycloak"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Major-Updates generell einzeln, ohne Automerge, 3 Tage Karenz",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "minimumReleaseAge": "3 days"
+    }
   ]
 }
