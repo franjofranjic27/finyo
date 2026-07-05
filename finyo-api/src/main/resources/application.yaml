@@ -3,7 +3,7 @@ spring:
     name: finyo-api
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/finyo}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/finyo}
     username: ${DB_USERNAME:finyo}
     password: ${DB_PASSWORD:finyo}
   jpa:
@@ -39,8 +39,6 @@ springdoc:
     tags-sorter: alpha
 
 finyo:
-  cli:
-    user-id: ${CLI_USER_ID:cli-default-user}
   six:
     base-url: ${SIX_API_BASE_URL:https://api.six-group.com/api/findata/v1}
     api-key: ${SIX_API_KEY:}
