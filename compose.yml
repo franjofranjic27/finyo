@@ -35,9 +35,9 @@ services:
       retries: 10
       start_period: 30s
 
-  finyo-api:
+  finyo-be:
     build:
-      context: ./finyo-api
+      context: ./finyo-be
       dockerfile: Dockerfile
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/finyo
@@ -62,14 +62,14 @@ services:
       retries: 10
       start_period: 30s
 
-  finyo-ui:
+  finyo-fe:
     build:
-      context: ./finyo-ui
+      context: ./finyo-fe
       dockerfile: Dockerfile
     ports:
       - "3001:80"
     depends_on:
-      finyo-api:
+      finyo-be:
         condition: service_healthy
 
 volumes:

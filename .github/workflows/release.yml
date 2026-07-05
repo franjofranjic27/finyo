@@ -1,9 +1,9 @@
 name: Release
 
 # Tag conventions:
-#   v1.2.3      → release BOTH images (finyo-api + finyo-ui)
-#   api-v1.2.3  → release only the backend image
-#   ui-v1.2.3   → release only the frontend image
+#   v1.2.3      → release BOTH images (finyo-be + finyo-fe)
+#   be-v1.2.3  → release only the backend image
+#   fe-v1.2.3   → release only the frontend image
 #
 # Required repository secrets:
 #   DOCKERHUB_USERNAME — Docker Hub account name (also used as image namespace)
@@ -13,8 +13,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
-      - 'api-v*.*.*'
-      - 'ui-v*.*.*'
+      - 'be-v*.*.*'
+      - 'fe-v*.*.*'
 
 permissions:
   contents: write
@@ -25,35 +25,35 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.parse.outputs.version }}
-      release_api: ${{ steps.parse.outputs.release_api }}
-      release_ui: ${{ steps.parse.outputs.release_ui }}
+      release_be: ${{ steps.parse.outputs.release_be }}
+      release_fe: ${{ steps.parse.outputs.release_fe }}
     steps:
       - name: Parse tag
         id: parse
         run: |
           TAG="${GITHUB_REF_NAME}"
           case "$TAG" in
-            api-v*)
-              echo "version=${TAG#api-v}" >> "$GITHUB_OUTPUT"
-              echo "release_api=true"     >> "$GITHUB_OUTPUT"
-              echo "release_ui=false"     >> "$GITHUB_OUTPUT"
+            be-v*)
+              echo "version=${TAG#be-v}" >> "$GITHUB_OUTPUT"
+              echo "release_be=true"     >> "$GITHUB_OUTPUT"
+              echo "release_fe=false"     >> "$GITHUB_OUTPUT"
               ;;
-            ui-v*)
-              echo "version=${TAG#ui-v}"  >> "$GITHUB_OUTPUT"
-              echo "release_api=false"    >> "$GITHUB_OUTPUT"
-              echo "release_ui=true"      >> "$GITHUB_OUTPUT"
+            fe-v*)
+              echo "version=${TAG#fe-v}"  >> "$GITHUB_OUTPUT"
+              echo "release_be=false"    >> "$GITHUB_OUTPUT"
+              echo "release_fe=true"      >> "$GITHUB_OUTPUT"
               ;;
             v*)
               echo "version=${TAG#v}"     >> "$GITHUB_OUTPUT"
-              echo "release_api=true"     >> "$GITHUB_OUTPUT"
-              echo "release_ui=true"      >> "$GITHUB_OUTPUT"
+              echo "release_be=true"     >> "$GITHUB_OUTPUT"
+              echo "release_fe=true"      >> "$GITHUB_OUTPUT"
               ;;
           esac
 
-  docker-api:
-    name: Build & push finyo-api image
+  docker-be:
+    name: Build & push finyo-be image
     needs: meta
-    if: needs.meta.outputs.release_api == 'true'
+    if: needs.meta.outputs.release_be == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,18 +70,18 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: finyo-api
+          context: finyo-be
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-api:${{ needs.meta.outputs.version }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-api:latest
-          cache-from: type=gha,scope=finyo-api
-          cache-to: type=gha,scope=finyo-api,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-be:${{ needs.meta.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-be:latest
+          cache-from: type=gha,scope=finyo-be
+          cache-to: type=gha,scope=finyo-be,mode=max
 
-  docker-ui:
-    name: Build & push finyo-ui image
+  docker-fe:
+    name: Build & push finyo-fe image
     needs: meta
-    if: needs.meta.outputs.release_ui == 'true'
+    if: needs.meta.outputs.release_fe == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,23 +98,23 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: finyo-ui
+          context: finyo-fe
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-ui:${{ needs.meta.outputs.version }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-ui:latest
-          cache-from: type=gha,scope=finyo-ui
-          cache-to: type=gha,scope=finyo-ui,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-fe:${{ needs.meta.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-fe:latest
+          cache-from: type=gha,scope=finyo-fe
+          cache-to: type=gha,scope=finyo-fe,mode=max
 
   github-release:
     name: Create GitHub release
-    needs: [meta, docker-api, docker-ui]
+    needs: [meta, docker-be, docker-fe]
     # run when everything that was supposed to run succeeded (skipped jobs are fine)
     if: >-
       ${{ !cancelled() &&
           needs.meta.result == 'success' &&
-          (needs.docker-api.result == 'success' || needs.docker-api.result == 'skipped') &&
-          (needs.docker-ui.result == 'success' || needs.docker-ui.result == 'skipped') }}
+          (needs.docker-be.result == 'success' || needs.docker-be.result == 'skipped') &&
+          (needs.docker-fe.result == 'success' || needs.docker-fe.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,11 +125,11 @@ jobs:
           {
             echo "body<<EOF"
             echo "## Docker Images"
-            if [ "${{ needs.meta.outputs.release_api }}" = "true" ]; then
-              echo "- \`finyo-api:${{ needs.meta.outputs.version }}\`"
+            if [ "${{ needs.meta.outputs.release_be }}" = "true" ]; then
+              echo "- \`finyo-be:${{ needs.meta.outputs.version }}\`"
             fi
-            if [ "${{ needs.meta.outputs.release_ui }}" = "true" ]; then
-              echo "- \`finyo-ui:${{ needs.meta.outputs.version }}\`"
+            if [ "${{ needs.meta.outputs.release_fe }}" = "true" ]; then
+              echo "- \`finyo-fe:${{ needs.meta.outputs.version }}\`"
             fi
             echo ""
             echo "EOF"

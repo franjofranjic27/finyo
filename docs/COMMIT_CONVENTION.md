@@ -30,7 +30,7 @@ Use the most specific scope that applies. Omit the scope for cross-cutting chang
 
 | Scope | Path | When to use |
 |---|---|---|
-| `api` | `finyo-api/` | Spring Boot application code |
+| `api` | `finyo-be/` | Spring Boot application code |
 | `infra` | `compose.yml`, Dockerfile, deployment configs | Docker, docker-compose, infrastructure |
 | `config` | Root-level config files | Environment, build, or project-level config |
 | `ci` | `.github/workflows/` | GitHub Actions workflows, Dependabot |

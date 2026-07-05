@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: finyo-be
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/finyo}
+    username: ${DB_USERNAME:finyo}
+    password: ${DB_PASSWORD:finyo}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/finyo}
+          jwk-set-uri: ${KEYCLOAK_JWK_URI:http://localhost:8081/realms/finyo/protocol/openid-connect/certs}
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=900s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+finyo:
+  six:
+    base-url: ${SIX_API_BASE_URL:https://api.six-group.com/api/findata/v1}
+    api-key: ${SIX_API_KEY:}

@@ -12,11 +12,11 @@ finyo is organised as a single-module Maven project today, with a second module 
 
 ```
 finyo/
-├── finyo-api/          # Spring Boot REST API (active)
+├── finyo-be/          # Spring Boot REST API (active)
 └── (frontend TBD)      # Angular or React — not yet created
 ```
 
-## Layered Architecture (finyo-api)
+## Layered Architecture (finyo-be)
 
 ```
 Controller → Service → Repository → PostgreSQL
@@ -24,9 +24,9 @@ Controller → Service → Repository → PostgreSQL
 
 | Layer | Package | Responsibility |
 |---|---|---|
-| Controller | `ch.finyoapi.<feature>` | HTTP request handling, response mapping |
-| Service | `ch.finyoapi.<feature>` | Business logic |
-| Repository | `ch.finyoapi.<feature>` | Data access via Spring Data JPA |
+| Controller | `ch.finyo.<feature>` | HTTP request handling, response mapping |
+| Service | `ch.finyo.<feature>` | Business logic |
+| Repository | `ch.finyo.<feature>` | Data access via Spring Data JPA |
 | Database | PostgreSQL 17 | Persistence |
 
 ## Tech Stack
@@ -50,7 +50,7 @@ Controller → Service → Repository → PostgreSQL
 Schema is managed by Flyway migrations located in:
 
 ```
-finyo-api/src/main/resources/db/migration/
+finyo-be/src/main/resources/db/migration/
 ```
 
 Current migrations:
@@ -99,7 +99,7 @@ Spring Security is enabled. The following endpoints are publicly accessible with
 
 | Endpoint | Reason |
 |---|---|
-| `/hello-world` | Health/smoke-test endpoint |
+| `/actuator/health` | Health endpoint (Docker healthcheck, load balancers) |
 | `/swagger-ui/**` | Swagger UI assets |
 | `/swagger-ui.html` | Swagger UI entry point |
 | `/v3/api-docs/**` | OpenAPI spec |
@@ -110,4 +110,4 @@ All other endpoints require authentication.
 
 When the frontend module is decided (Angular or React), it will be added as a second module
 under the repo root and documented here. The architecture section will be updated to describe
-how the frontend communicates with `finyo-api`.
+how the frontend communicates with `finyo-be`.

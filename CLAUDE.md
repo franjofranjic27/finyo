@@ -21,8 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Workflows in `.github/workflows/`:
 
 - **ci.yml** — active; backend (`./mvnw verify`) + frontend (lint, vitest, build) on PRs and pushes to `main`
-- **sonar.yml** — active; SonarCloud analysis for backend (`franjofranjic27_finyo`, JaCoCo) and frontend (`franjofranjic27_finyo-ui`, LCOV) on push to `main`, PRs and manually (`workflow_dispatch`); requires `SONAR_TOKEN`
-- **release.yml** — active; on tag push builds Docker images and publishes to Docker Hub plus a GitHub release. Tags: `v1.2.3` (both), `api-v1.2.3` (backend only), `ui-v1.2.3` (frontend only); requires `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
+- **sonar.yml** — active; SonarCloud analysis for backend (`franjofranjic27_finyo`, JaCoCo) and frontend (`franjofranjic27_finyo-fe`, LCOV) on push to `main`, PRs and manually (`workflow_dispatch`); requires `SONAR_TOKEN`
+- **release.yml** — active; on tag push builds Docker images and publishes to Docker Hub plus a GitHub release. Tags: `v1.2.3` (both), `be-v1.2.3` (backend only), `fe-v1.2.3` (frontend only); requires `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
 
 ## Build & Run
 
@@ -49,19 +49,19 @@ Host ports (5432/8080/3000 are occupied by another local project):
 
 ### Run the API locally (outside Docker)
 ```bash
-cd finyo-api
+cd finyo-be
 ./mvnw spring-boot:run
 ```
 
 ### Verify
 ```bash
-curl http://localhost:8082/hello-world
-# Expected: Hello, I'm finyo!
+curl http://localhost:8082/actuator/health
+# Expected: {"status":"UP"}
 ```
 
 ### Run tests
 ```bash
-cd finyo-api
+cd finyo-be
 ./mvnw test
 ```
 
@@ -78,7 +78,7 @@ All commits in this repository MUST follow this format:
 **Types:** `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`, `build`
 
 **Scopes** (use the most specific one that applies):
-- `api`    — Spring Boot application (`finyo-api/`)
+- `api`    — Spring Boot application (`finyo-be/`)
 - `infra`  — Docker, docker-compose, deployment configs
 - `config` — Environment, build, or project-level config
 - `ci`     — GitHub Actions workflows, dependabot

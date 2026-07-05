@@ -20,12 +20,12 @@ The project is in early development — the API foundation is in place and growi
 docker compose up -d
 
 # 2. Start the API
-cd finyo-api
+cd finyo-be
 ./mvnw spring-boot:run
 
 # 3. Verify
-curl http://localhost:8080/hello-world
-# Expected: Hello, I'm finyo!
+curl http://localhost:8080/actuator/health
+# Expected: {"status":"UP"}
 ```
 
 API docs are available at `http://localhost:8080/swagger-ui.html` once the app is running.

@@ -18,11 +18,11 @@ on:
 jobs:
   backend:
     if: github.actor != 'dependabot[bot]'
-    name: Backend — Sonar (finyo-api)
+    name: Backend — Sonar (finyo-be)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: finyo-api
+        working-directory: finyo-be
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,7 +52,7 @@ jobs:
 
   frontend:
     if: github.actor != 'dependabot[bot]'
-    name: Frontend — Sonar (finyo-ui)
+    name: Frontend — Sonar (finyo-fe)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,14 +64,14 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: finyo-ui/package-lock.json
+          cache-dependency-path: finyo-fe/package-lock.json
 
       - name: Install dependencies
-        working-directory: finyo-ui
+        working-directory: finyo-fe
         run: npm ci
 
       - name: Unit tests with coverage (LCOV)
-        working-directory: finyo-ui
+        working-directory: finyo-fe
         run: npm run coverage
 
       - name: SonarCloud scan
@@ -79,4 +79,4 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          projectBaseDir: finyo-ui
+          projectBaseDir: finyo-fe

@@ -51,11 +51,11 @@ Run the same checks locally before pushing to avoid waiting for CI:
 
 ```bash
 # Equivalent to ci.yml
-cd finyo-api
+cd finyo-be
 ./mvnw verify
 
 # Equivalent to sonar.yml (requires SONAR_TOKEN set in environment)
-cd finyo-api
+cd finyo-be
 mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
   -Dsonar.projectKey=franjofranjic27_finyo
 ```

@@ -1,7 +1,7 @@
 # Testing Notes — Devil's Advocate Analysis
 
 This document captures security concerns, missing validations, and edge cases
-identified while reviewing the finyo-api codebase for testability. It is
+identified while reviewing the finyo-be codebase for testability. It is
 intended for contributors implementing new features, so they can write tests
 that catch real bugs rather than only exercising happy paths.
 

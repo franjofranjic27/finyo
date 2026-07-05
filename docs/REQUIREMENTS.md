@@ -75,7 +75,7 @@ Roles are defined in the Keycloak realm and propagated via the JWT `realm_access
 
 ### Realm
 
-A single Keycloak realm named `finyo` with one client `finyo-api`.
+A single Keycloak realm named `finyo` with one client `finyo-be`.
 OIDC authorization code flow with PKCE for the React frontend.
 Client-credentials flow for the CLI (Spring Shell).
 
@@ -490,7 +490,7 @@ MVP is read-only; sources are pre-configured.
 #### Data Flow
 
 ```
-RSS Source → finyo-api (RSS parser + cache) → REST endpoint → React widget
+RSS Source → finyo-be (RSS parser + cache) → REST endpoint → React widget
 ```
 
 The backend parses RSS/Atom feeds server-side. The frontend never calls external
@@ -522,19 +522,19 @@ sources directly — this avoids CORS issues and allows caching.
 
 ```
 finyo/
-├── finyo-api/          # Spring Boot REST API (Java 25, Maven)
-├── finyo-ui/           # React frontend (Vite, TypeScript)
+├── finyo-be/          # Spring Boot REST API (Java 25, Maven)
+├── finyo-fe/           # React frontend (Vite, TypeScript)
 ├── compose.yml         # Full-stack local development + production compose
 ├── docs/               # Architecture, requirements, testing, workflows
 └── .github/workflows/  # CI/CD pipelines
 ```
 
-### 5.2 Backend — finyo-api
+### 5.2 Backend — finyo-be
 
 **Package structure:**
 
 ```
-ch.finyoapi/
+ch.finyo/
 ├── transaction/        # Transactions, accounts, categories
 ├── analytics/          # Spending summaries and chart data
 ├── budget/             # Budget planning
@@ -566,7 +566,7 @@ ch.finyoapi/
 | `springdoc-openapi` | Already present — OpenAPI docs |
 | `micrometer` | Metrics (for future monitoring) |
 
-### 5.3 Frontend — finyo-ui
+### 5.3 Frontend — finyo-fe
 
 **Stack:**
 
@@ -609,8 +609,8 @@ ch.finyoapi/
 |---|---|---|---|
 | `postgres` | `postgres:17` | 5432 | Primary database |
 | `keycloak` | `quay.io/keycloak/keycloak:26` | 8081 | Auth server |
-| `finyo-api` | `finyo-api:latest` (built locally) | 8080 | Spring Boot API |
-| `finyo-ui` | `finyo-ui:latest` (built locally) | 3000 | React frontend |
+| `finyo-be` | `finyo-be:latest` (built locally) | 8080 | Spring Boot API |
+| `finyo-fe` | `finyo-fe:latest` (built locally) | 3000 | React frontend |
 
 Keycloak is bootstrapped with an import of a pre-configured `finyo-realm.json`
 (realm, client, roles) so that `docker compose up` results in a fully working stack
@@ -691,8 +691,8 @@ The spec is generated automatically by SpringDoc.
 | Setting | Value |
 |---|---|
 | Realm | `finyo` |
-| Client | `finyo-api` (confidential, resource server) |
-| Client | `finyo-ui` (public, PKCE) |
+| Client | `finyo-be` (confidential, resource server) |
+| Client | `finyo-fe` (public, PKCE) |
 | Roles (realm-level) | `ROLE_USER`, `ROLE_ADMIN` |
 | Token lifespan | Access: 5 min, Refresh: 30 min |
 | HTTPS | Required in production; HTTP allowed for local dev |
@@ -758,7 +758,7 @@ Shadcn/UI components used as the base. Custom finyo components built on top:
 
 ### Playwright Tests
 
-Tests live in `finyo-ui/e2e/` and cover critical user flows:
+Tests live in `finyo-fe/e2e/` and cover critical user flows:
 
 | Test | Flow |
 |---|---|
@@ -840,7 +840,7 @@ admin
 
 ## 10. Testing Strategy
 
-### Backend (finyo-api)
+### Backend (finyo-be)
 
 Follows the conventions established in `docs/TESTING.md`:
 
@@ -859,7 +859,7 @@ Follows the conventions established in `docs/TESTING.md`:
 - CLI: integration tests using Spring Shell's test support
 - Security: integration tests verifying that endpoints reject missing/invalid tokens
 
-### Frontend (finyo-ui)
+### Frontend (finyo-fe)
 
 | Type | Tool | Scope |
 |---|---|---|
@@ -892,7 +892,7 @@ Existing workflows remain unchanged. New additions:
 
 | Scope | Path | When to use |
 |---|---|---|
-| `ui` | `finyo-ui/` | React frontend code |
+| `ui` | `finyo-fe/` | React frontend code |
 | `auth` | Keycloak config, realm JSON, security config | Auth-related changes |
 | `tax` | Tax engine, rate tables | Tax calculation changes |
 | `cli` | Spring Shell commands | CLI changes |
@@ -905,8 +905,8 @@ Existing workflows remain unchanged. New additions:
 
 ```bash
 docker compose up -d      # Start Postgres + Keycloak
-cd finyo-api && ./mvnw spring-boot:run
-cd finyo-ui && npm run dev
+cd finyo-be && ./mvnw spring-boot:run
+cd finyo-fe && npm run dev
 ```
 
 ### Full Stack via Docker Compose
@@ -917,8 +917,8 @@ Target: `docker compose up` starts everything with zero manual steps.
 # compose.yml services:
 postgres:    # PostgreSQL 17
 keycloak:    # Keycloak 26, realm imported from finyo-realm.json
-finyo-api:   # Spring Boot jar (built by ./mvnw package)
-finyo-ui:    # Nginx serving Vite production build
+finyo-be:   # Spring Boot jar (built by ./mvnw package)
+finyo-fe:    # Nginx serving Vite production build
 ```
 
 **Keycloak bootstrap**: Realm is imported on first start via
@@ -1023,7 +1023,7 @@ overview. Everything else is labelled "post-MVP" in this document.
 
 ### Phase 7 — Frontend
 
-1. Bootstrap `finyo-ui` with Vite + React + TypeScript + Tailwind + Shadcn/UI
+1. Bootstrap `finyo-fe` with Vite + React + TypeScript + Tailwind + Shadcn/UI
 2. OIDC auth flow (oidc-client-ts)
 3. API client layer (TanStack Query)
 4. i18n setup (react-i18next, EN + DE)

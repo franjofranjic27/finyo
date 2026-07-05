@@ -17,7 +17,7 @@ git config core.hooksPath .githooks
 docker compose up -d
 
 # 4. Verify your setup
-cd finyo-api
+cd finyo-be
 ./mvnw verify
 ```
 
@@ -41,8 +41,8 @@ Examples: `feat/transaction-listing`, `fix/budget-calculator-empty-response`
 **Making changes**
 
 1. Create a branch from `main`
-2. Make your changes in `finyo-api/`
-3. Run `./mvnw verify` from `finyo-api/` — this runs unit and integration tests
+2. Make your changes in `finyo-be/`
+3. Run `./mvnw verify` from `finyo-be/` — this runs unit and integration tests
 4. Push and open a pull request against `main`
 
 ## Commits

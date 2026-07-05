@@ -30,14 +30,14 @@
 ./mvnw failsafe:integration-test
 ```
 
-All commands must be run from the `finyo-api/` directory (or use `-f finyo-api/pom.xml` from the root).
+All commands must be run from the `finyo-be/` directory (or use `-f finyo-be/pom.xml` from the root).
 
 ## TestContainers Setup
 
 Integration tests do not require a locally running PostgreSQL instance. TestContainers
 pulls and manages the `postgres:17` Docker image automatically.
 
-The test profile is activated via `finyo-api/src/test/resources/application-test.yaml`.
+The test profile is activated via `finyo-be/src/test/resources/application-test.yaml`.
 It configures the datasource to connect to the TestContainers-managed instance.
 
 **Requirement:** Docker must be running when executing integration tests.
@@ -60,16 +60,16 @@ See [WORKFLOWS.md](WORKFLOWS.md) for CI details.
 
 | Type | Suffix | Example |
 |---|---|---|
-| Unit test | `*Test` | `HelloWorldServiceTest` |
-| Integration test | `*IT` | `FinyoApiApplicationIT` |
+| Unit test | `*Test` | `TaxCalculationServiceTest` |
+| Integration test | `*IT` | `FinyoApplicationIT` |
 
 **Package structure**
 
 Test classes mirror the main source tree:
 
 ```
-src/main/java/ch/finyoapi/helloworld/HelloWorldService.java
-src/test/java/ch/finyoapi/helloworld/HelloWorldServiceTest.java
+src/main/java/ch/finyo/tax/TaxCalculationService.java
+src/test/java/ch/finyo/tax/TaxCalculationServiceTest.java
 ```
 
 **Integration tests**

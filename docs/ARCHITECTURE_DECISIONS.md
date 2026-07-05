@@ -26,7 +26,7 @@ This document records key architectural decisions made for the finyo project, in
 
 **Rationale:**
 - **Keycloak is production-ready out of the box.** It ships with a UI for user and role management, brute-force protection, password reset, and session management — features that would each require bespoke development with Spring Authorization Server.
-- **Multi-client support.** The realm JSON defines `finyo-ui` (public client, PKCE, standard flow) and `finyo-cli` (confidential client, service accounts) as first-class concepts without custom code.
+- **Multi-client support.** The realm JSON defines `finyo-fe` (public client, PKCE, standard flow) and `finyo-cli` (confidential client, service accounts) as first-class concepts without custom code.
 - **PKCE enforcement per client.** Keycloak 26 supports `pkce.code.challenge.method: S256` as a client attribute, enforcing PKCE at the authorization-server level rather than relying on the SPA to opt in.
 - **Spring Authorization Server** was considered but rejected: it requires significant custom code to implement a user store, consent screens, and role management, which is not the core product value.
 
