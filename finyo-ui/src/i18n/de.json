@@ -1,14 +1,12 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "transactions": "Transaktionen",
-    "budget": "Budget",
-    "savings": "Sparziele",
     "investments": "Investitionen",
     "tax": "Steuerrechner",
     "insurance": "Versicherungen",
-    "news": "Nachrichten",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "collapseSidebar": "Seitenleiste einklappen",
+    "expandSidebar": "Seitenleiste ausklappen"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -17,42 +15,7 @@
     "totalIncome": "Gesamteinkommen",
     "biggestCategory": "Grösste Kategorie",
     "spendingByCategory": "Ausgaben nach Kategorie",
-    "monthlyOverview": "Monatsübersicht",
-    "recentTransactions": "Letzte Transaktionen",
-    "activeBudgets": "Aktive Budgets",
-    "savingsGoals": "Sparziele"
-  },
-  "transactions": {
-    "title": "Transaktionen",
-    "addTransaction": "Transaktion hinzufügen",
-    "importCsv": "CSV importieren",
-    "amount": "Betrag",
-    "date": "Datum",
-    "description": "Beschreibung",
-    "category": "Kategorie",
-    "account": "Konto",
-    "source": "Quelle",
-    "noTransactions": "Keine Transaktionen gefunden",
-    "confirmDelete": "Möchten Sie diese Transaktion wirklich löschen?"
-  },
-  "budget": {
-    "title": "Budget",
-    "addBudget": "Budget hinzufügen",
-    "monthlyBudget": "Monatsbudget",
-    "spent": "Ausgegeben",
-    "remaining": "Verbleibend",
-    "noBudgets": "Noch keine Budgets definiert",
-    "overBudget": "Budget überschritten"
-  },
-  "savings": {
-    "title": "Sparziele",
-    "addGoal": "Ziel hinzufügen",
-    "targetAmount": "Zielbetrag",
-    "currentAmount": "Aktueller Betrag",
-    "targetDate": "Zieldatum",
-    "progress": "Fortschritt",
-    "monthlyRequired": "Monatlich erforderlich",
-    "noGoals": "Noch keine Sparziele"
+    "monthlyOverview": "Monatsübersicht"
   },
   "investments": {
     "title": "Portfolio",
@@ -103,11 +66,6 @@
     "typicalCost": "Typische jährliche Kosten",
     "compare": "Vergleichen"
   },
-  "news": {
-    "title": "Finanznachrichten",
-    "readMore": "Mehr lesen",
-    "noNews": "Keine Nachrichten verfügbar"
-  },
   "common": {
     "save": "Speichern",
     "cancel": "Abbrechen",
@@ -122,5 +80,13 @@
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus",
     "language": "Sprache"
+  },
+  "auth": {
+    "redirecting": "Anmeldung wird geladen …",
+    "loginFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "retryLogin": "Erneut anmelden",
+    "accessDeniedTitle": "Zugriff verweigert",
+    "accessDeniedText": "Dein Konto hat nicht die erforderliche Rolle, um finyo zu verwenden. Bitte wende dich an den Administrator.",
+    "logout": "Abmelden"
   }
 }

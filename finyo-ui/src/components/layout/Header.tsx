@@ -16,13 +16,9 @@ import { useAuth } from '@/auth/useAuth';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'nav.dashboard',
-  '/transactions': 'nav.transactions',
-  '/budget': 'nav.budget',
-  '/savings': 'nav.savings',
   '/investments': 'nav.investments',
   '/tax': 'nav.tax',
   '/insurance': 'nav.insurance',
-  '/news': 'nav.news',
   '/settings': 'nav.settings',
 };
 

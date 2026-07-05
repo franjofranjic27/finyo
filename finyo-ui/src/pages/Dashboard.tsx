@@ -16,16 +16,11 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Wallet, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/auth/useAuth';
 import { analyticsApi } from '@/api/analytics';
-import { transactionsApi } from '@/api/transactions';
-import { budgetsApi } from '@/api/budgets';
-import { savingsApi } from '@/api/savings';
-import { formatCHF, formatDate, amountColour } from '@/lib/formatters';
-import type { CategoryBreakdown, MonthlyDataPoint, BudgetStatus, SavingsGoal, Transaction } from '@/types';
+import { formatCHF, amountColour } from '@/lib/formatters';
+import type { CategoryBreakdown, MonthlyDataPoint } from '@/types';
 
 const CHART_COLOURS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#e0e7ff'];
 
@@ -142,56 +137,6 @@ function MonthlyBarChart({ data }: { data: MonthlyDataPoint[] }) {
   );
 }
 
-function BudgetRow({ budget }: { budget: BudgetStatus }) {
-  const pct = Math.min(budget.percentageUsed, 100);
-  const over = budget.percentageUsed > 100;
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="font-medium">{budget.categoryName}</span>
-        <span className={over ? 'text-red-500 font-semibold' : 'text-muted-foreground'}>
-          {formatCHF(budget.spent)} / {formatCHF(budget.amount)}
-        </span>
-      </div>
-      <Progress
-        value={pct}
-        className={over ? '[&>div]:bg-red-500' : '[&>div]:bg-indigo-500'}
-      />
-    </div>
-  );
-}
-
-function GoalRow({ goal }: { goal: SavingsGoal }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="font-medium">{goal.name}</span>
-        <span className="text-muted-foreground">
-          {formatCHF(goal.currentAmount)} / {formatCHF(goal.targetAmount)}
-        </span>
-      </div>
-      <Progress value={Math.min(goal.progressPercentage, 100)} className="[&>div]:bg-emerald-500" />
-    </div>
-  );
-}
-
-function TransactionRow({ tx, lang }: { tx: Transaction; lang: string }) {
-  const amount = parseFloat(tx.amount);
-  return (
-    <div className="flex items-center justify-between py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{tx.description ?? tx.categoryName ?? '—'}</p>
-        <p className="text-xs text-muted-foreground">
-          {tx.accountName} · {formatDate(tx.date, lang)}
-        </p>
-      </div>
-      <span className={`ml-4 shrink-0 text-sm font-semibold ${amountColour(amount)}`}>
-        {formatCHF(amount)}
-      </span>
-    </div>
-  );
-}
-
 // --- Demo / placeholder data used when backend is offline ---
 
 const DEMO_SUMMARY = {
@@ -221,68 +166,10 @@ const DEMO_MONTHLY: MonthlyDataPoint[] = [
   { year: 2026, month: 2, expenses: '-3240', income: '7500', net: '4260' },
 ];
 
-const DEMO_BUDGETS: BudgetStatus[] = [
-  {
-    id: '1', categoryId: '1', categoryName: 'Groceries', categoryColor: '#6366f1',
-    amount: '900', period: 'MONTHLY', validFrom: '2026-02-01',
-    spent: '820', remaining: '80', percentageUsed: 91,
-  },
-  {
-    id: '2', categoryId: '3', categoryName: 'Dining', categoryColor: '#8b5cf6',
-    amount: '400', period: 'MONTHLY', validFrom: '2026-02-01',
-    spent: '560', remaining: '-160', percentageUsed: 140,
-  },
-  {
-    id: '3', categoryId: '4', categoryName: 'Entertainment', categoryColor: '#a78bfa',
-    amount: '500', period: 'MONTHLY', validFrom: '2026-02-01',
-    spent: '310', remaining: '190', percentageUsed: 62,
-  },
-];
-
-const DEMO_GOALS: SavingsGoal[] = [
-  {
-    id: '1', name: 'Emergency Fund', targetAmount: '20000', currentAmount: '14500',
-    archived: false, progressPercentage: 72.5,
-  },
-  {
-    id: '2', name: 'Vacation 2026', targetAmount: '5000', currentAmount: '2100',
-    targetDate: '2026-07-01', archived: false, progressPercentage: 42,
-    monthlyRequired: '387',
-  },
-];
-
-const DEMO_TRANSACTIONS: Transaction[] = [
-  {
-    id: '1', amount: '-89.50', currency: 'CHF', date: '2026-02-24',
-    description: 'Migros Zürich', categoryName: 'Groceries',
-    accountId: 'acc1', accountName: 'UBS Checking', source: 'MANUAL', createdAt: '2026-02-24T10:00:00Z',
-  },
-  {
-    id: '2', amount: '-12.40', currency: 'CHF', date: '2026-02-23',
-    description: 'SBB Tageskarte', categoryName: 'Transport',
-    accountId: 'acc1', accountName: 'UBS Checking', source: 'MANUAL', createdAt: '2026-02-23T08:30:00Z',
-  },
-  {
-    id: '3', amount: '7500.00', currency: 'CHF', date: '2026-02-22',
-    description: 'Salary February', categoryName: 'Income',
-    accountId: 'acc1', accountName: 'UBS Checking', source: 'MANUAL', createdAt: '2026-02-22T00:00:00Z',
-  },
-  {
-    id: '4', amount: '-45.00', currency: 'CHF', date: '2026-02-21',
-    description: 'Restaurant Zum Goldenen', categoryName: 'Dining',
-    accountId: 'acc1', accountName: 'UBS Checking', source: 'MANUAL', createdAt: '2026-02-21T19:45:00Z',
-  },
-  {
-    id: '5', amount: '-210.00', currency: 'CHF', date: '2026-02-20',
-    description: 'Swisscom Internet', categoryName: 'Utilities',
-    accountId: 'acc1', accountName: 'UBS Checking', source: 'CSV_IMPORT', createdAt: '2026-02-20T00:00:00Z',
-  },
-];
-
 // --- Main Dashboard component ---
 
 export function Dashboard() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
 
   const token = accessToken ?? '';
@@ -308,33 +195,9 @@ export function Dashboard() {
     placeholderData: DEMO_MONTHLY,
   });
 
-  const { data: budgetStatus, isLoading: loadingBudgets } = useQuery({
-    queryKey: ['budgets', 'status'],
-    queryFn: () => budgetsApi.getStatus(token),
-    enabled: !!token,
-    placeholderData: DEMO_BUDGETS,
-  });
-
-  const { data: goals, isLoading: loadingGoals } = useQuery({
-    queryKey: ['savings-goals'],
-    queryFn: () => savingsApi.getAll(token),
-    enabled: !!token,
-    placeholderData: DEMO_GOALS,
-  });
-
-  const { data: recentTxs, isLoading: loadingTxs } = useQuery({
-    queryKey: ['transactions', 'recent'],
-    queryFn: () => transactionsApi.getRecent(token, 5),
-    enabled: !!token,
-    placeholderData: DEMO_TRANSACTIONS,
-  });
-
   const summaryData = summary ?? DEMO_SUMMARY;
   const categoriesData = categories ?? DEMO_CATEGORIES;
   const monthlyData = monthly ?? DEMO_MONTHLY;
-  const budgetsData = budgetStatus ?? DEMO_BUDGETS;
-  const goalsData = (goals ?? DEMO_GOALS).filter((g) => !g.archived);
-  const txsData = recentTxs ?? DEMO_TRANSACTIONS;
 
   const biggestCategory = categoriesData.reduce<CategoryBreakdown | null>((acc, c) => {
     if (!acc || Math.abs(parseFloat(c.total)) > Math.abs(parseFloat(acc.total))) return c;
@@ -404,60 +267,6 @@ export function Dashboard() {
               <Skeleton className="h-64 w-full" />
             ) : (
               <MonthlyBarChart data={monthlyData} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bottom row */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Recent transactions */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">{t('dashboard.recentTransactions')}</CardTitle>
-          </CardHeader>
-          <CardContent className="divide-y">
-            {loadingTxs
-              ? Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="py-2 space-y-1">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-28" />
-                  </div>
-                ))
-              : txsData.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} lang={i18n.language} />
-                ))}
-          </CardContent>
-        </Card>
-
-        {/* Active budgets */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">{t('dashboard.activeBudgets')}</CardTitle>
-            <Badge variant="secondary">{budgetsData.length}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loadingBudgets
-              ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
-              : budgetsData.map((b) => <BudgetRow key={b.id} budget={b} />)}
-            {!loadingBudgets && budgetsData.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t('budget.noBudgets')}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Savings goals */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">{t('dashboard.savingsGoals')}</CardTitle>
-            <Badge variant="secondary">{goalsData.length}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loadingGoals
-              ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
-              : goalsData.map((g) => <GoalRow key={g.id} goal={g} />)}
-            {!loadingGoals && goalsData.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t('savings.noGoals')}</p>
             )}
           </CardContent>
         </Card>

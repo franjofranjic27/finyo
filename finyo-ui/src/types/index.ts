@@ -33,31 +33,6 @@ export interface Category {
   type: CategoryType;
 }
 
-// Transaction types
-export type TransactionSource = 'MANUAL' | 'CSV_IMPORT';
-
-export interface Transaction {
-  id: string;
-  amount: string;
-  currency: string;
-  date: string;
-  description?: string;
-  categoryId?: string;
-  categoryName?: string;
-  accountId: string;
-  accountName: string;
-  source: TransactionSource;
-  createdAt: string;
-}
-
-export interface TransactionPage {
-  content: Transaction[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
-}
-
 // Analytics types
 export type TimeRange =
   | 'LAST_7_DAYS'
@@ -91,39 +66,6 @@ export interface MonthlyDataPoint {
   expenses: string;
   income: string;
   net: string;
-}
-
-// Budget types
-export interface Budget {
-  id: string;
-  categoryId: string;
-  categoryName: string;
-  categoryColor?: string;
-  amount: string;
-  period: 'MONTHLY' | 'WEEKLY';
-  validFrom: string;
-  validUntil?: string;
-}
-
-export interface BudgetStatus extends Budget {
-  spent: string;
-  remaining: string;
-  percentageUsed: number;
-}
-
-// Savings goal types
-export interface SavingsGoal {
-  id: string;
-  name: string;
-  targetAmount: string;
-  currentAmount: string;
-  targetDate?: string;
-  accountId?: string;
-  icon?: string;
-  color?: string;
-  archived: boolean;
-  progressPercentage: number;
-  monthlyRequired?: string;
 }
 
 // Investment types
