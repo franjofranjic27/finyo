@@ -7,7 +7,7 @@ import ch.finyoapi.account.Account;
 import ch.finyoapi.category.Category;
 import ch.finyoapi.category.CategoryRepository;
 import ch.finyoapi.category.CategoryType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -214,7 +214,7 @@ class TransactionEdgeCaseIT extends BaseIntegrationTest {
         mockMvc.perform(get("/api/v1/transactions").with(asUser()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalElements", is(1)))
-            .andExpect(jsonPath("$.items[0].amount", is(100.00)));
+            .andExpect(jsonPath("$.content[0].amount", is(100.00)));
     }
 
     // =========================================================================

@@ -22,6 +22,9 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
 
+    // readOnly transaction keeps the session open while lazy account/category
+    // proxies are resolved during DTO mapping (open-in-view is disabled)
+    @Transactional(readOnly = true)
     public TransactionPageResponse getAll(String userId, LocalDate from, LocalDate to, Pageable pageable) {
         Page<Transaction> page;
         if (from != null && to != null) {
@@ -38,6 +41,7 @@ public class TransactionService {
         );
     }
 
+    @Transactional(readOnly = true)
     public TransactionResponse getById(UUID id, String userId) {
         return transactionRepository.findByIdAndUserId(id, userId)
                 .map(TransactionResponse::from)

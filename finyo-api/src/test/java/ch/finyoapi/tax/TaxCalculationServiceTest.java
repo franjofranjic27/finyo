@@ -14,6 +14,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -109,7 +110,8 @@ class TaxCalculationServiceTest {
                 .thenReturn(List.of(federalBracketA));
         when(cantonRateRepository.findByTaxYearAndCantonCodeAndTariffOrderByIncomeFromAsc(anyInt(), anyString(), anyString()))
                 .thenReturn(List.of(cantonBracketA));
-        when(communeMultiplierRepository.findByTaxYearAndBfsNumber(anyInt(), anyInt()))
+        // only invoked when the request carries a BFS number — lenient to avoid UnnecessaryStubbing
+        lenient().when(communeMultiplierRepository.findByTaxYearAndBfsNumber(anyInt(), anyInt()))
                 .thenReturn(Optional.empty());
     }
 
@@ -118,7 +120,8 @@ class TaxCalculationServiceTest {
                 .thenReturn(List.of(federalBracketB));
         when(cantonRateRepository.findByTaxYearAndCantonCodeAndTariffOrderByIncomeFromAsc(anyInt(), anyString(), anyString()))
                 .thenReturn(List.of(cantonBracketB));
-        when(communeMultiplierRepository.findByTaxYearAndBfsNumber(anyInt(), anyInt()))
+        // only invoked when the request carries a BFS number — lenient to avoid UnnecessaryStubbing
+        lenient().when(communeMultiplierRepository.findByTaxYearAndBfsNumber(anyInt(), anyInt()))
                 .thenReturn(Optional.empty());
     }
 

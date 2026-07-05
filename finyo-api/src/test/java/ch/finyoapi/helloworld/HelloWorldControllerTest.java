@@ -3,7 +3,7 @@ package ch.finyoapi.helloworld;
 import ch.finyoapi.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * HelloWorldService is mocked so the test has no database dependency.
  */
 @WebMvcTest(HelloWorldController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, ch.finyoapi.auth.UserProvisioningFilter.class})
 class HelloWorldControllerTest {
 
     @Autowired
@@ -47,10 +47,11 @@ class HelloWorldControllerTest {
     @MockitoBean
     private HelloWorldService helloWorldService;
 
-    // UserProvisioningFilter is registered in the security filter chain and
-    // depends on UserProvisioningService → must be stubbed in the slice.
+    // The real UserProvisioningFilter runs in the chain (imported above); its
+    // service dependency is mocked — a mocked *filter* would never call
+    // chain.doFilter and every request would short-circuit to an empty 200.
     @MockitoBean
-    private ch.finyoapi.auth.UserProvisioningFilter userProvisioningFilter;
+    private ch.finyoapi.auth.UserProvisioningService userProvisioningService;
 
     // -------------------------------------------------------------------------
     // Happy-path: verify response body and status

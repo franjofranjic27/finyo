@@ -5,7 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -35,8 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * NOT permit-all in SecurityConfig. Tests that hit these endpoints therefore
  * supply a jwt() post-processor to avoid a 401 masking the real assertion.
  */
-@WebMvcTest({GlobalExceptionHandler.class, GlobalExceptionHandlerTest.TestController.class})
-@Import(SecurityConfig.class)
+@WebMvcTest(GlobalExceptionHandler.class)
+@Import({SecurityConfig.class, ch.finyoapi.auth.UserProvisioningFilter.class,
+        GlobalExceptionHandlerTest.TestController.class})
 class GlobalExceptionHandlerTest {
 
     @Autowired
@@ -45,9 +46,11 @@ class GlobalExceptionHandlerTest {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
-    // UserProvisioningFilter is part of the filter chain registered in SecurityConfig.
+    // The real UserProvisioningFilter runs in the chain (imported above); its
+    // service dependency is mocked — a mocked *filter* would never call
+    // chain.doFilter and every request would short-circuit to an empty 200.
     @MockitoBean
-    private ch.finyoapi.auth.UserProvisioningFilter userProvisioningFilter;
+    private ch.finyoapi.auth.UserProvisioningService userProvisioningService;
 
     // -------------------------------------------------------------------------
     // Minimal fake controller — exercises every exception handler branch
