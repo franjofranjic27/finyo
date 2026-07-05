@@ -3,18 +3,36 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
+
+const SIDEBAR_COLLAPSED_KEY = 'finyo.sidebar.collapsed';
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+  );
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!prev));
+      return !prev;
+    });
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop sidebar — fixed, always visible */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:border-r lg:shrink-0">
-        <Sidebar />
+      {/* Desktop sidebar — collapsible to an icon-only rail */}
+      <aside
+        className={cn(
+          'hidden lg:flex lg:flex-col lg:shrink-0 lg:border-r transition-[width] duration-200',
+          collapsed ? 'lg:w-16' : 'lg:w-60'
+        )}
+      >
+        <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </aside>
 
-      {/* Mobile sidebar — slide-in sheet */}
+      {/* Mobile sidebar — slide-in sheet (never collapsed) */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-60 p-0">
           <Sidebar onClose={() => setMobileOpen(false)} />
