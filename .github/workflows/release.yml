@@ -1,0 +1,143 @@
+name: Release
+
+# Tag conventions:
+#   v1.2.3      → release BOTH images (finyo-api + finyo-ui)
+#   api-v1.2.3  → release only the backend image
+#   ui-v1.2.3   → release only the frontend image
+#
+# Required repository secrets:
+#   DOCKERHUB_USERNAME — Docker Hub account name (also used as image namespace)
+#   DOCKERHUB_TOKEN    — Docker Hub access token with write scope
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'api-v*.*.*'
+      - 'ui-v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    name: Parse release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      release_api: ${{ steps.parse.outputs.release_api }}
+      release_ui: ${{ steps.parse.outputs.release_ui }}
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in
+            api-v*)
+              echo "version=${TAG#api-v}" >> "$GITHUB_OUTPUT"
+              echo "release_api=true"     >> "$GITHUB_OUTPUT"
+              echo "release_ui=false"     >> "$GITHUB_OUTPUT"
+              ;;
+            ui-v*)
+              echo "version=${TAG#ui-v}"  >> "$GITHUB_OUTPUT"
+              echo "release_api=false"    >> "$GITHUB_OUTPUT"
+              echo "release_ui=true"      >> "$GITHUB_OUTPUT"
+              ;;
+            v*)
+              echo "version=${TAG#v}"     >> "$GITHUB_OUTPUT"
+              echo "release_api=true"     >> "$GITHUB_OUTPUT"
+              echo "release_ui=true"      >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+  docker-api:
+    name: Build & push finyo-api image
+    needs: meta
+    if: needs.meta.outputs.release_api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: finyo-api
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-api:${{ needs.meta.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-api:latest
+          cache-from: type=gha,scope=finyo-api
+          cache-to: type=gha,scope=finyo-api,mode=max
+
+  docker-ui:
+    name: Build & push finyo-ui image
+    needs: meta
+    if: needs.meta.outputs.release_ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: finyo-ui
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-ui:${{ needs.meta.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/finyo-ui:latest
+          cache-from: type=gha,scope=finyo-ui
+          cache-to: type=gha,scope=finyo-ui,mode=max
+
+  github-release:
+    name: Create GitHub release
+    needs: [meta, docker-api, docker-ui]
+    # run when everything that was supposed to run succeeded (skipped jobs are fine)
+    if: >-
+      ${{ !cancelled() &&
+          needs.meta.result == 'success' &&
+          (needs.docker-api.result == 'success' || needs.docker-api.result == 'skipped') &&
+          (needs.docker-ui.result == 'success' || needs.docker-ui.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose release summary
+        id: summary
+        run: |
+          {
+            echo "body<<EOF"
+            echo "## Docker Images"
+            if [ "${{ needs.meta.outputs.release_api }}" = "true" ]; then
+              echo "- \`finyo-api:${{ needs.meta.outputs.version }}\`"
+            fi
+            if [ "${{ needs.meta.outputs.release_ui }}" = "true" ]; then
+              echo "- \`finyo-ui:${{ needs.meta.outputs.version }}\`"
+            fi
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.summary.outputs.body }}
+          generate_release_notes: true

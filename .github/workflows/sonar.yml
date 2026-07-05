@@ -1,15 +1,24 @@
-name: SonarQube
+name: Sonar Analysis
+
+# Runs on every PR, on every push to main, and on demand via the
+# "Run workflow" button (workflow_dispatch). Two independent SonarCloud
+# projects are analysed: finyo backend and finyo frontend — both with
+# coverage reports (JaCoCo respectively LCOV).
+#
+# Required repository secret: SONAR_TOKEN
+
 on:
   push:
     branches:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 jobs:
-  build:
+  backend:
     if: github.actor != 'dependabot[bot]'
-    name: Build and analyze
+    name: Backend — Sonar (finyo-api)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,14 +42,41 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Build, test and analyze
+      - name: Build, test and analyze (JaCoCo coverage)
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=franjofranjic27_finyo
+        run: >-
+          ./mvnw -B verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.projectKey=franjofranjic27_finyo
+
+  frontend:
+    if: github.actor != 'dependabot[bot]'
+    name: Frontend — Sonar (finyo-ui)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: finyo-ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: finyo-ui
+        run: npm ci
+
+      - name: Unit tests with coverage (LCOV)
+        working-directory: finyo-ui
+        run: npm run coverage
+
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: finyo-ui

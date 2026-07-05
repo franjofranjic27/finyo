@@ -3,9 +3,12 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
 
 jobs:
-  build-and-test:
+  backend:
+    name: Backend — build & test
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
 
@@ -24,4 +27,49 @@ jobs:
           cache: 'maven'
 
       - name: Build and test
-        run: ./mvnw verify
+        run: ./mvnw -B verify
+
+      - name: Upload JaCoCo reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: finyo-api/target/site/jacoco*/jacoco.xml
+          retention-days: 7
+
+  frontend:
+    name: Frontend — lint, test & build
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: finyo-ui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: finyo-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (with coverage)
+        run: npm run coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-coverage
+          path: finyo-ui/coverage/lcov.info
+          retention-days: 7
