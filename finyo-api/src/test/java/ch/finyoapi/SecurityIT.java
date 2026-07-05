@@ -166,17 +166,23 @@ class SecurityIT extends BaseIntegrationTest {
     }
 
     @Test
-    void jwt_with_no_roles_claim_can_still_access_regular_protected_endpoint() throws Exception {
-        // A valid JWT with no roles should still be authenticated and reach
-        // the accounts list (the 404 or 200 doesn't matter, just not 401).
-        int status = mockMvc.perform(get("/api/v1/accounts").with(asUserWithNoRoles()))
+    void jwt_with_no_roles_claim_gets_403_on_regular_protected_endpoint() throws Exception {
+        // /api/** requires the "user" (or "admin") realm role — a valid token
+        // without any roles is authenticated but not authorised.
+        mockMvc.perform(get("/api/v1/accounts").with(asUserWithNoRoles()))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void jwt_with_user_role_can_access_regular_protected_endpoint() throws Exception {
+        int status = mockMvc.perform(get("/api/v1/accounts").with(asUser()))
             .andReturn()
             .getResponse()
             .getStatus();
 
         org.assertj.core.api.Assertions.assertThat(status)
-            .as("Authenticated token with no roles must not receive 401 for a non-admin endpoint")
-            .isNotEqualTo(401);
+            .as("Token with the user role must pass the authorisation layer")
+            .isNotIn(401, 403);
     }
 
     // -------------------------------------------------------------------------

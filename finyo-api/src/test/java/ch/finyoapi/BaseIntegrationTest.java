@@ -1,6 +1,6 @@
 package ch.finyoapi;
 
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -39,12 +39,16 @@ public abstract class BaseIntegrationTest {
      * The JWT carries a "user" realm role and a preferred_username claim.
      */
     protected org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor asUser() {
+        // authorities must be set explicitly: the jwt() post-processor bypasses
+        // the application's realm_access converter and would otherwise only
+        // grant SCOPE_* authorities derived from the scope claim.
         return jwt()
             .jwt(builder -> builder
                 .subject(TEST_USER_ID)
                 .claim("preferred_username", "testuser")
                 .claim("realm_access", Map.of("roles", List.of("user")))
-            );
+            )
+            .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_user"));
     }
 
     /**
@@ -57,7 +61,8 @@ public abstract class BaseIntegrationTest {
                 .subject(OTHER_USER_ID)
                 .claim("preferred_username", "otheruser")
                 .claim("realm_access", Map.of("roles", List.of("user")))
-            );
+            )
+            .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_user"));
     }
 
     /**
@@ -69,7 +74,10 @@ public abstract class BaseIntegrationTest {
                 .subject(ADMIN_USER_ID)
                 .claim("preferred_username", "adminuser")
                 .claim("realm_access", Map.of("roles", List.of("user", "admin")))
-            );
+            )
+            .authorities(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_user"),
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_admin"));
     }
 
     /**
