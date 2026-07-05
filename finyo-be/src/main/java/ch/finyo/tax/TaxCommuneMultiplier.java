@@ -31,4 +31,13 @@ public class TaxCommuneMultiplier {
 
     @Column(precision = 8, scale = 4, nullable = false)
     private BigDecimal multiplier;
+
+    @Column(name = "church_multiplier_protestant", precision = 8, scale = 4)
+    private BigDecimal churchMultiplierProtestant;
+
+    @Column(name = "church_multiplier_roman_catholic", precision = 8, scale = 4)
+    private BigDecimal churchMultiplierRomanCatholic;
+
+    @Column(name = "canton_multiplier", precision = 8, scale = 4)
+    private BigDecimal cantonMultiplier;
 }

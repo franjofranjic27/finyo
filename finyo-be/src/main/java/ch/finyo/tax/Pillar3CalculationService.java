@@ -108,14 +108,14 @@ public class Pillar3CalculationService {
 
             var inputWithout = new TaxInputRequest(
                     year, canton, null, cs,
-                    0, req.grossEmploymentIncome(),
+                    0, null, req.grossEmploymentIncome(),
                     null, null, null,
                     null, null, null, null,
                     BigDecimal.ZERO, null
             );
             var inputWith = new TaxInputRequest(
                     year, canton, null, cs,
-                    0, req.grossEmploymentIncome(),
+                    0, null, req.grossEmploymentIncome(),
                     null, null, null,
                     null, null, null, null,
                     contribution, null

@@ -14,6 +14,7 @@ public record TaxInputRequest(
         Integer bfsNumber,
         @NotNull TaxCivilStatus civilStatus,
         @Min(0) int numberOfChildren,
+        ChurchAffiliation churchAffiliation,
         @NotNull @DecimalMin("0") BigDecimal grossEmploymentIncome,
         BigDecimal selfEmploymentIncome,
         BigDecimal investmentIncome,

@@ -98,7 +98,7 @@ class TaxCalculationServiceTest {
     private TaxInputRequest minimalSingleRequest(BigDecimal grossIncome) {
         return new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, grossIncome,
+                0, null, grossIncome,
                 null, null, null,
                 null, null, null, null,
                 BigDecimal.ZERO, null
@@ -134,7 +134,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("60000"),
+                0, null, new BigDecimal("60000"),
                 new BigDecimal("10000"),
                 new BigDecimal("5000"),
                 new BigDecimal("3000"),
@@ -203,7 +203,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 new BigDecimal("6000"),   // user override
                 null, null, null, BigDecimal.ZERO, null
@@ -224,7 +224,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null,
                 new BigDecimal("5000"), null   // below 7 258 cap
@@ -242,7 +242,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null,
                 new BigDecimal("10000"), null  // over 7 258 cap
@@ -260,7 +260,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, BigDecimal.ZERO,
+                0, null, BigDecimal.ZERO,
                 new BigDecimal("100000"),    // self-employment income
                 null, null,
                 null, null, null, null,
@@ -285,7 +285,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.MARRIED,
-                2, new BigDecimal("80000"),
+                2, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -321,7 +321,7 @@ class TaxCalculationServiceTest {
         stubTariffB();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.MARRIED,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -339,7 +339,7 @@ class TaxCalculationServiceTest {
         stubTariffB();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE_PARENT,
-                1, new BigDecimal("80000"),
+                1, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -404,7 +404,7 @@ class TaxCalculationServiceTest {
 
         var req = new TaxInputRequest(
                 2025, "SG", 3203, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -439,7 +439,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO,
                 new BigDecimal("500000")   // wealth → triggers wealth tax
@@ -470,7 +470,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO,
                 new BigDecimal("600000")
@@ -488,7 +488,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO,
                 new BigDecimal("90000")   // below 100 000 exemption
@@ -508,7 +508,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, BigDecimal.ZERO,
+                0, null, BigDecimal.ZERO,
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -562,7 +562,7 @@ class TaxCalculationServiceTest {
         // Enormous deductions should not push taxableIncome below zero
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("10000"),
+                0, null, new BigDecimal("10000"),
                 null, null, null,
                 new BigDecimal("50000"),  // deduction exceeds income
                 null, null, null, BigDecimal.ZERO, null
@@ -582,7 +582,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null,
                 new BigDecimal("5000"), null
@@ -624,7 +624,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "SG", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO,
                 new BigDecimal("500000")
@@ -666,7 +666,7 @@ class TaxCalculationServiceTest {
         stubTariffA();
         var req = new TaxInputRequest(
                 2025, "sg", null, TaxCivilStatus.SINGLE,
-                0, new BigDecimal("80000"),
+                0, null, new BigDecimal("80000"),
                 null, null, null,
                 null, null, null, null, BigDecimal.ZERO, null
         );
@@ -692,5 +692,134 @@ class TaxCalculationServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getCommuneName()).isEqualTo("Rapperswil-Jona");
+    }
+
+    // -------------------------------------------------------------------------
+    // Church tax
+    //
+    // Church tax = cantonal simple tax × confession-specific commune multiplier.
+    // With the single-bracket stubs: taxable 77 600 × 8% = 6 208.00 simple tax.
+    // -------------------------------------------------------------------------
+
+    private TaxCommuneMultiplier stGallenWithChurchMultipliers() {
+        return TaxCommuneMultiplier.builder()
+                .id(1L).taxYear(2025).cantonCode("SG")
+                .communeName("St. Gallen").bfsNumber(3203)
+                .multiplier(new BigDecimal("1.14"))
+                .churchMultiplierProtestant(new BigDecimal("0.24"))
+                .churchMultiplierRomanCatholic(new BigDecimal("0.26"))
+                .build();
+    }
+
+    private TaxInputRequest communeRequest(ChurchAffiliation affiliation) {
+        return new TaxInputRequest(
+                2025, "SG", 3203, TaxCivilStatus.SINGLE,
+                0, affiliation, new BigDecimal("80000"),
+                null, null, null,
+                null, null, null, null, BigDecimal.ZERO, null
+        );
+    }
+
+    private void stubTariffAWithCommune(TaxCommuneMultiplier commune) {
+        when(federalRateRepository.findByTaxYearAndTariffOrderByIncomeFromAsc(anyInt(), anyString()))
+                .thenReturn(List.of(federalBracketA));
+        when(cantonRateRepository.findByTaxYearAndCantonCodeAndTariffOrderByIncomeFromAsc(anyInt(), anyString(), anyString()))
+                .thenReturn(List.of(cantonBracketA));
+        when(communeMultiplierRepository.findByTaxYearAndBfsNumber(2025, 3203))
+                .thenReturn(Optional.of(commune));
+    }
+
+    @Test
+    void church_tax_for_protestant_uses_the_protestant_commune_multiplier() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse result = service.calculate(communeRequest(ChurchAffiliation.PROTESTANT));
+
+        // churchTax = 6 208.00 × 0.24 = 1 489.92
+        assertThat(result.churchTax()).isEqualByComparingTo("1489.92");
+    }
+
+    @Test
+    void church_tax_for_roman_catholic_uses_the_catholic_commune_multiplier() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse result = service.calculate(communeRequest(ChurchAffiliation.ROMAN_CATHOLIC));
+
+        // churchTax = 6 208.00 × 0.26 = 1 614.08
+        assertThat(result.churchTax()).isEqualByComparingTo("1614.08");
+    }
+
+    @Test
+    void none_and_null_affiliation_both_yield_zero_church_tax_and_identical_totals() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse withNone = service.calculate(communeRequest(ChurchAffiliation.NONE));
+        TaxResultResponse withNull = service.calculate(communeRequest(null));
+
+        assertThat(withNone.churchTax()).isEqualByComparingTo("0");
+        assertThat(withNull.churchTax()).isEqualByComparingTo("0");
+        // A person who left the church must be taxed exactly like one who never
+        // declared an affiliation — NONE and null are equivalent.
+        assertThat(withNone.totalIncomeTax()).isEqualByComparingTo(withNull.totalIncomeTax());
+        assertThat(withNone.grandTotal()).isEqualByComparingTo(withNull.grandTotal());
+        assertThat(withNone.marginalRatePercent()).isEqualTo(withNull.marginalRatePercent());
+    }
+
+    @Test
+    void commune_without_church_multiplier_columns_yields_zero_church_tax() {
+        // Commune seeded without V15 church columns (nulls in DB)
+        TaxCommuneMultiplier commune = TaxCommuneMultiplier.builder()
+                .id(2L).taxYear(2025).cantonCode("SG")
+                .communeName("Nullhausen").bfsNumber(3203)
+                .multiplier(new BigDecimal("1.10"))
+                .build();
+        stubTariffAWithCommune(commune);
+
+        TaxResultResponse result = service.calculate(communeRequest(ChurchAffiliation.PROTESTANT));
+
+        assertThat(result.churchTax()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void church_tax_is_included_in_total_income_tax_and_grand_total() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse result = service.calculate(communeRequest(ChurchAffiliation.PROTESTANT));
+
+        assertThat(result.churchTax()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(result.totalIncomeTax()).isEqualByComparingTo(
+                result.federalTax()
+                        .add(result.cantonalTax())
+                        .add(result.communalTax())
+                        .add(result.churchTax()));
+        // no net wealth in the request → grandTotal must equal totalIncomeTax
+        assertThat(result.grandTotal()).isEqualByComparingTo(result.totalIncomeTax());
+    }
+
+    @Test
+    void breakdown_contains_church_tax_item_only_when_church_tax_is_positive() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse withAffiliation = service.calculate(communeRequest(ChurchAffiliation.PROTESTANT));
+        TaxResultResponse withoutAffiliation = service.calculate(communeRequest(ChurchAffiliation.NONE));
+
+        assertThat(withAffiliation.breakdown())
+                .extracting(TaxBreakdownItem::label)
+                .contains("Church Tax");
+        assertThat(withoutAffiliation.breakdown())
+                .extracting(TaxBreakdownItem::label)
+                .doesNotContain("Church Tax");
+    }
+
+    @Test
+    void marginal_rate_is_higher_with_church_affiliation_than_without() {
+        stubTariffAWithCommune(stGallenWithChurchMultipliers());
+
+        TaxResultResponse withAffiliation = service.calculate(communeRequest(ChurchAffiliation.PROTESTANT));
+        TaxResultResponse withoutAffiliation = service.calculate(communeRequest(ChurchAffiliation.NONE));
+
+        // Every additional CHF of income also incurs church tax → steeper marginal rate
+        assertThat(withAffiliation.marginalRatePercent())
+                .isGreaterThan(withoutAffiliation.marginalRatePercent());
     }
 }

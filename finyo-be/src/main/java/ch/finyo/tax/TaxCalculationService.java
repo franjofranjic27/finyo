@@ -85,8 +85,9 @@ public class TaxCalculationService {
         // 6. Cantonal tax — for SG, Staatssteuer equals the simple tax (multiplier 1.0)
         BigDecimal cantonalTax = cantonalSimpleTax;
 
-        // 7. Communal tax
+        // 7. Communal and church tax
         BigDecimal communalTax = BigDecimal.ZERO;
+        BigDecimal churchTax = BigDecimal.ZERO;
         String communeName = req.cantonCode().toUpperCase();
         if (req.bfsNumber() != null) {
             var commune = communeMultiplierRepository
@@ -96,10 +97,13 @@ public class TaxCalculationService {
                 communalTax = cantonalSimpleTax
                         .multiply(commune.get().getMultiplier())
                         .setScale(2, RoundingMode.HALF_UP);
+                churchTax = cantonalSimpleTax
+                        .multiply(churchMultiplier(commune.get(), req.churchAffiliation()))
+                        .setScale(2, RoundingMode.HALF_UP);
             }
         }
 
-        BigDecimal totalIncomeTax = federalTax.add(cantonalTax).add(communalTax);
+        BigDecimal totalIncomeTax = federalTax.add(cantonalTax).add(communalTax).add(churchTax);
 
         // 8. Effective and marginal rates
         double effectiveRate = grossIncome.compareTo(BigDecimal.ZERO) == 0 ? 0.0
@@ -107,7 +111,8 @@ public class TaxCalculationService {
                         .multiply(BigDecimal.valueOf(100)).doubleValue();
 
         double marginalRate = calculateMarginalRate(
-                taxableIncome, req.taxYear(), tariff, req.cantonCode(), req.bfsNumber());
+                taxableIncome, req.taxYear(), tariff, req.cantonCode(), req.bfsNumber(),
+                req.churchAffiliation());
 
         // 9. Wealth tax (simplified cantonal — SG rate approx 0.3‰ above 100 000 CHF)
         BigDecimal wealthTax = calculateWealthTax(req.netWealth(), req.cantonCode());
@@ -124,6 +129,7 @@ public class TaxCalculationService {
                             req.taxYear(), req.cantonCode().toUpperCase(), tariff));
 
             BigDecimal communalWithout = BigDecimal.ZERO;
+            BigDecimal churchWithout = BigDecimal.ZERO;
             if (req.bfsNumber() != null) {
                 var commune = communeMultiplierRepository
                         .findByTaxYearAndBfsNumber(req.taxYear(), req.bfsNumber());
@@ -131,10 +137,14 @@ public class TaxCalculationService {
                     communalWithout = cantonalWithout
                             .multiply(commune.get().getMultiplier())
                             .setScale(2, RoundingMode.HALF_UP);
+                    churchWithout = cantonalWithout
+                            .multiply(churchMultiplier(commune.get(), req.churchAffiliation()))
+                            .setScale(2, RoundingMode.HALF_UP);
                 }
             }
 
-            BigDecimal totalWithout = federalWithout.add(cantonalWithout).add(communalWithout);
+            BigDecimal totalWithout = federalWithout.add(cantonalWithout)
+                    .add(communalWithout).add(churchWithout);
             taxSavingWith3a = totalWithout.subtract(totalIncomeTax).max(BigDecimal.ZERO);
         }
 
@@ -148,6 +158,10 @@ public class TaxCalculationService {
                 pct(cantonalTax, grandTotal)));
         breakdown.add(new TaxBreakdownItem("Communal Tax", communalTax,
                 pct(communalTax, grandTotal)));
+        if (churchTax.compareTo(BigDecimal.ZERO) > 0) {
+            breakdown.add(new TaxBreakdownItem("Church Tax", churchTax,
+                    pct(churchTax, grandTotal)));
+        }
         if (wealthTax.compareTo(BigDecimal.ZERO) > 0) {
             breakdown.add(new TaxBreakdownItem("Wealth Tax", wealthTax,
                     pct(wealthTax, grandTotal)));
@@ -156,7 +170,7 @@ public class TaxCalculationService {
         return new TaxResultResponse(
                 req.taxYear(), req.cantonCode().toUpperCase(), communeName, req.civilStatus(),
                 grossIncome, totalDeductions, taxableIncome,
-                federalTax, cantonalTax, communalTax, totalIncomeTax,
+                federalTax, cantonalTax, communalTax, churchTax, totalIncomeTax,
                 effectiveRate, marginalRate,
                 wealthTax, grandTotal,
                 taxSavingWith3a, breakdown
@@ -217,7 +231,8 @@ public class TaxCalculationService {
     // -------------------------------------------------------------------------
 
     private double calculateMarginalRate(BigDecimal taxableIncome, int taxYear, String tariff,
-                                          String cantonCode, Integer bfsNumber) {
+                                          String cantonCode, Integer bfsNumber,
+                                          ChurchAffiliation churchAffiliation) {
         BigDecimal increment = new BigDecimal("1000");
         BigDecimal higher = taxableIncome.add(increment);
 
@@ -232,12 +247,13 @@ public class TaxCalculationService {
         BigDecimal taxHigher = calculateTaxFromFederalBrackets(higher, federalBrackets)
                 .add(calculateTaxFromCantonBrackets(higher, cantonBrackets));
 
-        // Include commune multiplier in marginal rate if a commune is selected
+        // Include commune and church multipliers in marginal rate if a commune is selected
         if (bfsNumber != null) {
             var commune = communeMultiplierRepository
                     .findByTaxYearAndBfsNumber(taxYear, bfsNumber);
             if (commune.isPresent()) {
-                BigDecimal multiplier = commune.get().getMultiplier();
+                BigDecimal multiplier = commune.get().getMultiplier()
+                        .add(churchMultiplier(commune.get(), churchAffiliation));
                 BigDecimal cantonCurrent = calculateTaxFromCantonBrackets(taxableIncome, cantonBrackets);
                 BigDecimal cantonHigher  = calculateTaxFromCantonBrackets(higher, cantonBrackets);
                 taxCurrent = taxCurrent.add(cantonCurrent.multiply(multiplier).setScale(2, RoundingMode.HALF_UP));
@@ -254,6 +270,18 @@ public class TaxCalculationService {
     // -------------------------------------------------------------------------
     // Helper methods
     // -------------------------------------------------------------------------
+
+    private BigDecimal churchMultiplier(TaxCommuneMultiplier commune, ChurchAffiliation affiliation) {
+        if (affiliation == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal multiplier = switch (affiliation) {
+            case NONE -> null;
+            case PROTESTANT -> commune.getChurchMultiplierProtestant();
+            case ROMAN_CATHOLIC -> commune.getChurchMultiplierRomanCatholic();
+        };
+        return multiplier != null ? multiplier : BigDecimal.ZERO;
+    }
 
     private BigDecimal calculateProfessionalExpenses(BigDecimal employmentIncome,
                                                       BigDecimal userProvided) {

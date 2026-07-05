@@ -18,6 +18,7 @@ public record TaxResultResponse(
         BigDecimal federalTax,
         BigDecimal cantonalTax,
         BigDecimal communalTax,
+        BigDecimal churchTax,
         BigDecimal totalIncomeTax,
 
         // Rates
