@@ -21,11 +21,11 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
       {/* Desktop sidebar — collapsible to an icon-only rail */}
       <aside
         className={cn(
-          'hidden lg:flex lg:flex-col lg:shrink-0 lg:border-r transition-[width] duration-200',
+          'hidden lg:flex lg:flex-col lg:shrink-0 lg:border-r transition-[width] duration-200 print:hidden',
           collapsed ? 'lg:w-16' : 'lg:w-60'
         )}
       >
@@ -40,10 +40,12 @@ export function AppLayout() {
       </Sheet>
 
       {/* Main area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onMenuClick={() => setMobileOpen(true)} />
+      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+        <div className="print:hidden">
+          <Header onMenuClick={() => setMobileOpen(true)} />
+        </div>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
           <div className="mx-auto max-w-[1400px] p-4 lg:p-6">
             <Outlet />
           </div>

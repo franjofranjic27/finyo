@@ -1,12 +1,17 @@
 import { apiRequest } from './client';
 
-export type TaxCivilStatus = 'SINGLE' | 'MARRIED' | 'WIDOWED';
+export type TaxCivilStatus = 'SINGLE' | 'MARRIED' | 'SINGLE_PARENT';
+
+export type TaxYearStatus = 'OPEN' | 'FILED' | 'ASSESSED' | 'PAID';
+
+export type ChurchAffiliation = 'NONE' | 'PROTESTANT' | 'ROMAN_CATHOLIC';
 
 export interface TaxCalculationRequest {
   taxYear: number;
   cantonCode: string;
   bfsNumber?: number | null;
   civilStatus: TaxCivilStatus;
+  churchAffiliation?: ChurchAffiliation | null;
   numberOfChildren: number;
   grossEmploymentIncome: number;
   selfEmploymentIncome?: number | null;
@@ -36,6 +41,7 @@ export interface TaxResultResponse {
   federalTax: number;
   cantonalTax: number;
   communalTax: number;
+  churchTax?: number;
   totalIncomeTax: number;
   effectiveRatePercent: number;
   marginalRatePercent: number;
@@ -52,6 +58,72 @@ export interface TaxCommune {
   communeName: string;
   bfsNumber: number;
   multiplier: number;
+  churchMultiplierProtestant: number | null;
+  churchMultiplierRomanCatholic: number | null;
+  cantonMultiplier: number | null;
+}
+
+export interface TaxYearSummary {
+  year: number;
+  status: TaxYearStatus;
+  expectedTax: number | null;
+  paidTotal: number;
+  openAmount: number | null;
+  grossIncome: number | null;
+  effectiveRatePercent: number | null;
+}
+
+export interface TaxYearInputs {
+  cantonCode: string | null;
+  bfsNumber: number | null;
+  civilStatus: TaxCivilStatus | null;
+  churchAffiliation: ChurchAffiliation | null;
+  numberOfChildren: number | null;
+  grossEmploymentIncome: number | null;
+  selfEmploymentIncome: number | null;
+  investmentIncome: number | null;
+  rentalIncome: number | null;
+  deductionProfessionalExpenses: number | null;
+  deductionInsurancePremiums: number | null;
+  deductionCharitableDonations: number | null;
+  deductionDebtInterest: number | null;
+  pillar3aContribution: number | null;
+  netWealth: number | null;
+}
+
+export interface TaxPayment {
+  id: string;
+  paymentDate: string;
+  amount: number;
+  label: string;
+}
+
+export type TaxPaymentInput = Omit<TaxPayment, 'id'>;
+
+export interface TaxDeadline {
+  id: string;
+  dueDate: string;
+  label: string;
+  amount: number | null;
+  done: boolean;
+}
+
+export type TaxDeadlineInput = Omit<TaxDeadline, 'id'>;
+
+export interface TaxYearDetail {
+  year: number;
+  status: TaxYearStatus;
+  inputs: TaxYearInputs | null;
+  calculation: TaxResultResponse | null;
+  payments: TaxPayment[];
+  deadlines: TaxDeadline[];
+  expectedTax: number | null;
+  paidTotal: number;
+  openAmount: number | null;
+  filingDeadline: string | null;
+  filedAt: string | null;
+  assessedAt: string | null;
+  assessedAmount: number | null;
 }
 
 export interface Pillar3Request {
@@ -106,4 +178,54 @@ export const taxApi = {
       { method: 'POST', body: JSON.stringify(data) },
       token,
     ),
+
+  getYears: (token: string) =>
+    apiRequest<TaxYearSummary[]>('/tax/years', {}, token),
+
+  getYear: (token: string, year: number) =>
+    apiRequest<TaxYearDetail>(`/tax/years/${year}`, {}, token),
+
+  upsertYear: (token: string, year: number, inputs: TaxYearInputs) =>
+    apiRequest<TaxYearDetail>(
+      `/tax/years/${year}`,
+      { method: 'PUT', body: JSON.stringify(inputs) },
+      token,
+    ),
+
+  updateYearStatus: (token: string, year: number, status: TaxYearStatus, effectiveDate?: string) =>
+    apiRequest<TaxYearDetail>(
+      `/tax/years/${year}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status, effectiveDate: effectiveDate ?? null }) },
+      token,
+    ),
+
+  deleteYear: (token: string, year: number) =>
+    apiRequest<void>(`/tax/years/${year}`, { method: 'DELETE' }, token),
+
+  addPayment: (token: string, year: number, payment: TaxPaymentInput) =>
+    apiRequest<TaxPayment>(
+      `/tax/years/${year}/payments`,
+      { method: 'POST', body: JSON.stringify(payment) },
+      token,
+    ),
+
+  deletePayment: (token: string, year: number, paymentId: string) =>
+    apiRequest<void>(`/tax/years/${year}/payments/${paymentId}`, { method: 'DELETE' }, token),
+
+  addDeadline: (token: string, year: number, deadline: TaxDeadlineInput) =>
+    apiRequest<TaxDeadline>(
+      `/tax/years/${year}/deadlines`,
+      { method: 'POST', body: JSON.stringify(deadline) },
+      token,
+    ),
+
+  updateDeadline: (token: string, year: number, deadlineId: string, deadline: TaxDeadlineInput) =>
+    apiRequest<TaxDeadline>(
+      `/tax/years/${year}/deadlines/${deadlineId}`,
+      { method: 'PUT', body: JSON.stringify(deadline) },
+      token,
+    ),
+
+  deleteDeadline: (token: string, year: number, deadlineId: string) =>
+    apiRequest<void>(`/tax/years/${year}/deadlines/${deadlineId}`, { method: 'DELETE' }, token),
 };

@@ -18,6 +18,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'nav.dashboard',
   '/investments': 'nav.investments',
   '/tax': 'nav.tax',
+  '/pillar3': 'nav.pillar3',
   '/insurance': 'nav.insurance',
   '/settings': 'nav.settings',
 };
@@ -32,7 +33,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { isDark, toggle } = useTheme();
   const { user, logout } = useAuth();
 
-  const pageTitle = t(ROUTE_LABELS[pathname] ?? 'nav.dashboard');
+  // Match on the first path segment so nested routes like /tax/2025 resolve correctly.
+  const pageTitle = t(ROUTE_LABELS[`/${pathname.split('/')[1]}`] ?? 'nav.dashboard');
   const username =
     (user?.profile?.preferred_username as string | undefined) ??
     (user?.profile?.name as string | undefined) ??

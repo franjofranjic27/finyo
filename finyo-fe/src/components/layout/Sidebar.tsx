@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   TrendingUp,
   Calculator,
+  PiggyBank,
   Shield,
   Settings,
   ChevronLeft,
@@ -33,6 +34,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Sideba
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
     { to: '/investments', label: t('nav.investments'), icon: TrendingUp },
     { to: '/tax', label: t('nav.tax'), icon: Calculator },
+    { to: '/pillar3', label: t('nav.pillar3'), icon: PiggyBank },
     { to: '/insurance', label: t('nav.insurance'), icon: Shield },
   ];
 
