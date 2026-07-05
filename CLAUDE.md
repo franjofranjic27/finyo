@@ -6,16 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **finyo** is a personal finance planner. The planned stack is a **Spring Boot** backend (Java, Maven) with a **PostgreSQL** database.
 
+## Documentation
+
+| File | Content |
+|---|---|
+| docs/ARCHITECTURE.md | Module structure, tech stack, DB schema, security, API docs |
+| docs/COMMIT_CONVENTION.md | Full commit format spec with examples |
+| docs/TESTING.md | Test types, how to run, how to write tests |
+| docs/WORKFLOWS.md | GitHub Actions workflows and local equivalents |
+| CONTRIBUTING.md | Contributor setup and workflow |
+
 ## CI/CD
 
-The workflows in `.github/workflows/` were copied from another project and still need to be adjusted for this repository:
+Workflows in `.github/workflows/`:
 
-- **ci.yml** — CI on PRs (typecheck, lint, test)
-- **sonar.yml** — SonarQube analysis on push to `main` and PRs
-- **claude.yml** — Claude Code responds to `@claude` mentions in issues/PRs (requires `CLAUDE_CODE_OAUTH_TOKEN` secret)
-- **claude-code-review.yml** — automated Claude code review on all PRs (requires `CLAUDE_CODE_OAUTH_TOKEN` secret)
-
-All workflows are currently commented out.
+- **ci.yml** — active; backend (`./mvnw verify`) + frontend (lint, vitest, build) on PRs and pushes to `main`
+- **sonar.yml** — active; SonarCloud analysis for backend (`franjofranjic27_finyo`, JaCoCo) and frontend (`franjofranjic27_finyo-ui`, LCOV) on push to `main`, PRs and manually (`workflow_dispatch`); requires `SONAR_TOKEN`
+- **release.yml** — active; on tag push builds Docker images and publishes to Docker Hub plus a GitHub release. Tags: `v1.2.3` (both), `api-v1.2.3` (backend only), `ui-v1.2.3` (frontend only); requires `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
 
 ## Build & Run
 
@@ -24,12 +31,23 @@ All workflows are currently commented out.
 - Maven (or use the Maven wrapper)
 - Docker (for PostgreSQL via Docker Compose)
 
-### Start infrastructure
+### Install git hooks
+```bash
+git config core.hooksPath .githooks
+```
+
+### Start the full stack
 ```bash
 docker compose up -d
 ```
 
-### Run the API
+Host ports (5432/8080/3000 are occupied by another local project):
+- Frontend: http://localhost:3001
+- API: http://localhost:8082 (Swagger UI: http://localhost:8082/swagger-ui.html)
+- Keycloak: http://localhost:8081 (realm `finyo`)
+- Postgres: localhost:5433
+
+### Run the API locally (outside Docker)
 ```bash
 cd finyo-api
 ./mvnw spring-boot:run
@@ -37,7 +55,7 @@ cd finyo-api
 
 ### Verify
 ```bash
-curl http://localhost:8080/hello-world
+curl http://localhost:8082/hello-world
 # Expected: Hello, I'm finyo!
 ```
 
@@ -46,6 +64,7 @@ curl http://localhost:8080/hello-world
 cd finyo-api
 ./mvnw test
 ```
+
 ## Commit Convention
 
 All commits in this repository MUST follow this format:
@@ -71,20 +90,4 @@ All commits in this repository MUST follow this format:
 - One logical change per commit — don't bundle unrelated changes
 - Reference issues with `Closes #N` or `Refs #N` in the body when applicable
 
-**Examples:**
-```
-feat(api): add transaction listing endpoint
-```
-```
-fix(api): handle empty response in budget calculator
-```
-```
-chore(infra): add postgres service to docker-compose stack
-```
-
-## Setup
-
-After cloning, install the git hooks:
-```bash
-git config core.hooksPath .githooks
-```
+See `docs/COMMIT_CONVENTION.md` for the full spec with examples.
