@@ -1,5 +1,6 @@
 package ch.finyo.tax;
 
+import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,7 @@ public class Pillar3CalculationService {
         BigDecimal rate          = BigDecimal.valueOf(req.assumedAnnualReturnPercent() / 100.0);
         BigDecimal balance       = req.currentBalance();
         BigDecimal totalContrib  = BigDecimal.ZERO;
-        int currentYear          = Year.now().getValue();
+        int currentYear          = Year.now(SwissTime.ZONE).getValue();
 
         List<Pillar3YearlyProjection> projection = new ArrayList<>(req.yearsToRetirement());
 
@@ -102,7 +103,7 @@ public class Pillar3CalculationService {
 
     private BigDecimal calculateTaxSaving(Pillar3InputRequest req, BigDecimal contribution) {
         try {
-            int year         = req.taxYear() > 0 ? req.taxYear() : Year.now().getValue();
+            int year         = req.taxYear() > 0 ? req.taxYear() : Year.now(SwissTime.ZONE).getValue();
             String canton    = req.cantonCode() != null ? req.cantonCode() : "SG";
             TaxCivilStatus cs = req.civilStatus() != null ? req.civilStatus() : TaxCivilStatus.SINGLE;
 

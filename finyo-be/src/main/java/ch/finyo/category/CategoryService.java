@@ -14,8 +14,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CategoryService {
 
+    private static final String RESOURCE_NAME = "Category";
+    private static final String COLOR_INDIGO = "#6366f1";
+
     private final CategoryRepository categoryRepository;
 
+    // readOnly transaction keeps the session open while the lazy parent proxy
+    // is resolved during DTO mapping (open-in-view is disabled)
+    @Transactional(readOnly = true)
     public List<CategoryResponse> getAll(String userId) {
         log.debug("Fetching all categories for user={}", userId);
         return categoryRepository.findByUserIdOrderByTypeAscNameAsc(userId)
@@ -24,6 +30,7 @@ public class CategoryService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<CategoryResponse> getTopLevel(String userId) {
         log.debug("Fetching top-level categories for user={}", userId);
         return categoryRepository.findByUserIdAndParentIsNullOrderByTypeAscNameAsc(userId)
@@ -32,11 +39,12 @@ public class CategoryService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public CategoryResponse getById(UUID id, String userId) {
         log.debug("Fetching category id={} for user={}", id, userId);
         return categoryRepository.findByIdAndUserId(id, userId)
                 .map(CategoryResponse::from)
-                .orElseThrow(() -> ResourceNotFoundException.of("Category", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
     @Transactional
@@ -63,7 +71,7 @@ public class CategoryService {
     public CategoryResponse update(UUID id, CategoryRequest request, String userId) {
         log.info("Updating category id={} for user={}", id, userId);
         Category existing = categoryRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Category", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         Category parent = resolveParent(request.parentId(), userId);
 
@@ -87,7 +95,7 @@ public class CategoryService {
     public void delete(UUID id, String userId) {
         log.info("Deleting category id={} for user={}", id, userId);
         if (!categoryRepository.existsByIdAndUserId(id, userId)) {
-            throw ResourceNotFoundException.of("Category", id);
+            throw ResourceNotFoundException.of(RESOURCE_NAME, id);
         }
         categoryRepository.deleteById(id);
         log.info("Deleted category id={} for user={}", id, userId);
@@ -104,7 +112,7 @@ public class CategoryService {
         log.info("Seeding default categories for new user={}", userId);
 
         // EXPENSE categories
-        saveDefault(userId, "Housing", "🏠", "#6366f1", CategoryType.EXPENSE, null);
+        saveDefault(userId, "Housing", "🏠", COLOR_INDIGO, CategoryType.EXPENSE, null);
         saveDefault(userId, "Groceries", "🛒", "#8b5cf6", CategoryType.EXPENSE, null);
         saveDefault(userId, "Transport", "🚗", "#3b82f6", CategoryType.EXPENSE, null);
         saveDefault(userId, "Health", "❤️", "#ef4444", CategoryType.EXPENSE, null);
@@ -113,14 +121,14 @@ public class CategoryService {
         saveDefault(userId, "Dining & Restaurants", "🍽️", "#f97316", CategoryType.EXPENSE, null);
         saveDefault(userId, "Entertainment", "🎬", "#ec4899", CategoryType.EXPENSE, null);
         saveDefault(userId, "Clothing", "👕", "#14b8a6", CategoryType.EXPENSE, null);
-        saveDefault(userId, "Education", "📚", "#6366f1", CategoryType.EXPENSE, null);
+        saveDefault(userId, "Education", "📚", COLOR_INDIGO, CategoryType.EXPENSE, null);
         saveDefault(userId, "Travel", "✈️", "#0ea5e9", CategoryType.EXPENSE, null);
         saveDefault(userId, "Personal Care", "💆", "#a78bfa", CategoryType.EXPENSE, null);
 
         // INCOME categories
         saveDefault(userId, "Salary", "💼", "#10b981", CategoryType.INCOME, null);
         saveDefault(userId, "Bonus", "🎁", "#f59e0b", CategoryType.INCOME, null);
-        saveDefault(userId, "Freelance", "💻", "#6366f1", CategoryType.INCOME, null);
+        saveDefault(userId, "Freelance", "💻", COLOR_INDIGO, CategoryType.INCOME, null);
         saveDefault(userId, "Investment Income", "📈", "#3b82f6", CategoryType.INCOME, null);
         saveDefault(userId, "Other Income", "💰", "#ec4899", CategoryType.INCOME, null);
 

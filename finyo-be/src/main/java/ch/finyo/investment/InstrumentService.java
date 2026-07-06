@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class InstrumentService {
+
+    private static final String RESOURCE_NAME = "Instrument";
 
     private final InstrumentRepository instrumentRepository;
     private final SixMarketDataClient sixClient;
@@ -31,7 +34,7 @@ public class InstrumentService {
         log.debug("Fetching instrument id={} for user={}", id, userId);
         return instrumentRepository.findByIdAndUserId(id, userId)
                 .map(InstrumentResponse::from)
-                .orElseThrow(() -> ResourceNotFoundException.of("Instrument", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
     @Transactional
@@ -56,7 +59,7 @@ public class InstrumentService {
     public InstrumentResponse update(UUID id, InstrumentRequest request, String userId) {
         log.info("Updating instrument id={} for user={}", id, userId);
         var existing = instrumentRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Instrument", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         var updated = Instrument.builder()
                 .id(existing.getId())
@@ -80,7 +83,7 @@ public class InstrumentService {
     public void delete(UUID id, String userId) {
         log.info("Deleting instrument id={} for user={}", id, userId);
         instrumentRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Instrument", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
         instrumentRepository.deleteById(id);
         log.info("Deleted instrument id={} for user={}", id, userId);
     }
@@ -88,12 +91,9 @@ public class InstrumentService {
     public MarketDataResponse getMarketData(UUID id, String userId) {
         log.debug("Fetching market data for instrument id={} user={}", id, userId);
         var instrument = instrumentRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Instrument", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
-        // Prefer valor, fall back to ISIN, then ticker
-        String identifier = instrument.getValor() != null ? instrument.getValor()
-                : instrument.getIsin() != null ? instrument.getIsin()
-                : instrument.getTicker();
+        String identifier = resolveIdentifier(instrument);
 
         if (identifier != null) {
             Optional<MarketDataResponse> liveData = sixClient.fetchByValorOrIsin(identifier);
@@ -114,8 +114,20 @@ public class InstrumentService {
                         + ". Please add a valid VALOR, ISIN, or ticker.");
     }
 
-    @Transactional
-    protected void updateCachedPrice(Instrument instrument, MarketDataResponse data) {
+    /** Prefer valor, fall back to ISIN, then ticker. */
+    private String resolveIdentifier(Instrument instrument) {
+        if (instrument.getValor() != null) {
+            return instrument.getValor();
+        }
+        if (instrument.getIsin() != null) {
+            return instrument.getIsin();
+        }
+        return instrument.getTicker();
+    }
+
+    // No @Transactional here: the single repository save() runs in its own
+    // transaction, and a self-invocation would bypass the Spring proxy anyway.
+    private void updateCachedPrice(Instrument instrument, MarketDataResponse data) {
         if (data.lastPrice() == null) {
             return;
         }
@@ -130,7 +142,7 @@ public class InstrumentService {
                     .instrumentType(instrument.getInstrumentType())
                     .sortOrder(instrument.getSortOrder())
                     .lastPrice(data.lastPrice())
-                    .lastPriceUpdatedAt(OffsetDateTime.now())
+                    .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
                     .build();
             instrumentRepository.save(updated);
         } catch (Exception e) {

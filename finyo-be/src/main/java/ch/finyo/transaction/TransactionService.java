@@ -18,6 +18,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransactionService {
 
+    private static final String RESOURCE_NAME = "Transaction";
+
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
@@ -45,7 +47,7 @@ public class TransactionService {
     public TransactionResponse getById(UUID id, String userId) {
         return transactionRepository.findByIdAndUserId(id, userId)
                 .map(TransactionResponse::from)
-                .orElseThrow(() -> ResourceNotFoundException.of("Transaction", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
     @Transactional
@@ -75,7 +77,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse update(UUID id, TransactionRequest request, String userId) {
         var existing = transactionRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Transaction", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         var account = accountRepository.findByIdAndUserId(request.accountId(), userId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Account", request.accountId()));
@@ -103,7 +105,7 @@ public class TransactionService {
     @Transactional
     public void delete(UUID id, String userId) {
         if (transactionRepository.findByIdAndUserId(id, userId).isEmpty()) {
-            throw ResourceNotFoundException.of("Transaction", id);
+            throw ResourceNotFoundException.of(RESOURCE_NAME, id);
         }
         transactionRepository.deleteById(id);
     }

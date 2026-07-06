@@ -27,8 +27,9 @@ public class TaxYear {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
+    /** Renamed from "taxYear" to avoid clashing with the class name; the DB column stays "tax_year". */
     @Column(name = "tax_year", nullable = false)
-    private int taxYear;
+    private int year;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)

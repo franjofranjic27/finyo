@@ -115,7 +115,7 @@ public class TaxCalculationService {
                 req.churchAffiliation());
 
         // 9. Wealth tax (simplified cantonal — SG rate approx 0.3‰ above 100 000 CHF)
-        BigDecimal wealthTax = calculateWealthTax(req.netWealth(), req.cantonCode());
+        BigDecimal wealthTax = calculateWealthTax(req.netWealth());
 
         // 10. Pillar 3a tax-saving calculation
         BigDecimal taxSavingWith3a = BigDecimal.ZERO;
@@ -307,7 +307,7 @@ public class TaxCalculationService {
         return flat.max(PROFESSIONAL_EXPENSE_MIN).min(PROFESSIONAL_EXPENSE_MAX);
     }
 
-    private BigDecimal calculateWealthTax(BigDecimal netWealth, String cantonCode) {
+    private BigDecimal calculateWealthTax(BigDecimal netWealth) {
         if (netWealth == null || netWealth.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }

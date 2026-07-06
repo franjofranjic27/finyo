@@ -8,9 +8,9 @@ import java.util.UUID;
 
 public interface TaxYearRepository extends JpaRepository<TaxYear, UUID> {
 
-    List<TaxYear> findByUserIdOrderByTaxYearDesc(String userId);
+    List<TaxYear> findByUserIdOrderByYearDesc(String userId);
 
-    Optional<TaxYear> findByUserIdAndTaxYear(String userId, int taxYear);
+    Optional<TaxYear> findByUserIdAndYear(String userId, int year);
 
     Optional<TaxYear> findByIdAndUserId(UUID id, String userId);
 }

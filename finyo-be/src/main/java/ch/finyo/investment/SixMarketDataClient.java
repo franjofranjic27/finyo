@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
 
@@ -57,7 +58,7 @@ public class SixMarketDataClient {
                 return Optional.empty();
             }
 
-            return Optional.of(mapSixResponse(identifier, response));
+            return Optional.of(mapSixResponse(response));
 
         } catch (RestClientException e) {
             log.warn("SIX API call failed for identifier {}: {}", identifier, e.getMessage());
@@ -66,7 +67,7 @@ public class SixMarketDataClient {
     }
 
     @SuppressWarnings("rawtypes")
-    private MarketDataResponse mapSixResponse(String identifier, Map raw) {
+    private MarketDataResponse mapSixResponse(Map raw) {
         // Map the SIX API response to our MarketDataResponse.
         // SIX returns fields like: valor, isin, name, currency, lastPrice, etc.
         // Field names may vary by subscription. This mapping uses common field names.
@@ -100,7 +101,7 @@ public class SixMarketDataClient {
                 raw.getOrDefault("instrumentType", "").toString(),
                 raw.getOrDefault("sector", "").toString(),
                 safeDecimal(raw.get("ter")),
-                OffsetDateTime.now(),
+                OffsetDateTime.now(ZoneOffset.UTC),
                 false
         );
     }
@@ -111,7 +112,7 @@ public class SixMarketDataClient {
         }
         try {
             return new BigDecimal(value.toString());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

@@ -1,5 +1,7 @@
 package ch.finyo.analytics;
 
+import ch.finyo.common.SwissTime;
+
 import java.time.LocalDate;
 
 public enum TimeRange {
@@ -12,7 +14,7 @@ public enum TimeRange {
     LAST_12_MONTHS;
 
     public LocalDate startDate() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SwissTime.ZONE);
         return switch (this) {
             case LAST_7_DAYS -> today.minusDays(7);
             case LAST_30_DAYS -> today.minusDays(30);
@@ -25,7 +27,7 @@ public enum TimeRange {
     }
 
     public LocalDate endDate() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SwissTime.ZONE);
         return switch (this) {
             case LAST_MONTH -> today.minusMonths(1).withDayOfMonth(today.minusMonths(1).lengthOfMonth());
             default -> today;

@@ -15,6 +15,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountService {
 
+    private static final String RESOURCE_NAME = "Account";
+
     private final AccountRepository accountRepository;
 
     public List<AccountResponse> getAll(String userId) {
@@ -29,7 +31,7 @@ public class AccountService {
         log.debug("Fetching account id={} for user={}", id, userId);
         return accountRepository.findByIdAndUserId(id, userId)
                 .map(AccountResponse::from)
-                .orElseThrow(() -> ResourceNotFoundException.of("Account", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
     @Transactional
@@ -52,7 +54,7 @@ public class AccountService {
     public AccountResponse update(UUID id, AccountRequest request, String userId) {
         log.info("Updating account id={} for user={}", id, userId);
         Account existing = accountRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Account", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         Account updated = Account.builder()
                 .id(existing.getId())
@@ -74,7 +76,7 @@ public class AccountService {
     public void delete(UUID id, String userId) {
         log.info("Deleting account id={} for user={}", id, userId);
         if (!accountRepository.existsByIdAndUserId(id, userId)) {
-            throw ResourceNotFoundException.of("Account", id);
+            throw ResourceNotFoundException.of(RESOURCE_NAME, id);
         }
         accountRepository.deleteById(id);
         log.info("Deleted account id={} for user={}", id, userId);

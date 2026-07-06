@@ -2,6 +2,7 @@ package ch.finyo.budget;
 
 import ch.finyo.category.CategoryRepository;
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
 import ch.finyo.transaction.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,10 +20,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BudgetService {
 
+    private static final String RESOURCE_NAME = "Budget";
+
     private final BudgetRepository budgetRepository;
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
 
+    // readOnly transaction keeps the session open while the lazy category proxy
+    // is resolved during DTO mapping (open-in-view is disabled)
+    @Transactional(readOnly = true)
     public List<BudgetResponse> getAll(String userId) {
         log.debug("Fetching all budgets for user={}", userId);
         return budgetRepository.findByUserIdOrderByCategoryNameAsc(userId)
@@ -31,15 +37,17 @@ public class BudgetService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public BudgetResponse getById(UUID id, String userId) {
         log.debug("Fetching budget id={} for user={}", id, userId);
         return budgetRepository.findByIdAndUserId(id, userId)
                 .map(BudgetResponse::from)
-                .orElseThrow(() -> ResourceNotFoundException.of("Budget", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
+    @Transactional(readOnly = true)
     public List<BudgetStatusResponse> getCurrentStatus(String userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SwissTime.ZONE);
         LocalDate monthStart = today.withDayOfMonth(1);
 
         log.debug("Computing current budget status for user={} monthStart={}", userId, monthStart);
@@ -102,7 +110,7 @@ public class BudgetService {
     public BudgetResponse update(UUID id, BudgetRequest request, String userId) {
         log.info("Updating budget id={} for user={}", id, userId);
         var existing = budgetRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Budget", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         var category = categoryRepository.findByIdAndUserId(request.categoryId(), userId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Category", request.categoryId()));
@@ -126,7 +134,7 @@ public class BudgetService {
     public void delete(UUID id, String userId) {
         log.info("Deleting budget id={} for user={}", id, userId);
         budgetRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Budget", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
         budgetRepository.deleteById(id);
         log.info("Deleted budget id={} for user={}", id, userId);
     }

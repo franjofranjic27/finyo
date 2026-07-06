@@ -75,6 +75,15 @@ public class CsvImportService {
         return processRows(rows, mapping, account, userId, request.skipDuplicates());
     }
 
+    private enum RowOutcome {
+        IMPORTED, SKIPPED, FAILED
+    }
+
+    /** Immutable per-import settings shared by every row. */
+    private record ImportContext(CsvColumnMapping mapping, DateTimeFormatter formatter,
+                                 Account account, String userId, boolean skipDuplicates) {
+    }
+
     private ImportResultResponse processRows(List<String[]> rows, CsvColumnMapping mapping, Account account, String userId, boolean skipDuplicates) {
         int imported = 0;
         int skipped = 0;
@@ -82,55 +91,62 @@ public class CsvImportService {
         List<String> errors = new ArrayList<>();
         List<Transaction> toSave = new ArrayList<>();
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(mapping.dateFormat());
+        ImportContext context = new ImportContext(
+                mapping, DateTimeFormatter.ofPattern(mapping.dateFormat()), account, userId, skipDuplicates);
 
         for (int i = 0; i < rows.size(); i++) {
-            String[] row = rows.get(i);
-            try {
-                if (row.length <= Math.max(mapping.dateColumn(), mapping.amountColumn())) {
-                    errors.add("Row " + (i + 1) + ": insufficient columns");
-                    failed++;
-                    continue;
-                }
-
-                String dateStr = row[mapping.dateColumn()].trim();
-                String amountStr = row[mapping.amountColumn()].trim();
-                String description = mapping.descriptionColumn() >= 0 && row.length > mapping.descriptionColumn()
-                        ? row[mapping.descriptionColumn()].trim() : "";
-
-                if (dateStr.isEmpty() || amountStr.isEmpty()) {
-                    failed++;
-                    continue;
-                }
-
-                LocalDate date = LocalDate.parse(dateStr, formatter);
-                BigDecimal amount = parseAmount(amountStr, mapping.decimalSeparator(), mapping.groupingSeparator());
-
-                if (skipDuplicates && transactionRepository.existsByUserIdAndDateAndAmountAndDescription(userId, date, amount, description)) {
-                    skipped++;
-                    continue;
-                }
-
-                Transaction tx = Transaction.builder()
-                        .userId(userId)
-                        .amount(amount)
-                        .currency("CHF")
-                        .date(date)
-                        .description(description)
-                        .account(account)
-                        .source(TransactionSource.CSV_IMPORT)
-                        .build();
-                toSave.add(tx);
-                imported++;
-            } catch (Exception e) {
-                errors.add("Row " + (i + 1) + ": " + e.getMessage());
-                failed++;
+            switch (processRow(rows.get(i), i + 1, context, toSave, errors)) {
+                case IMPORTED -> imported++;
+                case SKIPPED -> skipped++;
+                case FAILED -> failed++;
             }
         }
 
         transactionRepository.saveAll(toSave);
         log.info("CSV import: {} imported, {} skipped, {} failed", imported, skipped, failed);
         return new ImportResultResponse(rows.size(), imported, skipped, failed, errors);
+    }
+
+    private RowOutcome processRow(String[] row, int rowNumber, ImportContext context,
+                                  List<Transaction> toSave, List<String> errors) {
+        CsvColumnMapping mapping = context.mapping();
+        try {
+            if (row.length <= Math.max(mapping.dateColumn(), mapping.amountColumn())) {
+                errors.add("Row " + rowNumber + ": insufficient columns");
+                return RowOutcome.FAILED;
+            }
+
+            String dateStr = row[mapping.dateColumn()].trim();
+            String amountStr = row[mapping.amountColumn()].trim();
+            String description = mapping.descriptionColumn() >= 0 && row.length > mapping.descriptionColumn()
+                    ? row[mapping.descriptionColumn()].trim() : "";
+
+            if (dateStr.isEmpty() || amountStr.isEmpty()) {
+                return RowOutcome.FAILED;
+            }
+
+            LocalDate date = LocalDate.parse(dateStr, context.formatter());
+            BigDecimal amount = parseAmount(amountStr, mapping.decimalSeparator(), mapping.groupingSeparator());
+
+            if (context.skipDuplicates() && transactionRepository.existsByUserIdAndDateAndAmountAndDescription(
+                    context.userId(), date, amount, description)) {
+                return RowOutcome.SKIPPED;
+            }
+
+            toSave.add(Transaction.builder()
+                    .userId(context.userId())
+                    .amount(amount)
+                    .currency("CHF")
+                    .date(date)
+                    .description(description)
+                    .account(context.account())
+                    .source(TransactionSource.CSV_IMPORT)
+                    .build());
+            return RowOutcome.IMPORTED;
+        } catch (Exception e) {
+            errors.add("Row " + rowNumber + ": " + e.getMessage());
+            return RowOutcome.FAILED;
+        }
     }
 
     private BigDecimal parseAmount(String raw, String decimalSep, String groupSep) {
@@ -175,7 +191,7 @@ public class CsvImportService {
                 request.amountColumn() != null ? request.amountColumn() : 1,
                 request.descriptionColumn() != null ? request.descriptionColumn() : 2,
                 request.currencyColumn() != null ? request.currencyColumn() : -1,
-                request.dateFormat() != null ? request.dateFormat() : "dd.MM.yyyy",
+                request.dateFormat() != null ? request.dateFormat() : CsvColumnMapping.SWISS_DATE_FORMAT,
                 request.decimalSeparator() != null ? request.decimalSeparator() : ".",
                 "'",
                 request.hasHeader(),

@@ -3,6 +3,7 @@ package ch.finyo.savings;
 import ch.finyo.account.Account;
 import ch.finyo.account.AccountRepository;
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,9 +21,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SavingsGoalService {
 
+    private static final String RESOURCE_NAME = "SavingsGoal";
+
     private final SavingsGoalRepository savingsGoalRepository;
     private final AccountRepository accountRepository;
 
+    // readOnly transaction keeps the session open while the lazy account proxy
+    // is resolved during DTO mapping (open-in-view is disabled)
+    @Transactional(readOnly = true)
     public List<SavingsGoalResponse> getAll(String userId) {
         log.debug("Fetching active savings goals for user={}", userId);
         return savingsGoalRepository.findByUserIdAndArchivedFalseOrderByTargetDateAscNameAsc(userId)
@@ -31,6 +37,7 @@ public class SavingsGoalService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<SavingsGoalResponse> getAllIncludingArchived(String userId) {
         log.debug("Fetching all savings goals (including archived) for user={}", userId);
         return savingsGoalRepository.findByUserIdOrderByArchivedAscNameAsc(userId)
@@ -39,11 +46,12 @@ public class SavingsGoalService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public SavingsGoalResponse getById(UUID id, String userId) {
         log.debug("Fetching savings goal id={} for user={}", id, userId);
         return savingsGoalRepository.findByIdAndUserId(id, userId)
                 .map(this::toResponse)
-                .orElseThrow(() -> ResourceNotFoundException.of("SavingsGoal", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
     }
 
     @Transactional
@@ -72,7 +80,7 @@ public class SavingsGoalService {
     public SavingsGoalResponse update(UUID id, SavingsGoalRequest request, String userId) {
         log.info("Updating savings goal id={} for user={}", id, userId);
         var existing = savingsGoalRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("SavingsGoal", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         Account account = resolveAccount(request.accountId(), userId);
 
@@ -98,7 +106,7 @@ public class SavingsGoalService {
     public SavingsGoalResponse archive(UUID id, String userId) {
         log.info("Archiving savings goal id={} for user={}", id, userId);
         var existing = savingsGoalRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("SavingsGoal", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
         var archived = SavingsGoal.builder()
                 .id(existing.getId())
@@ -122,7 +130,7 @@ public class SavingsGoalService {
     public void delete(UUID id, String userId) {
         log.info("Deleting savings goal id={} for user={}", id, userId);
         savingsGoalRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> ResourceNotFoundException.of("SavingsGoal", id));
+                .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
         savingsGoalRepository.deleteById(id);
         log.info("Deleted savings goal id={} for user={}", id, userId);
     }
@@ -169,7 +177,7 @@ public class SavingsGoalService {
         if (targetDate == null) {
             return null;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(SwissTime.ZONE);
         long months = ChronoUnit.MONTHS.between(today.withDayOfMonth(1), targetDate.withDayOfMonth(1));
         if (months <= 0) {
             return null;

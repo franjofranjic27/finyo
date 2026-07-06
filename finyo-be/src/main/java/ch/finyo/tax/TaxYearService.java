@@ -1,6 +1,7 @@
 package ch.finyo.tax;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,7 @@ public class TaxYearService {
 
     public List<TaxYearSummaryResponse> getAll(String userId) {
         log.debug("Fetching all tax years for user={}", userId);
-        return taxYearRepository.findByUserIdOrderByTaxYearDesc(userId)
+        return taxYearRepository.findByUserIdOrderByYearDesc(userId)
                 .stream()
                 .map(taxYear -> toSummary(taxYear, userId))
                 .toList();
@@ -37,11 +38,11 @@ public class TaxYearService {
     @Transactional
     public TaxYearDetailResponse upsert(int year, TaxYearRequest request, String userId) {
         log.info("Upserting tax year={} for user={}", year, userId);
-        TaxYear.TaxYearBuilder builder = taxYearRepository.findByUserIdAndTaxYear(userId, year)
+        TaxYear.TaxYearBuilder builder = taxYearRepository.findByUserIdAndYear(userId, year)
                 .map(TaxYear::toBuilder)
                 .orElseGet(() -> TaxYear.builder()
                         .userId(userId)
-                        .taxYear(year)
+                        .year(year)
                         .status(TaxYearStatus.OPEN));
 
         builder.cantonCode(request.cantonCode())
@@ -84,7 +85,7 @@ public class TaxYearService {
                     "Cannot transition tax year " + year + " from " + taxYear.getStatus() + " to " + target);
         }
 
-        LocalDate effectiveDate = request.effectiveDate() != null ? request.effectiveDate() : LocalDate.now();
+        LocalDate effectiveDate = request.effectiveDate() != null ? request.effectiveDate() : LocalDate.now(SwissTime.ZONE);
         TaxYear.TaxYearBuilder builder = taxYear.toBuilder().status(target);
 
         if (target.compareTo(TaxYearStatus.FILED) >= 0) {
@@ -191,7 +192,7 @@ public class TaxYearService {
     // -------------------------------------------------------------------------
 
     private TaxYear loadYear(int year, String userId) {
-        return taxYearRepository.findByUserIdAndTaxYear(userId, year)
+        return taxYearRepository.findByUserIdAndYear(userId, year)
                 .orElseThrow(() -> ResourceNotFoundException.of("Tax year", year));
     }
 
@@ -219,7 +220,7 @@ public class TaxYearService {
                 .findByTaxYearIdAndUserIdOrderByPaymentDateAsc(taxYear.getId(), userId));
         BigDecimal expectedTax = expectedTax(taxYear, calculation);
         return new TaxYearSummaryResponse(
-                taxYear.getTaxYear(),
+                taxYear.getYear(),
                 taxYear.getStatus(),
                 expectedTax,
                 paidTotal,
@@ -241,7 +242,7 @@ public class TaxYearService {
                 .findByTaxYearIdAndUserIdOrderByDueDateAsc(taxYear.getId(), userId)
                 .stream().map(TaxDeadlineResponse::from).toList();
         return new TaxYearDetailResponse(
-                taxYear.getTaxYear(),
+                taxYear.getYear(),
                 taxYear.getStatus(),
                 TaxYearInputs.from(taxYear),
                 calculation,
@@ -264,7 +265,7 @@ public class TaxYearService {
             return null;
         }
         return taxCalculationService.calculate(new TaxInputRequest(
-                taxYear.getTaxYear(),
+                taxYear.getYear(),
                 taxYear.getCantonCode(),
                 taxYear.getBfsNumber(),
                 taxYear.getCivilStatus(),
