@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TaxPayment, TaxYearSummary } from '@/api/tax';
 import {
   aggregatePaymentsByMonth,
+  allowedStatusTransitions,
   buildComparisonData,
   buildYearList,
   deriveDisplayStatus,
@@ -162,5 +163,23 @@ describe('buildComparisonData', () => {
 
   it('returns an empty array when no year has results', () => {
     expect(buildComparisonData([summary({ year: 2024 })])).toEqual([]);
+  });
+});
+
+describe('allowedStatusTransitions', () => {
+  it('allows any forward step from OPEN but no backward step', () => {
+    expect(allowedStatusTransitions('OPEN')).toEqual(['FILED', 'ASSESSED', 'PAID']);
+  });
+
+  it('allows exactly one step back plus all forward steps from FILED', () => {
+    expect(allowedStatusTransitions('FILED')).toEqual(['OPEN', 'ASSESSED', 'PAID']);
+  });
+
+  it('does not allow jumping two steps back from ASSESSED', () => {
+    expect(allowedStatusTransitions('ASSESSED')).toEqual(['FILED', 'PAID']);
+  });
+
+  it('only allows the single corrective step back from PAID', () => {
+    expect(allowedStatusTransitions('PAID')).toEqual(['ASSESSED']);
   });
 });
