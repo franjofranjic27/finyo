@@ -9,7 +9,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,14 +112,14 @@ class UserContextProviderTest {
     @Test
     void getUserId_throws_when_security_context_is_empty() {
         // SecurityContext is cleared in @AfterEach and never populated here
-        assertThatThrownBy(() -> provider.getUserId())
+        assertThatThrownBy(provider::getUserId)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No authenticated JWT found in security context");
     }
 
     @Test
     void getUsername_throws_when_security_context_is_empty() {
-        assertThatThrownBy(() -> provider.getUsername())
+        assertThatThrownBy(provider::getUsername)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No authenticated JWT found in security context");
     }
@@ -129,7 +128,7 @@ class UserContextProviderTest {
     void getUserId_throws_when_authentication_is_null() {
         SecurityContextHolder.getContext().setAuthentication(null);
 
-        assertThatThrownBy(() -> provider.getUserId())
+        assertThatThrownBy(provider::getUserId)
             .isInstanceOf(IllegalStateException.class);
     }
 
@@ -146,7 +145,7 @@ class UserContextProviderTest {
         );
         SecurityContextHolder.getContext().setAuthentication(nonJwtAuth);
 
-        assertThatThrownBy(() -> provider.getUserId())
+        assertThatThrownBy(provider::getUserId)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No authenticated JWT found in security context");
     }
@@ -158,7 +157,7 @@ class UserContextProviderTest {
         );
         SecurityContextHolder.getContext().setAuthentication(nonJwtAuth);
 
-        assertThatThrownBy(() -> provider.getUsername())
+        assertThatThrownBy(provider::getUsername)
             .isInstanceOf(IllegalStateException.class);
     }
 
@@ -176,13 +175,13 @@ class UserContextProviderTest {
 
         // UserContextProvider does NOT throw — it returns whatever the JWT contains.
         // If the platform requires non-empty subjects, validation belongs upstream.
-        assertThat(provider.getUserId()).isEqualTo("");
+        assertThat(provider.getUserId()).isEmpty();
     }
 
     // -------------------------------------------------------------------------
-    // Isolation: different threads see different SecurityContexts
-    // (using MODE_INHERITABLETHREADLOCAL is intentionally NOT tested here;
-    //  the default MODE_THREADLOCAL is the expected production setting)
+    // Isolation: different threads see different SecurityContexts. The default
+    // thread-local strategy is the expected production setting, so the
+    // inheritable variant is intentionally not tested here.
     // -------------------------------------------------------------------------
 
     @Test
@@ -197,7 +196,7 @@ class UserContextProviderTest {
             try {
                 provider.getUserId(); // should throw because context is empty for this thread
                 contextLeaked[0] = true; // if we reach here, context leaked
-            } catch (IllegalStateException expected) {
+            } catch (IllegalStateException _) {
                 // correct: the other thread's context is not visible
             }
         });

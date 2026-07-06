@@ -28,8 +28,8 @@ class FinyoApplicationIT {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        // application-test.yaml pins the Testcontainers JDBC-URL driver;
-        // this test uses a plain postgres URL and needs the real driver
+        // The test profile pins the Testcontainers JDBC-URL driver, but this
+        // test uses a plain postgres URL and therefore needs the real driver
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 

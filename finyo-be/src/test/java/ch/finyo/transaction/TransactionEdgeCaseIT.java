@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Map;
 import java.util.UUID;
 
@@ -567,7 +568,7 @@ class TransactionEdgeCaseIT extends BaseIntegrationTest {
             .userId(TEST_USER_ID)
             .amount(new BigDecimal("-10.00"))
             .currency("CHF")
-            .date(LocalDate.of(2025, 3, 15))
+            .date(LocalDate.of(2025, Month.MARCH, 15))
             .account(testUserAccount)
             .source(TransactionSource.MANUAL)
             .build());
@@ -577,7 +578,7 @@ class TransactionEdgeCaseIT extends BaseIntegrationTest {
             .userId(TEST_USER_ID)
             .amount(new BigDecimal("-20.00"))
             .currency("CHF")
-            .date(LocalDate.of(2025, 1, 1))
+            .date(LocalDate.of(2025, Month.JANUARY, 1))
             .account(testUserAccount)
             .source(TransactionSource.MANUAL)
             .build());
@@ -603,7 +604,7 @@ class TransactionEdgeCaseIT extends BaseIntegrationTest {
             .userId(TEST_USER_ID)
             .amount(new BigDecimal("-5.00"))
             .currency("CHF")
-            .date(LocalDate.of(2020, 1, 1))
+            .date(LocalDate.of(2020, Month.JANUARY, 1))
             .account(testUserAccount)
             .source(TransactionSource.MANUAL)
             .build());
@@ -612,7 +613,7 @@ class TransactionEdgeCaseIT extends BaseIntegrationTest {
             .userId(TEST_USER_ID)
             .amount(new BigDecimal("-6.00"))
             .currency("CHF")
-            .date(LocalDate.of(2025, 6, 1))
+            .date(LocalDate.of(2025, Month.JUNE, 1))
             .account(testUserAccount)
             .source(TransactionSource.MANUAL)
             .build());

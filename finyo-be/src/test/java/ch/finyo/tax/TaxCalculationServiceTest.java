@@ -3,6 +3,8 @@ package ch.finyo.tax;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -160,42 +162,26 @@ class TaxCalculationServiceTest {
     // Professional expense deduction
     // -------------------------------------------------------------------------
 
-    @Test
-    void professional_expense_deduction_is_3_percent_for_normal_income() {
+    /**
+     * Swiss standard deduction: 3% of employment income, bounded to [2 200, 4 400].
+     *   80 000 → 3% = 2 400 (within range)          → taxable 77 600
+     *   40 000 → 3% = 1 200 < 2 200 (floor applies) → taxable 37 800
+     *  200 000 → 3% = 6 000 > 4 400 (cap applies)   → taxable 195 600
+     */
+    @ParameterizedTest(name = "income {0} → taxable {1}")
+    @CsvSource({
+            "80000, 77600",
+            "40000, 37800",
+            "200000, 195600"
+    })
+    void professional_expense_deduction_is_3_percent_bounded_between_2200_and_4400(
+            String grossIncome, String expectedTaxableIncome) {
         stubTariffA();
-        // 3% of 50 000 = 1 500 CHF → below minimum 2 200 → capped at 2 200
-        // 3% of 80 000 = 2 400 CHF → within range [2200, 4400]
-        var req = minimalSingleRequest(new BigDecimal("80000"));
+        var req = minimalSingleRequest(new BigDecimal(grossIncome));
 
         TaxResultResponse result = service.calculate(req);
 
-        // Deductions = professional expenses 2 400 + nothing else
-        // taxableIncome = 80 000 - 2 400 = 77 600 → rounded to 77 600
-        assertThat(result.taxableIncome()).isEqualByComparingTo("77600");
-    }
-
-    @Test
-    void professional_expense_deduction_is_floored_at_2200() {
-        stubTariffA();
-        // 3% of 40 000 = 1 200 < 2 200 → floor applies
-        var req = minimalSingleRequest(new BigDecimal("40000"));
-
-        TaxResultResponse result = service.calculate(req);
-
-        // taxableIncome = 40 000 - 2 200 = 37 800 → rounded to 37 800
-        assertThat(result.taxableIncome()).isEqualByComparingTo("37800");
-    }
-
-    @Test
-    void professional_expense_deduction_is_capped_at_4400() {
-        stubTariffA();
-        // 3% of 200 000 = 6 000 > 4 400 → cap applies
-        var req = minimalSingleRequest(new BigDecimal("200000"));
-
-        TaxResultResponse result = service.calculate(req);
-
-        // taxableIncome = 200 000 - 4 400 = 195 600
-        assertThat(result.taxableIncome()).isEqualByComparingTo("195600");
+        assertThat(result.taxableIncome()).isEqualByComparingTo(expectedTaxableIncome);
     }
 
     @Test
@@ -646,6 +632,7 @@ class TaxCalculationServiceTest {
 
         assertThat(result.breakdown())
                 .extracting(TaxBreakdownItem::label)
+                .isNotEmpty()
                 .doesNotContain("Wealth Tax");
     }
 
@@ -838,6 +825,7 @@ class TaxCalculationServiceTest {
                 .contains("Church Tax");
         assertThat(withoutAffiliation.breakdown())
                 .extracting(TaxBreakdownItem::label)
+                .isNotEmpty()
                 .doesNotContain("Church Tax");
     }
 

@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Map;
 import java.util.UUID;
 
@@ -113,8 +114,8 @@ class TaxYearIT extends BaseIntegrationTest {
         BigDecimal expectedTax = decimal(detail, "expectedTax");
         assertThat(expectedTax)
                 .as("expectedTax must equal the calculation's grandTotal while OPEN")
-                .isEqualByComparingTo(new BigDecimal(detail.get("calculation").get("grandTotal").asText()));
-        assertThat(expectedTax).isGreaterThan(BigDecimal.ZERO);
+                .isEqualByComparingTo(new BigDecimal(detail.get("calculation").get("grandTotal").asText()))
+                .isGreaterThan(BigDecimal.ZERO);
 
         // --- 2. GET /years lists it with derived figures ---------------------
         String listJson = mockMvc.perform(get("/api/v1/tax/years").with(asUser()))
@@ -206,7 +207,7 @@ class TaxYearIT extends BaseIntegrationTest {
     void other_user_cannot_read_patch_or_delete_a_foreign_tax_year() throws Exception {
         TaxYear owned = taxYearRepository.save(TaxYear.builder()
                 .userId(TEST_USER_ID)
-                .taxYear(2025)
+                .year(2025)
                 .status(TaxYearStatus.OPEN)
                 .build());
 
@@ -257,20 +258,20 @@ class TaxYearIT extends BaseIntegrationTest {
     void other_user_cannot_delete_a_foreign_payment_even_when_owning_a_year_with_the_same_number() throws Exception {
         TaxYear ownersYear = taxYearRepository.save(TaxYear.builder()
                 .userId(TEST_USER_ID)
-                .taxYear(2025)
+                .year(2025)
                 .status(TaxYearStatus.OPEN)
                 .build());
         TaxPayment ownersPayment = taxPaymentRepository.save(TaxPayment.builder()
                 .taxYearId(ownersYear.getId())
                 .userId(TEST_USER_ID)
-                .paymentDate(LocalDate.of(2025, 6, 30))
+                .paymentDate(LocalDate.of(2025, Month.JUNE, 30))
                 .amount(new BigDecimal("5000"))
                 .build());
         // The attacker owns their OWN 2025 year, so loadYear() succeeds for them —
         // the payment lookup itself must still enforce ownership.
         taxYearRepository.save(TaxYear.builder()
                 .userId(OTHER_USER_ID)
-                .taxYear(2025)
+                .year(2025)
                 .status(TaxYearStatus.OPEN)
                 .build());
 

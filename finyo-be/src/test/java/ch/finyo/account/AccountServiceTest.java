@@ -134,8 +134,8 @@ class AccountServiceTest {
         given(accountRepository.findByIdAndUserId(id, "wrong-user")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.getById(id, "wrong-user"))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .as("Account owned by a different user must not be accessible — must throw, not return data");
+                .as("Account owned by a different user must not be accessible — must throw, not return data")
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     // =========================================================================
@@ -242,8 +242,8 @@ class AccountServiceTest {
         given(accountRepository.findByIdAndUserId(id, "attacker-user")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.update(id, request, "attacker-user"))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .as("Update must be scoped to the authenticated user — cannot update another user's account");
+                .as("Update must be scoped to the authenticated user — cannot update another user's account")
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -318,8 +318,8 @@ class AccountServiceTest {
 
         try {
             accountService.delete(id, "user-1");
-        } catch (ResourceNotFoundException expected) {
-            // expected
+        } catch (ResourceNotFoundException _) {
+            // expected — the guard below verifies no delete happened
         }
 
         then(accountRepository).should(never()).deleteById(any());
@@ -332,7 +332,7 @@ class AccountServiceTest {
         given(accountRepository.existsByIdAndUserId(id, "attacker")).willReturn(false);
 
         assertThatThrownBy(() -> accountService.delete(id, "attacker"))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .as("delete() must not allow cross-user deletion — attacker must receive ResourceNotFoundException");
+                .as("delete() must not allow cross-user deletion — attacker must receive ResourceNotFoundException")
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

@@ -1,6 +1,7 @@
 package ch.finyo.tax;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -9,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,7 +70,7 @@ class TaxYearServiceTest {
         return TaxYear.builder()
                 .id(YEAR_ID)
                 .userId(USER_ID)
-                .taxYear(YEAR)
+                .year(YEAR)
                 .status(status)
                 .cantonCode("SG")
                 .civilStatus(TaxCivilStatus.SINGLE)
@@ -81,7 +83,7 @@ class TaxYearServiceTest {
         return TaxYear.builder()
                 .id(YEAR_ID)
                 .userId(USER_ID)
-                .taxYear(YEAR)
+                .year(YEAR)
                 .status(status)
                 .build();
     }
@@ -102,7 +104,7 @@ class TaxYearServiceTest {
                 new BigDecimal("100000"), null, null, null,
                 null, null, null, null,
                 new BigDecimal("7000"), null,
-                LocalDate.of(2026, 3, 31), null);
+                LocalDate.of(2026, Month.MARCH, 31), null);
     }
 
     private TaxPayment payment(BigDecimal amount) {
@@ -110,7 +112,7 @@ class TaxYearServiceTest {
                 .id(UUID.randomUUID())
                 .taxYearId(YEAR_ID)
                 .userId(USER_ID)
-                .paymentDate(LocalDate.of(2025, 6, 30))
+                .paymentDate(LocalDate.of(2025, Month.JUNE, 30))
                 .amount(amount)
                 .build();
     }
@@ -144,7 +146,7 @@ class TaxYearServiceTest {
 
     @Test
     void upsert_creates_new_year_with_open_status_when_absent() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.empty());
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.empty());
         stubSaveAssignsId();
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12000.00"));
@@ -156,16 +158,16 @@ class TaxYearServiceTest {
         assertThat(result.status()).isEqualTo(TaxYearStatus.OPEN);
         then(taxYearRepository).should().save(argThat(saved ->
                 USER_ID.equals(saved.getUserId())
-                        && saved.getTaxYear() == YEAR
+                        && saved.getYear() == YEAR
                         && saved.getStatus() == TaxYearStatus.OPEN
                         && "SG".equals(saved.getCantonCode())));
     }
 
     @Test
     void upsert_updates_existing_year_preserving_userId_status_and_filedAt() {
-        LocalDate filedAt = LocalDate.of(2026, 4, 1);
+        LocalDate filedAt = LocalDate.of(2026, Month.APRIL, 1);
         TaxYear existing = completeYear(TaxYearStatus.FILED).toBuilder().filedAt(filedAt).build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
         stubSaveReturnsArgument();
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12000.00"));
@@ -184,12 +186,12 @@ class TaxYearServiceTest {
 
     @Test
     void upsert_preserves_filingDeadline_and_assessedAmount_when_request_omits_them() {
-        LocalDate filingDeadline = LocalDate.of(2026, 3, 31);
+        LocalDate filingDeadline = LocalDate.of(2026, Month.MARCH, 31);
         TaxYear existing = completeYear(TaxYearStatus.ASSESSED).toBuilder()
                 .filingDeadline(filingDeadline)
                 .assessedAmount(new BigDecimal("9999.99"))
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
         stubSaveReturnsArgument();
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12000.00"));
@@ -211,15 +213,15 @@ class TaxYearServiceTest {
     @Test
     void upsert_overwrites_filingDeadline_and_assessedAmount_when_request_provides_them() {
         TaxYear existing = completeYear(TaxYearStatus.ASSESSED).toBuilder()
-                .filingDeadline(LocalDate.of(2026, 3, 31))
+                .filingDeadline(LocalDate.of(2026, Month.MARCH, 31))
                 .assessedAmount(new BigDecimal("9999.99"))
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
         stubSaveReturnsArgument();
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12000.00"));
         stubEmptyPaymentsAndDeadlines();
-        LocalDate newDeadline = LocalDate.of(2026, 6, 30);
+        LocalDate newDeadline = LocalDate.of(2026, Month.JUNE, 30);
         TaxYearRequest request = new TaxYearRequest("SG", 3203, TaxCivilStatus.SINGLE, 0, ChurchAffiliation.NONE,
                 new BigDecimal("100000"), null, null, null,
                 null, null, null, null,
@@ -238,7 +240,7 @@ class TaxYearServiceTest {
 
     @Test
     void getByYear_throws_ResourceNotFoundException_when_year_absent() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.empty());
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getByYear(YEAR, USER_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -251,8 +253,8 @@ class TaxYearServiceTest {
 
     @Test
     void updateStatus_open_to_filed_sets_filedAt_to_the_effective_date() {
-        LocalDate effectiveDate = LocalDate.of(2026, 4, 15);
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        LocalDate effectiveDate = LocalDate.of(2026, Month.APRIL, 15);
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         stubSaveReturnsArgument();
         stubEmptyPaymentsAndDeadlines();
@@ -267,23 +269,23 @@ class TaxYearServiceTest {
 
     @Test
     void updateStatus_defaults_effective_date_to_today_when_not_provided() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         stubSaveReturnsArgument();
         stubEmptyPaymentsAndDeadlines();
-        LocalDate before = LocalDate.now();
+        LocalDate before = LocalDate.now(SwissTime.ZONE);
 
         TaxYearDetailResponse result = service.updateStatus(
                 YEAR, new TaxYearStatusRequest(TaxYearStatus.FILED, null), USER_ID);
 
         // isBetween guards against the (unlikely) midnight rollover during the test
-        assertThat(result.filedAt()).isBetween(before, LocalDate.now());
+        assertThat(result.filedAt()).isBetween(before, LocalDate.now(SwissTime.ZONE));
     }
 
     @Test
     void updateStatus_forward_skip_open_to_assessed_stamps_filedAt_and_assessedAt() {
-        LocalDate effectiveDate = LocalDate.of(2026, 9, 1);
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        LocalDate effectiveDate = LocalDate.of(2026, Month.SEPTEMBER, 1);
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         stubSaveReturnsArgument();
         stubEmptyPaymentsAndDeadlines();
@@ -298,12 +300,12 @@ class TaxYearServiceTest {
 
     @Test
     void updateStatus_one_step_back_assessed_to_filed_clears_assessedAt_but_keeps_filedAt() {
-        LocalDate filedAt = LocalDate.of(2026, 4, 1);
+        LocalDate filedAt = LocalDate.of(2026, Month.APRIL, 1);
         TaxYear assessed = incompleteYear(TaxYearStatus.ASSESSED).toBuilder()
                 .filedAt(filedAt)
-                .assessedAt(LocalDate.of(2026, 9, 1))
+                .assessedAt(LocalDate.of(2026, Month.SEPTEMBER, 1))
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(assessed));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(assessed));
         stubSaveReturnsArgument();
         stubEmptyPaymentsAndDeadlines();
 
@@ -317,11 +319,11 @@ class TaxYearServiceTest {
 
     @Test
     void updateStatus_two_steps_back_paid_to_open_throws_IllegalStateException() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.PAID)));
+        TaxYearStatusRequest request = new TaxYearStatusRequest(TaxYearStatus.OPEN, null);
 
-        assertThatThrownBy(() -> service.updateStatus(
-                YEAR, new TaxYearStatusRequest(TaxYearStatus.OPEN, null), USER_ID))
+        assertThatThrownBy(() -> service.updateStatus(YEAR, request, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("PAID")
                 .hasMessageContaining("OPEN");
@@ -330,11 +332,11 @@ class TaxYearServiceTest {
 
     @Test
     void updateStatus_same_status_transition_throws_IllegalStateException() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.FILED)));
+        TaxYearStatusRequest request = new TaxYearStatusRequest(TaxYearStatus.FILED, null);
 
-        assertThatThrownBy(() -> service.updateStatus(
-                YEAR, new TaxYearStatusRequest(TaxYearStatus.FILED, null), USER_ID))
+        assertThatThrownBy(() -> service.updateStatus(YEAR, request, USER_ID))
                 .isInstanceOf(IllegalStateException.class);
         then(taxYearRepository).should(never()).save(any());
     }
@@ -345,7 +347,7 @@ class TaxYearServiceTest {
 
     @Test
     void expectedTax_is_null_and_calculation_skipped_when_inputs_incomplete() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         stubEmptyPaymentsAndDeadlines();
 
@@ -358,7 +360,7 @@ class TaxYearServiceTest {
 
     @Test
     void expectedTax_equals_calculation_grand_total_when_inputs_complete() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(completeYear(TaxYearStatus.OPEN)));
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12345.67"));
@@ -374,7 +376,7 @@ class TaxYearServiceTest {
         TaxYear assessed = completeYear(TaxYearStatus.ASSESSED).toBuilder()
                 .assessedAmount(new BigDecimal("9999.99"))
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(assessed));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(assessed));
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12345.67"));
         stubEmptyPaymentsAndDeadlines();
@@ -390,7 +392,7 @@ class TaxYearServiceTest {
         TaxYear paid = completeYear(TaxYearStatus.PAID).toBuilder()
                 .assessedAmount(new BigDecimal("8888.88"))
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.of(paid));
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(paid));
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12345.67"));
         stubEmptyPaymentsAndDeadlines();
@@ -406,7 +408,7 @@ class TaxYearServiceTest {
 
     @Test
     void openAmount_is_negative_when_payments_exceed_expected_tax() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(completeYear(TaxYearStatus.OPEN)));
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("1000.00"));
@@ -424,7 +426,7 @@ class TaxYearServiceTest {
 
     @Test
     void openAmount_is_null_when_expected_tax_is_null_even_with_payments() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         given(taxPaymentRepository.findByTaxYearIdAndUserIdOrderByPaymentDateAsc(YEAR_ID, USER_ID))
                 .willReturn(List.of(payment(new BigDecimal("500.00"))));
@@ -443,9 +445,9 @@ class TaxYearServiceTest {
 
     @Test
     void addPayment_throws_ResourceNotFoundException_when_tax_year_absent() {
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR)).willReturn(Optional.empty());
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.empty());
         TaxPaymentRequest request =
-                new TaxPaymentRequest(LocalDate.of(2025, 6, 30), new BigDecimal("500"), "Provisional");
+                new TaxPaymentRequest(LocalDate.of(2025, Month.JUNE, 30), new BigDecimal("500"), "Provisional");
 
         assertThatThrownBy(() -> service.addPayment(YEAR, request, USER_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -456,13 +458,13 @@ class TaxYearServiceTest {
     @Test
     void updatePayment_throws_ResourceNotFoundException_when_payment_belongs_to_other_user() {
         UUID foreignPaymentId = UUID.randomUUID();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
         // findByIdAndUserId is scoped by userId — a foreign payment resolves to empty
         given(taxPaymentRepository.findByIdAndUserId(foreignPaymentId, USER_ID))
                 .willReturn(Optional.empty());
         TaxPaymentRequest request =
-                new TaxPaymentRequest(LocalDate.of(2025, 6, 30), new BigDecimal("500"), null);
+                new TaxPaymentRequest(LocalDate.of(2025, Month.JUNE, 30), new BigDecimal("500"), null);
 
         assertThatThrownBy(() -> service.updatePayment(YEAR, foreignPaymentId, request, USER_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -477,12 +479,13 @@ class TaxYearServiceTest {
         TaxPayment paymentOfOtherYear = payment(new BigDecimal("500.00")).toBuilder()
                 .taxYearId(UUID.randomUUID())
                 .build();
-        given(taxYearRepository.findByUserIdAndTaxYear(USER_ID, YEAR))
+        UUID paymentId = paymentOfOtherYear.getId();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
                 .willReturn(Optional.of(incompleteYear(TaxYearStatus.OPEN)));
-        given(taxPaymentRepository.findByIdAndUserId(paymentOfOtherYear.getId(), USER_ID))
+        given(taxPaymentRepository.findByIdAndUserId(paymentId, USER_ID))
                 .willReturn(Optional.of(paymentOfOtherYear));
 
-        assertThatThrownBy(() -> service.deletePayment(YEAR, paymentOfOtherYear.getId(), USER_ID))
+        assertThatThrownBy(() -> service.deletePayment(YEAR, paymentId, USER_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Tax payment");
         then(taxPaymentRepository).should(never()).delete(any(TaxPayment.class));
