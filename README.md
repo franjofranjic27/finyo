@@ -2,7 +2,9 @@
 
 A personal finance planner.
 
-[![CI status](https://img.shields.io/github/actions/workflow/status/franjofranjic27/finyo/sonar.yml?branch=main&style=for-the-badge)](https://github.com/frnajofranjic27/finyo/actions/workflows/sonar.yml?branch=main)
+[![CI status](https://img.shields.io/github/actions/workflow/status/franjofranjic27/finyo/sonar.yml?branch=main&style=for-the-badge)](https://github.com/franjofranjic27/finyo/actions/workflows/sonar.yml?branch=main)
+[![Backend coverage](https://img.shields.io/sonar/coverage/franjofranjic27_finyo?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=backend%20coverage)](https://sonarcloud.io/summary/overall?id=franjofranjic27_finyo)
+[![Frontend coverage](https://img.shields.io/sonar/coverage/franjofranjic27_finyo-fe?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=frontend%20coverage)](https://sonarcloud.io/summary/overall?id=franjofranjic27_finyo-fe)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 ## What is finyo?
