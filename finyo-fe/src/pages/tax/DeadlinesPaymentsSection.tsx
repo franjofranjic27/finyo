@@ -22,7 +22,7 @@ interface DeadlinesPaymentsSectionProps {
   className?: string;
 }
 
-export function DeadlinesPaymentsSection({ year, detail, className }: DeadlinesPaymentsSectionProps) {
+export function DeadlinesPaymentsSection({ year, detail, className }: Readonly<DeadlinesPaymentsSectionProps>) {
   const { t, i18n } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -59,7 +59,7 @@ export function DeadlinesPaymentsSection({ year, detail, className }: DeadlinesP
       taxApi.addDeadline(token, year, {
         dueDate: deadlineDate,
         label: deadlineLabel,
-        amount: deadlineAmount ? parseFloat(deadlineAmount) : null,
+        amount: deadlineAmount ? Number.parseFloat(deadlineAmount) : null,
         done: false,
       }),
     onSuccess: () => {
@@ -74,7 +74,7 @@ export function DeadlinesPaymentsSection({ year, detail, className }: DeadlinesP
     mutationFn: () =>
       taxApi.addPayment(token, year, {
         paymentDate,
-        amount: parseFloat(amount) || 0,
+        amount: Number.parseFloat(amount) || 0,
         label,
       }),
     onSuccess: () => {
@@ -91,7 +91,7 @@ export function DeadlinesPaymentsSection({ year, detail, className }: DeadlinesP
   });
 
   const confirmDeletePayment = (paymentId: string) => {
-    if (window.confirm(t('tax.confirmDeletePayment'))) {
+    if (globalThis.confirm(t('tax.confirmDeletePayment'))) {
       deletePayment.mutate(paymentId);
     }
   };

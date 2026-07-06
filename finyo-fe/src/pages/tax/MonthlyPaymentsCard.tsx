@@ -11,7 +11,7 @@ interface MonthlyPaymentsCardProps {
   className?: string;
 }
 
-export function MonthlyPaymentsCard({ detail, className }: MonthlyPaymentsCardProps) {
+export function MonthlyPaymentsCard({ detail, className }: Readonly<MonthlyPaymentsCardProps>) {
   const { t, i18n } = useTranslation();
 
   const monthFormatter = new Intl.DateTimeFormat(i18n.language, { month: 'short' });

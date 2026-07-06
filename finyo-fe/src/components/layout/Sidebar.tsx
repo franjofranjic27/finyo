@@ -27,7 +27,7 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: SidebarProps) {
+export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readonly<SidebarProps>) {
   const { t } = useTranslation();
 
   const navItems: NavItem[] = [

@@ -27,7 +27,7 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick }: Readonly<HeaderProps>) {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const { isDark, toggle } = useTheme();

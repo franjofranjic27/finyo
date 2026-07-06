@@ -9,7 +9,7 @@ interface YearStatusBadgeProps {
   inverted?: boolean;
 }
 
-export function YearStatusBadge({ status, inverted = false }: YearStatusBadgeProps) {
+export function YearStatusBadge({ status, inverted = false }: Readonly<YearStatusBadgeProps>) {
   const { t } = useTranslation();
 
   return (

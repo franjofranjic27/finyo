@@ -30,6 +30,11 @@ const CIVIL_STATUS_OPTIONS: { value: TaxCivilStatus; labelKey: string }[] = [
   { value: 'SINGLE_PARENT', labelKey: 'tax.civilStatus.singleParent' },
 ];
 
+// Module scope: recharts re-renders formatter results, nested components would remount.
+const renderLegendText = (value: string) => (
+  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
+);
+
 function Pillar3Form() {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -47,11 +52,11 @@ function Pillar3Form() {
   const { mutate, data: result, isPending } = useMutation({
     mutationFn: () =>
       taxApi.calculatePillar3(token, {
-        currentBalance: parseFloat(balance) || 0,
-        annualContribution: parseFloat(contribution) || 0,
-        assumedAnnualReturnPercent: parseFloat(returnPct) || 5,
-        yearsToRetirement: parseInt(years) || 30,
-        grossEmploymentIncome: income ? parseFloat(income) : null,
+        currentBalance: Number.parseFloat(balance) || 0,
+        annualContribution: Number.parseFloat(contribution) || 0,
+        assumedAnnualReturnPercent: Number.parseFloat(returnPct) || 5,
+        yearsToRetirement: Number.parseInt(years) || 30,
+        grossEmploymentIncome: income ? Number.parseFloat(income) : null,
         civilStatus: income ? civilStatus : null,
         cantonCode: income ? canton : null,
         taxYear: currentYear,
@@ -121,12 +126,12 @@ function Pillar3Form() {
       </Card>
 
       {isPending && <Skeleton className="h-96 w-full" />}
-      {result && <Pillar3Result result={result} years={parseInt(years)} />}
+      {result && <Pillar3Result result={result} years={Number.parseInt(years)} />}
     </div>
   );
 }
 
-function Pillar3Result({ result, years }: { result: Pillar3Result; years: number }) {
+function Pillar3Result({ result, years }: Readonly<{ result: Pillar3Result; years: number }>) {
   const { t } = useTranslation();
 
   const chartData = result.yearlyProjection
@@ -186,7 +191,7 @@ function Pillar3Result({ result, years }: { result: Pillar3Result; years: number
                 formatter={(v: number) => formatCHF(v)}
                 contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
               />
-              <Legend formatter={(v) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{v}</span>} />
+              <Legend formatter={renderLegendText} />
               <Area type="monotone" dataKey="Contributions" stackId="1" stroke="#6366f1" fill="#6366f1" fillOpacity={0.6} />
               <Area type="monotone" dataKey="Returns" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
             </AreaChart>
@@ -216,7 +221,7 @@ function Pillar3Result({ result, years }: { result: Pillar3Result; years: number
   );
 }
 
-function MetricCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function MetricCard({ label, value, highlight }: Readonly<{ label: string; value: string; highlight?: boolean }>) {
   return (
     <Card className={highlight ? 'border-emerald-500/30 bg-emerald-500/5' : ''}>
       <CardContent className="pt-4">

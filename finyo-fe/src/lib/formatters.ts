@@ -3,8 +3,8 @@
  * Uses Swiss locale for consistent formatting: 1'234.56
  */
 export function formatCHF(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return 'CHF 0.00';
+  const num = typeof value === 'string' ? Number.parseFloat(value) : value;
+  if (Number.isNaN(num)) return 'CHF 0.00';
   return `CHF ${num.toLocaleString('de-CH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -16,7 +16,7 @@ export function formatCHF(value: number | string): string {
  */
 export function formatDateDE(isoDate: string): string {
   const date = new Date(isoDate);
-  if (isNaN(date.getTime())) return isoDate;
+  if (Number.isNaN(date.getTime())) return isoDate;
   return date.toLocaleDateString('de-CH', {
     day: '2-digit',
     month: '2-digit',
@@ -29,7 +29,7 @@ export function formatDateDE(isoDate: string): string {
  */
 export function formatDateEN(isoDate: string): string {
   const date = new Date(isoDate);
-  if (isNaN(date.getTime())) return isoDate;
+  if (Number.isNaN(date.getTime())) return isoDate;
   return date.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -55,7 +55,7 @@ export function formatPercent(value: number): string {
  * Return a colour class for positive/negative amounts.
  */
 export function amountColour(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
+  const num = typeof value === 'string' ? Number.parseFloat(value) : value;
   if (num > 0) return 'text-emerald-500';
   if (num < 0) return 'text-red-500';
   return 'text-muted-foreground';

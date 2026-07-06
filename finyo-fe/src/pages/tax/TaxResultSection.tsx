@@ -31,20 +31,25 @@ function buildDeductionRows(inputs: TaxYearInputs | null): DeductionRow[] {
   );
 }
 
+// Module scope: recharts re-renders formatter results, nested components would remount.
+const renderLegendText = (value: string) => (
+  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
+);
+
 interface TaxResultSectionProps {
   result: TaxResultResponse;
   inputs: TaxYearInputs | null;
   className?: string;
 }
 
-export function TaxResultSection({ result, inputs, className }: TaxResultSectionProps) {
+export function TaxResultSection({ result, inputs, className }: Readonly<TaxResultSectionProps>) {
   const { t } = useTranslation();
   // Controlled so the PDF export can force the deductions open before printing.
   const [deductionsOpen, setDeductionsOpen] = useState(false);
 
   const exportPdf = () => {
     setDeductionsOpen(true);
-    requestAnimationFrame(() => window.print());
+    requestAnimationFrame(() => globalThis.print());
   };
 
   const deductionRows = buildDeductionRows(inputs);
@@ -132,7 +137,7 @@ export function TaxResultSection({ result, inputs, className }: TaxResultSection
                 formatter={(v: number) => formatCHF(v)}
                 contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
               />
-              <Legend formatter={(v) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{v}</span>} />
+              <Legend formatter={renderLegendText} />
             </PieChart>
           </ResponsiveContainer>
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -157,13 +162,13 @@ function Row({
   muted,
   bold,
   className,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   muted?: boolean;
   bold?: boolean;
   className?: string;
-}) {
+}>) {
   return (
     <div className="flex justify-between">
       <span className={cn(muted && 'text-muted-foreground')}>{label}</span>

@@ -19,9 +19,11 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+// Renders a <div> so consumers stay in control of the heading hierarchy
+// (an empty <h3> would violate a11y rules for headings).
+const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn('font-semibold leading-none tracking-tight', className)} {...props} />
+    <div ref={ref} className={cn('font-semibold leading-none tracking-tight', className)} {...props} />
   )
 );
 CardTitle.displayName = 'CardTitle';

@@ -20,6 +20,8 @@ import type { Instrument, MarketData } from '@/types';
 
 const INSTRUMENT_TYPES = ['STOCK', 'ETF', 'FUND', 'BOND', 'CRYPTO', 'OTHER'];
 
+const SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3', 'sk-4'];
+
 function formatMarketCap(value?: number): string {
   if (!value) return '—';
   if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
@@ -27,7 +29,7 @@ function formatMarketCap(value?: number): string {
   return value.toLocaleString('de-CH');
 }
 
-function ChangeCell({ pct }: { pct?: number }) {
+function ChangeCell({ pct }: Readonly<{ pct?: number }>) {
   if (pct === undefined || pct === null) return <span className="text-muted-foreground">—</span>;
   const positive = pct >= 0;
   return (
@@ -42,11 +44,11 @@ function InstrumentCard({
   instrument,
   marketData,
   onDelete,
-}: {
+}: Readonly<{
   instrument: Instrument;
   marketData?: MarketData;
   onDelete: (id: string) => void;
-}) {
+}>) {
   const { t } = useTranslation();
 
   const displayName = marketData?.name ?? instrument.name ?? instrument.isin ?? instrument.ticker ?? instrument.valor ?? 'Unknown';
@@ -73,7 +75,7 @@ function InstrumentCard({
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-red-500"
             onClick={() => {
-              if (window.confirm('Delete this instrument?')) onDelete(instrument.id);
+              if (globalThis.confirm('Delete this instrument?')) onDelete(instrument.id);
             }}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -140,7 +142,7 @@ function InstrumentCard({
   );
 }
 
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+function Fact({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
@@ -154,12 +156,12 @@ function AddInstrumentDialog({
   onClose,
   onAdd,
   isAdding,
-}: {
+}: Readonly<{
   open: boolean;
   onClose: () => void;
   onAdd: (data: { valor?: string; isin?: string; ticker?: string; name?: string; instrumentType?: string }) => void;
   isAdding: boolean;
-}) {
+}>) {
   const { t } = useTranslation();
   const [valor, setValor] = useState('');
   const [isin, setIsin] = useState('');
@@ -268,6 +270,38 @@ export function Investments() {
     undefined;
 
   const isLoading = loadingInstruments || loadingMarket;
+  const instrumentList = instruments ?? [];
+
+  let content: React.ReactNode;
+  if (isLoading) {
+    content = (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-64 w-full" />)}
+      </div>
+    );
+  } else if (instrumentList.length === 0) {
+    content = (
+      <div className="py-16 text-center space-y-3">
+        <p className="text-muted-foreground">{t('investments.noInstruments')}</p>
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> {t('investments.addInstrument')}
+        </Button>
+      </div>
+    );
+  } else {
+    content = (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {instrumentList.map((instrument) => (
+          <InstrumentCard
+            key={instrument.id}
+            instrument={instrument}
+            marketData={getMarketData(instrument)}
+            onDelete={(id) => deleteInstrument(id)}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -283,29 +317,7 @@ export function Investments() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
-        </div>
-      ) : (instruments ?? []).length === 0 ? (
-        <div className="py-16 text-center space-y-3">
-          <p className="text-muted-foreground">{t('investments.noInstruments')}</p>
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('investments.addInstrument')}
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(instruments ?? []).map((instrument) => (
-            <InstrumentCard
-              key={instrument.id}
-              instrument={instrument}
-              marketData={getMarketData(instrument)}
-              onDelete={(id) => deleteInstrument(id)}
-            />
-          ))}
-        </div>
-      )}
+      {content}
 
       <AddInstrumentDialog
         open={addOpen}

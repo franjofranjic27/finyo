@@ -8,7 +8,7 @@ export function getRealmRoles(accessToken?: string): string[] {
     const payloadPart = accessToken.split('.')[1];
     if (!payloadPart) return [];
     const payload = JSON.parse(
-      atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/'))
+      atob(payloadPart.replaceAll('-', '+').replaceAll('_', '/'))
     ) as { realm_access?: { roles?: string[] } };
     return payload.realm_access?.roles ?? [];
   } catch {

@@ -13,7 +13,7 @@ interface YearSidebarProps {
   orientation?: 'vertical' | 'horizontal';
 }
 
-export function YearSidebar({ entries, selectedYear, orientation = 'vertical' }: YearSidebarProps) {
+export function YearSidebar({ entries, selectedYear, orientation = 'vertical' }: Readonly<YearSidebarProps>) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 

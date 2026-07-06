@@ -26,17 +26,20 @@ const ACCOUNT_TYPES: Account['type'][] = [
   'CHECKING', 'SAVINGS', 'CREDIT_CARD', 'INVESTMENT', 'CASH', 'OTHER',
 ];
 
+const ACCOUNT_SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3'];
+const CATEGORY_SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'];
+
 // --- Accounts Tab ---
 
 function AddAccountDialog({
   open,
   onClose,
   token,
-}: {
+}: Readonly<{
   open: boolean;
   onClose: () => void;
   token: string;
-}) {
+}>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
@@ -111,7 +114,7 @@ function AddAccountDialog({
   );
 }
 
-function AccountsTab({ token }: { token: string }) {
+function AccountsTab({ token }: Readonly<{ token: string }>) {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
@@ -126,6 +129,59 @@ function AccountsTab({ token }: { token: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
   });
 
+  const accountList = accounts ?? [];
+
+  let content: React.ReactNode;
+  if (isLoading) {
+    content = ACCOUNT_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-16 w-full" />);
+  } else if (accountList.length === 0) {
+    content = <p className="py-8 text-center text-sm text-muted-foreground">No accounts yet.</p>;
+  } else {
+    content = (
+      <div className="space-y-2">
+        {accountList.map((account) => (
+          <Card key={account.id}>
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {account.color && (
+                    <span
+                      className="h-4 w-4 rounded-full shrink-0"
+                      style={{ background: account.color }}
+                    />
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">{account.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCHF(account.initialBalance)} initial · {account.currency}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {account.type.replace('_', ' ')}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                    onClick={() => {
+                      if (globalThis.confirm(`Delete account "${account.name}"? This cannot be undone.`)) {
+                        deleteAccount(account.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -134,53 +190,7 @@ function AccountsTab({ token }: { token: string }) {
         </Button>
       </div>
 
-      {isLoading ? (
-        Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
-      ) : (accounts ?? []).length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">No accounts yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {(accounts ?? []).map((account) => (
-            <Card key={account.id}>
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {account.color && (
-                      <span
-                        className="h-4 w-4 rounded-full shrink-0"
-                        style={{ background: account.color }}
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium text-sm">{account.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCHF(account.initialBalance)} initial · {account.currency}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {account.type.replace('_', ' ')}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                      onClick={() => {
-                        if (window.confirm(`Delete account "${account.name}"? This cannot be undone.`)) {
-                          deleteAccount(account.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {content}
 
       <AddAccountDialog open={addOpen} onClose={() => setAddOpen(false)} token={token} />
     </div>
@@ -194,12 +204,12 @@ function AddCategoryDialog({
   onClose,
   categories,
   token,
-}: {
+}: Readonly<{
   open: boolean;
   onClose: () => void;
   categories: Category[];
   token: string;
-}) {
+}>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
@@ -292,7 +302,31 @@ function AddCategoryDialog({
   );
 }
 
-function CategoriesTab({ token }: { token: string }) {
+function CategoryRow({ cat, onDelete }: Readonly<{ cat: Category; onDelete: (id: string) => void }>) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center gap-2">
+        {cat.color && (
+          <span className="h-3 w-3 rounded-full shrink-0" style={{ background: cat.color }} />
+        )}
+        {cat.icon && <span className="text-base">{cat.icon}</span>}
+        <span className="text-sm">{cat.parentName ? `${cat.parentName} › ` : ''}{cat.name}</span>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-red-500"
+        onClick={() => {
+          if (globalThis.confirm(`Delete category "${cat.name}"?`)) onDelete(cat.id);
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+function CategoriesTab({ token }: Readonly<{ token: string }>) {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
@@ -311,28 +345,6 @@ function CategoriesTab({ token }: { token: string }) {
   const expenses = (categories ?? []).filter((c) => c.type === 'EXPENSE');
   const incomes = (categories ?? []).filter((c) => c.type === 'INCOME');
 
-  const CategoryRow = ({ cat }: { cat: Category }) => (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-2">
-        {cat.color && (
-          <span className="h-3 w-3 rounded-full shrink-0" style={{ background: cat.color }} />
-        )}
-        {cat.icon && <span className="text-base">{cat.icon}</span>}
-        <span className="text-sm">{cat.parentName ? `${cat.parentName} › ` : ''}{cat.name}</span>
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-red-500"
-        onClick={() => {
-          if (window.confirm(`Delete category "${cat.name}"?`)) deleteCategory(cat.id);
-        }}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -342,7 +354,7 @@ function CategoriesTab({ token }: { token: string }) {
       </div>
 
       {isLoading ? (
-        Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+        CATEGORY_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-10 w-full" />)
       ) : (
         <div className="space-y-4">
           <div>
@@ -355,7 +367,7 @@ function CategoriesTab({ token }: { token: string }) {
                 {expenses.length === 0 ? (
                   <p className="py-3 text-sm text-muted-foreground text-center">No expense categories</p>
                 ) : (
-                  expenses.map((c) => <CategoryRow key={c.id} cat={c} />)
+                  expenses.map((c) => <CategoryRow key={c.id} cat={c} onDelete={deleteCategory} />)
                 )}
               </CardContent>
             </Card>
@@ -373,7 +385,7 @@ function CategoriesTab({ token }: { token: string }) {
                 {incomes.length === 0 ? (
                   <p className="py-3 text-sm text-muted-foreground text-center">No income categories</p>
                 ) : (
-                  incomes.map((c) => <CategoryRow key={c.id} cat={c} />)
+                  incomes.map((c) => <CategoryRow key={c.id} cat={c} onDelete={deleteCategory} />)
                 )}
               </CardContent>
             </Card>

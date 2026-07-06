@@ -9,7 +9,7 @@ import { getRealmRoles } from './roles';
 /** Realm roles that grant access to the application. */
 const ALLOWED_ROLES = ['user', 'admin'];
 
-function CenteredScreen({ children }: { children: React.ReactNode }) {
+function CenteredScreen({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4 text-center px-4">{children}</div>
@@ -22,7 +22,7 @@ function CenteredScreen({ children }: { children: React.ReactNode }) {
  * blocks authenticated users that do not carry one of the required realm
  * roles ("user" or "admin").
  */
-export function RequireAuth({ children }: { children: React.ReactNode }) {
+export function RequireAuth({ children }: Readonly<{ children: React.ReactNode }>) {
   const auth = useAuth();
   const { t } = useTranslation();
 

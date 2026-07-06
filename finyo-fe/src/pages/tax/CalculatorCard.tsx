@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
-import type { ChurchAffiliation, TaxCivilStatus, TaxYearInputs } from '@/api/tax';
+import type { ChurchAffiliation, TaxCivilStatus, TaxCommune, TaxYearInputs } from '@/api/tax';
 
 const CANTONS = [
   'AG','AI','AR','BE','BL','BS','FR','GE','GL','GR',
@@ -55,13 +55,23 @@ function formatMultiplier(multiplier: number): string {
   return `${(multiplier * 100).toFixed(0)} %`;
 }
 
+function resolveChurchMultiplier(
+  commune: TaxCommune | null,
+  church: ChurchAffiliation,
+): number | null {
+  if (!commune) return null;
+  if (church === 'PROTESTANT') return commune.churchMultiplierProtestant;
+  if (church === 'ROMAN_CATHOLIC') return commune.churchMultiplierRomanCatholic;
+  return null;
+}
+
 interface CalculatorCardProps {
   year: number;
   inputs: TaxYearInputs | null;
   className?: string;
 }
 
-export function CalculatorCard({ year, inputs, className }: CalculatorCardProps) {
+export function CalculatorCard({ year, inputs, className }: Readonly<CalculatorCardProps>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -96,12 +106,7 @@ export function CalculatorCard({ year, inputs, className }: CalculatorCardProps)
   });
 
   const selectedCommune = communes?.find((c) => String(c.bfsNumber) === bfsNumber) ?? null;
-  const churchMultiplier =
-    church === 'PROTESTANT'
-      ? selectedCommune?.churchMultiplierProtestant
-      : church === 'ROMAN_CATHOLIC'
-        ? selectedCommune?.churchMultiplierRomanCatholic
-        : null;
+  const churchMultiplier = resolveChurchMultiplier(selectedCommune, church);
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: () => {
@@ -111,11 +116,11 @@ export function CalculatorCard({ year, inputs, className }: CalculatorCardProps)
         bfsNumber: bfsNumber ? Number(bfsNumber) : null,
         civilStatus,
         churchAffiliation: church,
-        numberOfChildren: parseInt(children) || 0,
-        grossEmploymentIncome: parseFloat(grossIncome) || 0,
-        investmentIncome: investmentIncome ? parseFloat(investmentIncome) : null,
-        pillar3aContribution: pillar3a ? parseFloat(pillar3a) : null,
-        netWealth: netWealth ? parseFloat(netWealth) : null,
+        numberOfChildren: Number.parseInt(children) || 0,
+        grossEmploymentIncome: Number.parseFloat(grossIncome) || 0,
+        investmentIncome: investmentIncome ? Number.parseFloat(investmentIncome) : null,
+        pillar3aContribution: pillar3a ? Number.parseFloat(pillar3a) : null,
+        netWealth: netWealth ? Number.parseFloat(netWealth) : null,
       };
       return taxApi.upsertYear(token, year, payload);
     },

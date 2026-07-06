@@ -24,6 +24,13 @@ import type { CategoryBreakdown, MonthlyDataPoint } from '@/types';
 
 const CHART_COLOURS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#e0e7ff'];
 
+const SUMMARY_SKELETON_KEYS = ['net', 'income', 'expenses', 'category'];
+
+// Module scope: recharts re-renders formatter results, nested components would remount.
+const renderLegendText = (value: string) => (
+  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
+);
+
 // --- Sub-components ---
 
 function SummaryCard({
@@ -32,13 +39,13 @@ function SummaryCard({
   sub,
   icon: Icon,
   valueClass,
-}: {
+}: Readonly<{
   title: string;
   value: string;
   sub?: string;
   icon: React.ComponentType<{ className?: string }>;
   valueClass?: string;
-}) {
+}>) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -67,10 +74,11 @@ function SummaryCardSkeleton() {
   );
 }
 
-function SpendingDonut({ data }: { data: CategoryBreakdown[] }) {
+function SpendingDonut({ data }: Readonly<{ data: CategoryBreakdown[] }>) {
   const chartData = data.slice(0, 6).map((d) => ({
+    id: d.categoryId,
     name: d.categoryName,
-    value: Math.abs(parseFloat(d.total)),
+    value: Math.abs(Number.parseFloat(d.total)),
   }));
 
   return (
@@ -85,29 +93,25 @@ function SpendingDonut({ data }: { data: CategoryBreakdown[] }) {
           paddingAngle={3}
           dataKey="value"
         >
-          {chartData.map((_, index) => (
-            <Cell key={index} fill={CHART_COLOURS[index % CHART_COLOURS.length]} />
+          {chartData.map((entry, index) => (
+            <Cell key={entry.id} fill={CHART_COLOURS[index % CHART_COLOURS.length]} />
           ))}
         </Pie>
         <Tooltip
           formatter={(value: number) => formatCHF(value)}
           contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
         />
-        <Legend
-          formatter={(value) => (
-            <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
-          )}
-        />
+        <Legend formatter={renderLegendText} />
       </PieChart>
     </ResponsiveContainer>
   );
 }
 
-function MonthlyBarChart({ data }: { data: MonthlyDataPoint[] }) {
+function MonthlyBarChart({ data }: Readonly<{ data: MonthlyDataPoint[] }>) {
   const chartData = data.slice(-6).map((d) => ({
     month: `${String(d.month).padStart(2, '0')}/${d.year}`,
-    Income: Math.abs(parseFloat(d.income)),
-    Expenses: Math.abs(parseFloat(d.expenses)),
+    Income: Math.abs(Number.parseFloat(d.income)),
+    Expenses: Math.abs(Number.parseFloat(d.expenses)),
   }));
 
   return (
@@ -200,7 +204,7 @@ export function Dashboard() {
   const monthlyData = monthly ?? DEMO_MONTHLY;
 
   const biggestCategory = categoriesData.reduce<CategoryBreakdown | null>((acc, c) => {
-    if (!acc || Math.abs(parseFloat(c.total)) > Math.abs(parseFloat(acc.total))) return c;
+    if (!acc || Math.abs(Number.parseFloat(c.total)) > Math.abs(Number.parseFloat(acc.total))) return c;
     return acc;
   }, null);
 
@@ -209,14 +213,14 @@ export function Dashboard() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {loadingSummary ? (
-          Array.from({ length: 4 }).map((_, i) => <SummaryCardSkeleton key={i} />)
+          SUMMARY_SKELETON_KEYS.map((key) => <SummaryCardSkeleton key={key} />)
         ) : (
           <>
             <SummaryCard
               title={t('dashboard.netThisMonth')}
               value={formatCHF(summaryData.netAmount)}
               icon={Wallet}
-              valueClass={amountColour(parseFloat(summaryData.netAmount))}
+              valueClass={amountColour(Number.parseFloat(summaryData.netAmount))}
               sub={`${summaryData.transactionCount} transactions`}
             />
             <SummaryCard

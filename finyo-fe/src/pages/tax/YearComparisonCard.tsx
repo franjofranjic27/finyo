@@ -7,12 +7,17 @@ import type { TaxYearSummary } from '@/api/tax';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 import { buildComparisonData } from './taxYearUtils';
 
+// Module scope: recharts re-renders formatter results, nested components would remount.
+const renderLegendText = (value: string) => (
+  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
+);
+
 interface YearComparisonCardProps {
   years: TaxYearSummary[];
   className?: string;
 }
 
-export function YearComparisonCard({ years, className }: YearComparisonCardProps) {
+export function YearComparisonCard({ years, className }: Readonly<YearComparisonCardProps>) {
   const { t } = useTranslation();
 
   const data = buildComparisonData(years);
@@ -47,7 +52,7 @@ export function YearComparisonCard({ years, className }: YearComparisonCardProps
               }
               contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
             />
-            <Legend formatter={(v) => <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{v}</span>} />
+            <Legend formatter={renderLegendText} />
             <Bar yAxisId="chf" dataKey="income" name={t('tax.income')} fill="#c7d2fe" radius={[4, 4, 0, 0]} />
             <Bar yAxisId="chf" dataKey="taxBurden" name={t('tax.taxBurden')} fill="#6366f1" radius={[4, 4, 0, 0]} />
             <Line yAxisId="pct" dataKey="effectiveRate" name={rateLabel} stroke="#10b981" strokeWidth={2} />

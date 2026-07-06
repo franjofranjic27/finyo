@@ -9,6 +9,8 @@ import { useAuth } from '@/auth/useAuth';
 import { insuranceApi } from '@/api/insurance';
 import type { InsuranceOverview } from '@/api/insurance';
 
+const SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'];
+
 function formatCostRange(min?: number, max?: number): string | null {
   if (!min && !max) return null;
   if (min && max) return `CHF ${min.toLocaleString('de-CH')} – ${max.toLocaleString('de-CH')} / year`;
@@ -22,12 +24,12 @@ function InsuranceCard({
   lang,
   onToggle,
   isToggling,
-}: {
+}: Readonly<{
   item: InsuranceOverview;
   lang: string;
   onToggle: (id: string, current: boolean) => void;
   isToggling: boolean;
-}) {
+}>) {
   const { t } = useTranslation();
   const name = lang === 'de' ? item.nameDe : item.nameEn;
   const description = lang === 'de' ? item.descriptionDe : item.descriptionEn;
@@ -90,7 +92,7 @@ function InsuranceCard({
   );
 }
 
-function SectionHeader({ title, count }: { title: string; count: number }) {
+function SectionHeader({ title, count }: Readonly<{ title: string; count: number }>) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <h2 className="text-base font-semibold">{title}</h2>
@@ -148,7 +150,7 @@ export function Insurance() {
 
       {isLoading ? (
         <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+          {SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-20 w-full" />)}
         </div>
       ) : (
         <>

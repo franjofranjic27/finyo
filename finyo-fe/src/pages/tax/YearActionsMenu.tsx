@@ -22,7 +22,7 @@ interface YearActionsMenuProps {
 }
 
 /** Status transitions and deletion for a persisted tax year. */
-export function YearActionsMenu({ year, status }: YearActionsMenuProps) {
+export function YearActionsMenu({ year, status }: Readonly<YearActionsMenuProps>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -49,7 +49,7 @@ export function YearActionsMenu({ year, status }: YearActionsMenuProps) {
   });
 
   const confirmDeleteYear = () => {
-    if (window.confirm(t('tax.confirmDeleteYear', { year }))) {
+    if (globalThis.confirm(t('tax.confirmDeleteYear', { year }))) {
       deleteYear.mutate();
     }
   };
