@@ -1,0 +1,60 @@
+{
+  "realm": "finyo",
+  "enabled": true,
+  "displayName": "finyo",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionMaxLifespan": 1800,
+  "offlineSessionMaxLifespanEnabled": false,
+  "requiredActions": [],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Standard user role",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "finyo"
+      },
+      {
+        "name": "admin",
+        "description": "Administrator role",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "finyo"
+      }
+    ]
+  },
+  "defaultRoles": [
+    "user"
+  ],
+  "clients": [
+    {
+      "clientId": "finyo-ui",
+      "name": "finyo UI",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://${FINYO_DOMAIN}/*"
+      ],
+      "webOrigins": [
+        "https://${FINYO_DOMAIN}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://${FINYO_DOMAIN}"
+      },
+      "protocol": "openid-connect"
+    }
+  ]
+}

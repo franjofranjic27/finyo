@@ -1,0 +1,19 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$FINYO_DOMAIN} {
+	encode gzip zstd
+
+	handle /auth/* {
+		reverse_proxy keycloak:8080
+	}
+
+	handle /api/* {
+		reverse_proxy finyo-be:8080
+	}
+
+	handle {
+		reverse_proxy finyo-fe:80
+	}
+}
