@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | docs/COMMIT_CONVENTION.md | Full commit format spec with examples |
 | docs/TESTING.md | Test types, how to run, how to write tests |
 | docs/WORKFLOWS.md | GitHub Actions workflows and local equivalents |
+| docs/DEPLOYMENT.md | Production deployment (compose.prod.yml, Caddy, Keycloak persistence) |
 | CONTRIBUTING.md | Contributor setup and workflow |
 
 ## CI/CD
