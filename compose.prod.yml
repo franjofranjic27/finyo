@@ -1,0 +1,120 @@
+# Production stack — pulls released images from Docker Hub.
+# See docs/DEPLOYMENT.md for the full setup guide.
+#
+# Usage:
+#   cp .env.prod.example .env.prod   # then fill in the values
+#   docker compose -f compose.prod.yml --env-file .env.prod up -d
+#
+# Only Caddy (80/443) is exposed to the host; it terminates TLS and routes
+#   /auth/* → Keycloak, /api/* → finyo-be, everything else → finyo-fe.
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finyo
+      POSTGRES_USER: finyo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # consumed by the init script to create the keycloak database
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/create-keycloak-db.sh:/docker-entrypoint-initdb.d/create-keycloak-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finyo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.4
+    restart: unless-stopped
+    command: start --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER:?KC_ADMIN_USER is required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?KC_ADMIN_PASSWORD is required}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required}
+      # public URL — must match the issuer the backend and frontend expect
+      KC_HOSTNAME: https://${FINYO_DOMAIN:?FINYO_DOMAIN is required}/auth
+      KC_HTTP_RELATIVE_PATH: /auth
+      # TLS is terminated by Caddy; trust its X-Forwarded-* headers
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      # substituted into ${FINYO_DOMAIN} placeholders in the realm import file
+      FINYO_DOMAIN: ${FINYO_DOMAIN}
+    volumes:
+      - ./keycloak/finyo-realm.prod.json:/opt/keycloak/data/import/finyo-realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak image has no curl/wget; health endpoint lives on management port 9000
+      # (under the /auth relative path)
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  finyo-be:
+    image: ${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}/finyo-be:${FINYO_BE_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/finyo
+      DB_USERNAME: finyo
+      DB_PASSWORD: ${DB_PASSWORD}
+      # issuer must match the `iss` claim in tokens (public Keycloak URL);
+      # keys are fetched via the internal network, hence the separate JWK URI
+      KEYCLOAK_ISSUER_URI: https://${FINYO_DOMAIN}/auth/realms/finyo
+      KEYCLOAK_JWK_URI: http://keycloak:8080/auth/realms/finyo/protocol/openid-connect/certs
+      SIX_API_KEY: ${SIX_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      # temurin alpine image ships busybox wget, not curl
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  finyo-fe:
+    image: ${DOCKERHUB_USERNAME}/finyo-fe:${FINYO_FE_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      # written into /config.js at container start (runtime config)
+      KEYCLOAK_URL: https://${FINYO_DOMAIN}/auth/realms/finyo
+    depends_on:
+      finyo-be:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FINYO_DOMAIN: ${FINYO_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - finyo-fe
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

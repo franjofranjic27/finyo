@@ -14,5 +14,8 @@ target/
 # OS
 .DS_Store
 
+# Environment — real values live only on the server
+.env.prod
+
 # Logs
 *.log
