@@ -87,7 +87,10 @@ Request body for create, update and import rows (`Pillar3ProductRequest`):
 Admin endpoints need a token for a user with realm role `admin`. The local
 Keycloak realm (`keycloak/finyo-realm.json`) ships the confidential client
 `finyo-cli` with the password grant enabled and a seeded admin user
-(`admin` / `admin123`), so a token can be fetched directly:
+(`admin` / `admin123`), so a token can be fetched directly. These credentials
+and the client secret exist only in the local dev realm — the production realm
+(`keycloak/finyo-realm.prod.json`) contains neither the `finyo-cli` client nor
+any seeded users:
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8081/realms/finyo/protocol/openid-connect/token \
