@@ -6,6 +6,8 @@
     "pillar3": "Säule 3a",
     "insurance": "Versicherungen",
     "settings": "Einstellungen",
+    "admin": "Admin",
+    "adminPillar3Products": "3a-Produkte",
     "collapseSidebar": "Seitenleiste einklappen",
     "expandSidebar": "Seitenleiste ausklappen"
   },
@@ -171,6 +173,37 @@
     "iHaveThis": "Ich habe dies",
     "typicalCost": "Typische jährliche Kosten",
     "compare": "Vergleichen"
+  },
+  "admin": {
+    "products": {
+      "title": "3a-Produkte",
+      "newProduct": "Neues Produkt",
+      "editProduct": "Produkt bearbeiten",
+      "provider": "Anbieter",
+      "name": "Name",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "equity": "Aktienquote",
+      "ter": "TER",
+      "sortOrder": "Sortierung",
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "actions": "Aktionen",
+      "activate": "Aktivieren",
+      "deactivate": "Deaktivieren",
+      "deleteTitle": "Produkt löschen",
+      "deleteText": "«{{name}}» endgültig löschen? Alternativ kannst du das Produkt deaktivieren – deaktivierte Produkte bleiben für bestehende Vergleiche verfügbar.",
+      "deactivateInstead": "Stattdessen deaktivieren",
+      "empty": "Noch keine Produkte. Erstelle das erste Produkt oder nutze den Import-Endpoint.",
+      "validation": {
+        "providerRequired": "Anbieter ist erforderlich",
+        "nameRequired": "Name ist erforderlich",
+        "isinInvalid": "ISIN muss 12 Zeichen lang sein: 2 Buchstaben, 9 alphanumerische Zeichen, 1 Ziffer",
+        "valorInvalid": "Valor darf nur Ziffern enthalten",
+        "equityRange": "Aktienquote muss zwischen 0 und 100 liegen",
+        "terRange": "TER muss zwischen 0 und 10 liegen"
+      }
+    }
   },
   "common": {
     "save": "Speichern",
