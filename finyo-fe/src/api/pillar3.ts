@@ -43,7 +43,6 @@ export interface Pillar3ProductComparison {
   netReturnPct: number;
   totalFees: number;
   finalCapital: number;
-  totalPaidIn: number;
 }
 
 export interface Pillar3CompareResponse {

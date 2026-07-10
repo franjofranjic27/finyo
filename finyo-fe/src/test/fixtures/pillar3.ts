@@ -35,7 +35,6 @@ export function pillar3Comparison(
     netReturnPct: 3.0,
     totalFees: 2_000,
     finalCapital: 200_000,
-    totalPaidIn: 145_160,
     ...overrides,
   };
 }

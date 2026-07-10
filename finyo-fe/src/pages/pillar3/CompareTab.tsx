@@ -58,6 +58,9 @@ export function CompareTab() {
     () => [...selectedIds].sort((a, b) => a.localeCompare(b)),
     [selectedIds],
   );
+  // Key on the parsed values so "20", "020" and empty (→ default) share one cache entry.
+  const balanceValue = Number.parseFloat(debouncedBalance) || 0;
+  const contributionValue = Number.parseFloat(debouncedContribution) || 0;
   const yearsValue = Number.parseInt(debouncedYears) || Number.parseInt(DEFAULT_YEARS);
 
   const {
@@ -65,11 +68,11 @@ export function CompareTab() {
     isLoading: comparisonLoading,
     error: comparisonError,
   } = useQuery({
-    queryKey: ['pillar3-compare', debouncedBalance, debouncedContribution, debouncedYears, sortedIds],
+    queryKey: ['pillar3-compare', balanceValue, contributionValue, yearsValue, sortedIds],
     queryFn: () =>
       pillar3Api.compare(token, {
-        currentBalance: Number.parseFloat(debouncedBalance) || 0,
-        annualContribution: Number.parseFloat(debouncedContribution) || 0,
+        currentBalance: balanceValue,
+        annualContribution: contributionValue,
         years: yearsValue,
         productIds: sortedIds,
       }),
