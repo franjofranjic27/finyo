@@ -1,8 +1,11 @@
 # All files
 * @franjofranjic27
 
-# API module
-/finyo-api/ @franjofranjic27
+# Backend
+/finyo-be/ @franjofranjic27
+
+# Frontend
+/finyo-fe/ @franjofranjic27
 
 # GitHub configuration
 /.github/ @franjofranjic27
