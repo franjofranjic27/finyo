@@ -17,6 +17,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | docs/DEPLOYMENT.md | Production deployment (compose.prod.yml, Caddy, Keycloak persistence) |
 | CONTRIBUTING.md | Contributor setup and workflow |
 
+The `docs/` folder is published as a MkDocs Material site to
+https://franjofranjic27.github.io/finyo/ (`docs.yml` workflow); new docs pages
+must be added to the `nav` in `mkdocs.yml`.
+
+## Repo standards, PR & issue templates
+
+Repo-wide conventions are defined in
+[franjofranjic27/.github](https://github.com/franjofranjic27/.github)
+(`REPO_STANDARDS.md`). Issue and PR templates are inherited from that repo —
+do not add per-repo templates here. When opening a PR, use the matching template
+from `franjofranjic27/.github` via `gh pr create --body-file`:
+
+- Dependency updates (TLCM/Renovate follow-ups): `PULL_REQUEST_TEMPLATE/dependency-update.md`
+- SonarQube/SonarCloud fixes: `PULL_REQUEST_TEMPLATE/sonar-fix.md`
+- Everything else: `PULL_REQUEST_TEMPLATE.md`
+
 ## CI/CD
 
 Workflows in `.github/workflows/`:

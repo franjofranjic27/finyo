@@ -132,3 +132,10 @@
 - Format log messages with placeholders (e.g., `{}`) instead of string concatenation.
 - Logging info code could follow this template: log.info("[MicroserviceName/ModuleName] - API-CALL/METHOD/ACTION: response: {}, userId: {}", body, userId);
 - Logging error code could follow this template: log.error("[MicroserviceName/ModuleName] - API-CALL/METHOD/ACTION: errorMessage: {}, userId: {}", errorMessage, userId);
+
+## Pull Requests
+
+- Repo-wide standards and templates: https://github.com/franjofranjic27/.github (`REPO_STANDARDS.md`).
+- Use the matching PR template from that repo (`gh pr create --body-file`):
+  `dependency-update.md` for dependency updates, `sonar-fix.md` for Sonar fixes,
+  `PULL_REQUEST_TEMPLATE.md` otherwise.
