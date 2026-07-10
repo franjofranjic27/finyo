@@ -66,6 +66,7 @@ Tests: `cd finyo-be && ./mvnw test` — see [docs/TESTING.md](docs/TESTING.md).
 | [docs/TESTING.md](docs/TESTING.md) | How to run and write tests |
 | [docs/WORKFLOWS.md](docs/WORKFLOWS.md) | GitHub Actions CI/CD workflows |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment (VPS, Caddy, Keycloak) |
+| [docs/PILLAR3_PRODUCTS.md](docs/PILLAR3_PRODUCTS.md) | Pillar 3a product catalog administration and bulk import |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to this project |
 
 Repo-wide conventions (README/badge standard, PR and issue templates) live in
