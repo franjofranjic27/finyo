@@ -41,6 +41,31 @@ Keycloak. Create application users in the Keycloak admin console
 (`https://<domain>/auth/admin`, bootstrap admin from `.env.prod`) and assign
 them the `user` realm role — without it the API rejects all requests.
 
+## Automated deployment
+
+Pushing a release tag deploys automatically: after building and publishing
+the images, the release workflow's `deploy` job connects to the VPS over
+SSH, checks out the tag, updates the version pins in `.env.prod`, pulls the
+images, restarts the stack (`deploy/deploy.sh`) and verifies the backend
+healthcheck plus the public URL.
+
+Required repository secrets:
+
+| Secret | Value |
+|---|---|
+| `VPS_HOST` | server IP or hostname |
+| `VPS_USER` | SSH user (e.g. `root`) |
+| `VPS_SSH_KEY` | private ed25519 deploy key; public key in the server's `~/.ssh/authorized_keys` |
+
+The repository must be cloned at `~/finyo` on the server (override with
+`DEPLOY_DIR`).
+
+## Monitoring
+
+`monitoring/` contains an independent compose project (Grafana, Prometheus,
+Loki, Alloy, node_exporter, cAdvisor) served through the same Caddy at its
+own subdomain — see `monitoring/README.md`.
+
 ## Operations
 
 ```bash
