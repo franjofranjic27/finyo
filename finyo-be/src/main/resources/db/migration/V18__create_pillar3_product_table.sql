@@ -5,7 +5,7 @@ CREATE TABLE pillar3_product (
     isin        VARCHAR(12)  NOT NULL UNIQUE,
     valor       VARCHAR(20),
     equity_pct  DECIMAL(5,2) NOT NULL CHECK (equity_pct >= 0 AND equity_pct <= 100),
-    ter_pct     DECIMAL(5,3) NOT NULL CHECK (ter_pct >= 0),
+    ter_pct     DECIMAL(5,3) NOT NULL CHECK (ter_pct >= 0 AND ter_pct <= 10),
     active      BOOLEAN      NOT NULL DEFAULT TRUE,
     sort_order  INT          NOT NULL DEFAULT 0,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),

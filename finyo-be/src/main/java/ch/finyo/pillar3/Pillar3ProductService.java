@@ -119,9 +119,14 @@ public class Pillar3ProductService {
                 } else {
                     updated++;
                 }
-            } catch (Exception e) {
+            } catch (IllegalArgumentException | IllegalStateException e) {
                 failed++;
                 errors.add("row " + (i + 1) + " (ISIN " + row.isin() + "): " + e.getMessage());
+            } catch (Exception e) {
+                // Unexpected (e.g. persistence) failures must not echo internals to the client.
+                failed++;
+                errors.add("row " + (i + 1) + " (ISIN " + row.isin() + "): persistence error");
+                log.error("Pillar3 product import row {} failed unexpectedly", i + 1, e);
             }
         }
 
