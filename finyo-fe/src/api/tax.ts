@@ -126,6 +126,19 @@ export interface TaxYearDetail {
   assessedAmount: number | null;
 }
 
+/** Flat request payload (backend convention: flat request, nested response). */
+export type TaxScenarioRequest = TaxYearInputs & { name: string; isDefault?: boolean };
+
+export interface TaxScenario {
+  id: string;
+  taxYear: number;
+  name: string;
+  isDefault: boolean;
+  inputs: TaxYearInputs;
+  createdAt: string;
+  calculation: TaxResultResponse | null;
+}
+
 export interface Pillar3Request {
   currentBalance: number;
   annualContribution: number;
@@ -228,4 +241,24 @@ export const taxApi = {
 
   deleteDeadline: (token: string, year: number, deadlineId: string) =>
     apiRequest<void>(`/tax/years/${year}/deadlines/${deadlineId}`, { method: 'DELETE' }, token),
+
+  getScenarios: (token: string, year: number) =>
+    apiRequest<TaxScenario[]>(`/tax/years/${year}/scenarios`, {}, token),
+
+  createScenario: (token: string, year: number, scenario: TaxScenarioRequest) =>
+    apiRequest<TaxScenario>(
+      `/tax/years/${year}/scenarios`,
+      { method: 'POST', body: JSON.stringify(scenario) },
+      token,
+    ),
+
+  setDefaultScenario: (token: string, year: number, scenarioId: string) =>
+    apiRequest<TaxScenario>(
+      `/tax/years/${year}/scenarios/${scenarioId}/default`,
+      { method: 'PATCH' },
+      token,
+    ),
+
+  deleteScenario: (token: string, year: number, scenarioId: string) =>
+    apiRequest<void>(`/tax/years/${year}/scenarios/${scenarioId}`, { method: 'DELETE' }, token),
 };

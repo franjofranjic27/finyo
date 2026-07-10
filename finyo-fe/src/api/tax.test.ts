@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { taxApi } from './tax';
-import type { TaxCalculationRequest, TaxDeadlineInput, TaxPaymentInput, TaxYearInputs } from './tax';
+import type {
+  TaxCalculationRequest,
+  TaxDeadlineInput,
+  TaxPaymentInput,
+  TaxScenarioRequest,
+  TaxYearInputs,
+} from './tax';
 import { apiRequest } from './client';
 
 vi.mock('./client', () => ({ apiRequest: vi.fn() }));
@@ -166,6 +172,43 @@ describe('taxApi', () => {
     taxApi.deleteDeadline(TOKEN, 2025, 'd1');
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/tax/years/2025/deadlines/d1',
+      { method: 'DELETE' },
+      TOKEN,
+    );
+  });
+
+  it('getScenarios requests the scenarios of a year', () => {
+    taxApi.getScenarios(TOKEN, 2025);
+    expect(apiRequestMock).toHaveBeenCalledWith('/tax/years/2025/scenarios', {}, TOKEN);
+  });
+
+  it('createScenario POSTs the scenario to the year', () => {
+    const scenario: TaxScenarioRequest = {
+      ...yearInputs,
+      name: 'With max 3a',
+      isDefault: true,
+    };
+    taxApi.createScenario(TOKEN, 2025, scenario);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/tax/years/2025/scenarios',
+      { method: 'POST', body: JSON.stringify(scenario) },
+      TOKEN,
+    );
+  });
+
+  it('setDefaultScenario PATCHes the default path without a body', () => {
+    taxApi.setDefaultScenario(TOKEN, 2025, 's1');
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/tax/years/2025/scenarios/s1/default',
+      { method: 'PATCH' },
+      TOKEN,
+    );
+  });
+
+  it('deleteScenario issues DELETE on the scenario path', () => {
+    taxApi.deleteScenario(TOKEN, 2025, 's1');
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/tax/years/2025/scenarios/s1',
       { method: 'DELETE' },
       TOKEN,
     );

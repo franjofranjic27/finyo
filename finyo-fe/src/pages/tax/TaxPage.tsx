@@ -13,6 +13,7 @@ import { CalculatorCard } from './CalculatorCard';
 import { TaxResultSection } from './TaxResultSection';
 import { MonthlyPaymentsCard } from './MonthlyPaymentsCard';
 import { DeadlinesPaymentsSection } from './DeadlinesPaymentsSection';
+import { ScenariosCard } from './ScenariosCard';
 import { YearComparisonCard } from './YearComparisonCard';
 
 // Matches the backend rate-data validation (@Min(2020) on the year path variable).
@@ -104,6 +105,7 @@ export function TaxPage() {
             {detail && (
               <DeadlinesPaymentsSection year={year} detail={detail} className="print:hidden" />
             )}
+            <ScenariosCard year={year} inputs={detail?.inputs ?? null} className="print:hidden" />
             <YearComparisonCard years={years ?? []} className="print:hidden" />
           </>
         )}

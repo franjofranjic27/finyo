@@ -1,5 +1,6 @@
 import type {
   TaxResultResponse,
+  TaxScenario,
   TaxYearDetail,
   TaxYearInputs,
   TaxYearSummary,
@@ -56,6 +57,20 @@ export function taxResult(overrides: Partial<TaxResultResponse> = {}): TaxResult
     marginalRatePercent: 22,
     grandTotal: 12_000,
     breakdown: [],
+    ...overrides,
+  };
+}
+
+export function taxScenario(
+  overrides: Partial<TaxScenario> & { id: string },
+): TaxScenario {
+  return {
+    taxYear: 2025,
+    name: 'Base scenario',
+    isDefault: false,
+    inputs: taxYearInputs(),
+    createdAt: '2025-06-01T10:00:00Z',
+    calculation: taxResult(),
     ...overrides,
   };
 }

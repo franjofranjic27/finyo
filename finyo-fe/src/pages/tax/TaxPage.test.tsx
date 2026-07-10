@@ -31,6 +31,10 @@ vi.mock('@/api/tax', () => ({
     addDeadline: vi.fn(),
     updateDeadline: vi.fn(),
     deleteDeadline: vi.fn(),
+    getScenarios: vi.fn(),
+    createScenario: vi.fn(),
+    setDefaultScenario: vi.fn(),
+    deleteScenario: vi.fn(),
   },
 }));
 
@@ -71,6 +75,7 @@ describe('TaxPage', () => {
       }),
     );
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/2024');
 
@@ -84,6 +89,7 @@ describe('TaxPage', () => {
     expect(screen.getByText('Instalment')).toBeInTheDocument();
     expect(screen.getByText('File return')).toBeInTheDocument();
     expect(screen.getByText('Monthly Payments')).toBeInTheDocument();
+    expect(screen.getByText('Scenarios')).toBeInTheDocument();
     expect(screen.getByText('Year Comparison')).toBeInTheDocument();
   });
 
@@ -91,6 +97,7 @@ describe('TaxPage', () => {
     vi.mocked(taxApi.getYears).mockResolvedValue([]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('Tax year not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/2026');
 
@@ -106,6 +113,7 @@ describe('TaxPage', () => {
     vi.mocked(taxApi.getYears).mockResolvedValue([]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/1999');
 
@@ -122,6 +130,7 @@ describe('TaxPage', () => {
     ]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax');
 
