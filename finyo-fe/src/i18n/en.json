@@ -132,7 +132,36 @@
     "balanceGrowth": "Balance Growth over {{years}} Years",
     "contributionCap": "You could contribute <strong>{{remaining}}</strong> more to reach the maximum of <strong>{{max}}</strong>, saving an additional <strong>{{saving}}</strong> in taxes.",
     "vsSavingsTitle": "Compared to taxable savings account",
-    "vsSavingsText": "Same gross contributions in a regular taxable account would yield approximately <strong>{{equivalent}}</strong> — the 3a account yields <emph>+{{advantage}}</emph> more after payout tax."
+    "vsSavingsText": "Same gross contributions in a regular taxable account would yield approximately <strong>{{equivalent}}</strong> — the 3a account yields <emph>+{{advantage}}</emph> more after payout tax.",
+    "tabs": {
+      "calculator": "Calculator",
+      "compare": "Product Comparison"
+    },
+    "compare": {
+      "formTitle": "Comparison Parameters",
+      "currentBalance": "Current 3a Balance",
+      "annualContribution": "Annual Contribution",
+      "years": "Investment Horizon (Years)",
+      "capHint": "Maximum annual contribution: {{max}}",
+      "searchLabel": "Add product",
+      "searchPlaceholder": "Search by name, provider, ISIN or valor …",
+      "noResults": "No matching products",
+      "maxProducts": "Maximum of {{max}} products reached",
+      "emptyCatalog": "No products available yet — an administrator has to add the product catalog first.",
+      "emptySelection": "Search for 3a products above to compare their projected final capital.",
+      "tableTitle": "Comparison",
+      "product": "Product",
+      "equity": "Equity",
+      "ter": "TER",
+      "avgReturn": "Ø Return",
+      "fees": "Fees over Term",
+      "finalCapital": "Final Capital",
+      "topBadge": "Top",
+      "remove": "Remove {{name}}",
+      "chartTitle": "Final Capital after {{years}} Years",
+      "totalPaidIn": "Total paid in: {{amount}}",
+      "footnote": "Model calculation: expected gross return = 1% + equity share × 5%; the TER is deducted annually from the grown balance. Values are projections, not guarantees."
+    }
   },
   "insurance": {
     "title": "Insurance Overview",

@@ -132,7 +132,36 @@
     "balanceGrowth": "Guthabenentwicklung über {{years}} Jahre",
     "contributionCap": "Du könntest <strong>{{remaining}}</strong> zusätzlich einzahlen, um das Maximum von <strong>{{max}}</strong> zu erreichen und weitere <strong>{{saving}}</strong> Steuern zu sparen.",
     "vsSavingsTitle": "Im Vergleich zu einem steuerpflichtigen Sparkonto",
-    "vsSavingsText": "Dieselben Bruttoeinzahlungen auf ein reguläres steuerpflichtiges Konto ergäben ungefähr <strong>{{equivalent}}</strong> — das 3a-Konto liefert nach der Bezugssteuer <emph>+{{advantage}}</emph> mehr."
+    "vsSavingsText": "Dieselben Bruttoeinzahlungen auf ein reguläres steuerpflichtiges Konto ergäben ungefähr <strong>{{equivalent}}</strong> — das 3a-Konto liefert nach der Bezugssteuer <emph>+{{advantage}}</emph> mehr.",
+    "tabs": {
+      "calculator": "Rechner",
+      "compare": "Produktvergleich"
+    },
+    "compare": {
+      "formTitle": "Vergleichsparameter",
+      "currentBalance": "Aktuelles 3a-Guthaben",
+      "annualContribution": "Jährlicher Beitrag",
+      "years": "Anlagehorizont (Jahre)",
+      "capHint": "Maximaler Jahresbeitrag: {{max}}",
+      "searchLabel": "Produkt hinzufügen",
+      "searchPlaceholder": "Nach Name, Anbieter, ISIN oder Valor suchen …",
+      "noResults": "Keine passenden Produkte",
+      "maxProducts": "Maximal {{max}} Produkte erreicht",
+      "emptyCatalog": "Noch keine Produkte verfügbar – ein Administrator muss zuerst den Produktkatalog erfassen.",
+      "emptySelection": "Suche oben nach 3a-Produkten, um deren erwartetes Endkapital zu vergleichen.",
+      "tableTitle": "Vergleich",
+      "product": "Produkt",
+      "equity": "Aktienquote",
+      "ter": "TER",
+      "avgReturn": "Ø Rendite",
+      "fees": "Gebühren (Laufzeit)",
+      "finalCapital": "Endkapital",
+      "topBadge": "Top",
+      "remove": "{{name}} entfernen",
+      "chartTitle": "Endkapital nach {{years}} Jahren",
+      "totalPaidIn": "Total einbezahlt: {{amount}}",
+      "footnote": "Modellrechnung: erwartete Bruttorendite = 1 % + Aktienquote × 5 %; die TER wird jährlich vom gewachsenen Guthaben abgezogen. Die Werte sind Projektionen, keine Garantien."
+    }
   },
   "insurance": {
     "title": "Versicherungsübersicht",
