@@ -74,6 +74,10 @@ services:
       KEYCLOAK_ISSUER_URI: https://${FINYO_DOMAIN}/auth/realms/finyo
       KEYCLOAK_JWK_URI: http://keycloak:8080/auth/realms/finyo/protocol/openid-connect/certs
       SIX_API_KEY: ${SIX_API_KEY:-}
+    networks:
+      - default
+      # lets the monitoring stack's Prometheus scrape /actuator/prometheus
+      - edge
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,12 +111,25 @@ services:
     environment:
       FINYO_DOMAIN: ${FINYO_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+      # Grafana of the monitoring stack; the .localhost default keeps Caddy
+      # from requesting ACME certificates when monitoring is not deployed
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:-grafana.localhost}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - default
+      # reaches the monitoring stack's Grafana
+      - edge
     depends_on:
       - finyo-fe
+
+networks:
+  default:
+  # shared with the monitoring stack; create once: docker network create edge
+  edge:
+    external: true
 
 volumes:
   postgres_data:
