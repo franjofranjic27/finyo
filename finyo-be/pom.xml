@@ -103,6 +103,13 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Prometheus metrics — /actuator/prometheus, scraped by the monitoring stack -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- CSV parsing -->
         <dependency>
             <groupId>com.univocity</groupId>
