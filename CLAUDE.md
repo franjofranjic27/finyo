@@ -23,7 +23,7 @@ Workflows in `.github/workflows/`:
 
 - **ci.yml** — active; backend (`./mvnw verify`) + frontend (lint, vitest, build) on PRs and pushes to `main`
 - **sonar.yml** — active; SonarCloud analysis for backend (`franjofranjic27_finyo`, JaCoCo) and frontend (`franjofranjic27_finyo-fe`, LCOV) on push to `main`, PRs and manually (`workflow_dispatch`); requires `SONAR_TOKEN`
-- **release.yml** — active; on tag push builds Docker images and publishes to Docker Hub plus a GitHub release. Tags: `v1.2.3` (both), `be-v1.2.3` (backend only), `fe-v1.2.3` (frontend only); requires `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
+- **release.yml** — active; on tag push builds Docker images, publishes to Docker Hub, deploys to the VPS via SSH (`deploy/deploy.sh`) and creates a GitHub release. Tags: `v1.2.3` (both), `be-v1.2.3` (backend only), `fe-v1.2.3` (frontend only); requires `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 
 ## Build & Run
 

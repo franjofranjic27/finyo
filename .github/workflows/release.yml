@@ -8,6 +8,9 @@ name: Release
 # Required repository secrets:
 #   DOCKERHUB_USERNAME — Docker Hub account name (also used as image namespace)
 #   DOCKERHUB_TOKEN    — Docker Hub access token with write scope
+#   VPS_HOST           — deployment target host (IP or hostname)
+#   VPS_USER           — SSH user on the target host
+#   VPS_SSH_KEY        — private SSH deploy key (ed25519) authorized on the host
 
 on:
   push:
@@ -105,6 +108,32 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/finyo-fe:latest
           cache-from: type=gha,scope=finyo-fe
           cache-to: type=gha,scope=finyo-fe,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: [meta, docker-be, docker-fe]
+    # run when everything that was supposed to run succeeded (skipped jobs are fine)
+    if: >-
+      ${{ !cancelled() &&
+          needs.meta.result == 'success' &&
+          (needs.docker-be.result == 'success' || needs.docker-be.result == 'skipped') &&
+          (needs.docker-fe.result == 'success' || needs.docker-fe.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy release
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            'bash -s -- "${{ github.ref_name }}" "${{ needs.meta.outputs.version }}" "${{ needs.meta.outputs.release_be }}" "${{ needs.meta.outputs.release_fe }}"' \
+            < deploy/deploy.sh
 
   github-release:
     name: Create GitHub release

@@ -21,11 +21,13 @@ spring:
     caffeine:
       spec: maximumSize=500,expireAfterWrite=900s
 
+# /actuator is not routed by the reverse proxy — health and prometheus stay
+# reachable only inside the Docker network
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never

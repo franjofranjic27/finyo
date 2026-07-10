@@ -16,6 +16,7 @@ target/
 
 # Environment — real values live only on the server
 .env.prod
+monitoring/.env
 
 # Logs
 *.log

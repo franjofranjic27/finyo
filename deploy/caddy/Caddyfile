@@ -17,3 +17,8 @@
 		reverse_proxy finyo-fe:80
 	}
 }
+
+{$GRAFANA_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy grafana:3000
+}
