@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TaxPage } from './TaxPage';
 import { taxApi } from '@/api/tax';
-import { taxResult, taxYearDetail, taxYearSummary } from '@/test/fixtures/tax';
+import {
+  taxResult,
+  taxScenario,
+  taxYearDetail,
+  taxYearSummary,
+} from '@/test/fixtures/tax';
 import { renderWithProviders } from '@/test/test-utils';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -31,6 +37,10 @@ vi.mock('@/api/tax', () => ({
     addDeadline: vi.fn(),
     updateDeadline: vi.fn(),
     deleteDeadline: vi.fn(),
+    getScenarios: vi.fn(),
+    createScenario: vi.fn(),
+    setDefaultScenario: vi.fn(),
+    deleteScenario: vi.fn(),
   },
 }));
 
@@ -71,6 +81,7 @@ describe('TaxPage', () => {
       }),
     );
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/2024');
 
@@ -84,6 +95,7 @@ describe('TaxPage', () => {
     expect(screen.getByText('Instalment')).toBeInTheDocument();
     expect(screen.getByText('File return')).toBeInTheDocument();
     expect(screen.getByText('Monthly Payments')).toBeInTheDocument();
+    expect(screen.getByText('Scenarios')).toBeInTheDocument();
     expect(screen.getByText('Year Comparison')).toBeInTheDocument();
   });
 
@@ -91,6 +103,7 @@ describe('TaxPage', () => {
     vi.mocked(taxApi.getYears).mockResolvedValue([]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('Tax year not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/2026');
 
@@ -106,6 +119,7 @@ describe('TaxPage', () => {
     vi.mocked(taxApi.getYears).mockResolvedValue([]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax/1999');
 
@@ -122,6 +136,7 @@ describe('TaxPage', () => {
     ]);
     vi.mocked(taxApi.getYear).mockRejectedValue(new Error('not found'));
     vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
 
     renderTaxPage('/tax');
 
@@ -129,5 +144,163 @@ describe('TaxPage', () => {
     expect((await screen.findAllByText(String(currentYear - 1))).length).toBeGreaterThan(0);
     expect(screen.getAllByText(String(currentYear + 1)).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Planned').length).toBeGreaterThan(0);
+  });
+
+  it('switches the results to the selected scenario and back on deselect', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024, grandTotal: 12_000 }) }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([
+      taxScenario({
+        id: 's1',
+        name: 'Status quo',
+        isDefault: true,
+        calculation: taxResult({ taxYear: 2024, grandTotal: 17_842 }),
+      }),
+      taxScenario({
+        id: 's2',
+        name: 'Without 3a',
+        calculation: taxResult({ taxYear: 2024, grandTotal: 19_732 }),
+      }),
+    ]);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /Without 3a/ }));
+
+    // Scenario figures, title suffix and the delta badge against the default
+    expect(
+      await screen.findByText('Tax Breakdown — Canton SG 2024 · Without 3a'),
+    ).toBeInTheDocument();
+    expect(screen.getByText("CHF 19'732.00")).toBeInTheDocument();
+    expect(screen.getByText("+CHF 1'890.00 vs. default")).toBeInTheDocument();
+
+    // Clicking the active chip deselects and restores the year's own result
+    await user.click(screen.getByRole('button', { name: /Without 3a/ }));
+    expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
+    expect(screen.getByText("CHF 12'000.00")).toBeInTheDocument();
+  });
+
+  it('clears the selection when the selected scenario is deleted', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024 }) }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([
+      taxScenario({
+        id: 's2',
+        name: 'Without 3a',
+        calculation: taxResult({ taxYear: 2024, grandTotal: 19_732 }),
+      }),
+    ]);
+    vi.mocked(taxApi.deleteScenario).mockResolvedValue(undefined);
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /Without 3a/ }));
+    expect(
+      await screen.findByText('Tax Breakdown — Canton SG 2024 · Without 3a'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Scenario actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Delete scenario/ }));
+
+    await waitFor(() =>
+      expect(taxApi.deleteScenario).toHaveBeenCalledWith('test-token', 2024, 's2'),
+    );
+    expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
+  });
+
+  it('clears the scenario selection after recalculating the year', async () => {
+    const detail = taxYearDetail({
+      year: 2024,
+      calculation: taxResult({ taxYear: 2024, grandTotal: 12_000 }),
+    });
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(detail);
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([
+      taxScenario({
+        id: 's2',
+        name: 'Without 3a',
+        calculation: taxResult({ taxYear: 2024, grandTotal: 19_732 }),
+      }),
+    ]);
+    vi.mocked(taxApi.upsertYear).mockResolvedValue(detail);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /Without 3a/ }));
+    expect(
+      await screen.findByText('Tax Breakdown — Canton SG 2024 · Without 3a'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Calculate for 2024/ }));
+
+    expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
+    expect(screen.getByText("CHF 12'000.00")).toBeInTheDocument();
+  });
+
+  it('opens the inline save panel via the new-scenario chip', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024 }) }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /New scenario/ }));
+
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Set as default scenario for 2024')).toBeInTheDocument();
+  });
+
+  it('persists the current form before opening the save panel', async () => {
+    const detail = taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024 }) });
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(detail);
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
+    vi.mocked(taxApi.upsertYear).mockResolvedValue(detail);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /Save scenario/ }));
+
+    // The panel only opens after the form was persisted (edited values are
+    // never silently skipped in the scenario snapshot).
+    expect(await screen.findByLabelText('Name')).toBeInTheDocument();
+    expect(taxApi.upsertYear).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the save panel closed when persisting the form fails', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024 }) }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([]);
+    vi.mocked(taxApi.upsertYear).mockRejectedValue(new Error('No rate data for 2024'));
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /Save scenario/ }));
+
+    expect(await screen.findByText('No rate data for 2024')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 });

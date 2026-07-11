@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Calculator } from 'lucide-react';
+import { Calculator, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,10 +69,30 @@ function resolveChurchMultiplier(
 interface CalculatorCardProps {
   year: number;
   inputs: TaxYearInputs | null;
+  /** Called after a successful recalculation (the page clears its scenario selection). */
+  onCalculated?: () => void;
+  /**
+   * When set, a save-scenario button is rendered next to the calculate button.
+   * The current form is persisted first (same upsert as calculate) and the
+   * callback fires only on success, so scenarios never snapshot stale inputs.
+   */
+  onSaveScenarioRequested?: () => void;
+  /** Extra content rendered next to the calculate button (e.g. saved flash). */
+  actionsExtra?: ReactNode;
+  /** Rendered below the actions row (e.g. the inline scenario save panel). */
+  footer?: ReactNode;
   className?: string;
 }
 
-export function CalculatorCard({ year, inputs, className }: Readonly<CalculatorCardProps>) {
+export function CalculatorCard({
+  year,
+  inputs,
+  onCalculated,
+  onSaveScenarioRequested,
+  actionsExtra,
+  footer,
+  className,
+}: Readonly<CalculatorCardProps>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -127,6 +148,7 @@ export function CalculatorCard({ year, inputs, className }: Readonly<CalculatorC
     onSuccess: (detail) => {
       queryClient.setQueryData(['tax', 'year', String(year)], detail);
       queryClient.invalidateQueries({ queryKey: ['tax', 'years'] });
+      onCalculated?.();
     },
   });
 
@@ -235,12 +257,28 @@ export function CalculatorCard({ year, inputs, className }: Readonly<CalculatorC
         )}
 
         <div className="mt-4 space-y-2">
-          <Button onClick={() => mutate()} disabled={!grossIncome || isPending}>
-            <Calculator className="mr-2 h-4 w-4" />
-            {isPending ? t('common.loading') : t('tax.calculateForYear', { year })}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={() => mutate()} disabled={!grossIncome || isPending}>
+              <Calculator className="mr-2 h-4 w-4" />
+              {isPending ? t('common.loading') : t('tax.calculateForYear', { year })}
+            </Button>
+            {onSaveScenarioRequested && (
+              <Button
+                variant="outline"
+                disabled={!grossIncome || isPending}
+                onClick={() =>
+                  mutate(undefined, { onSuccess: () => onSaveScenarioRequested() })
+                }
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {t('tax.saveScenario')}
+              </Button>
+            )}
+            {actionsExtra}
+          </div>
           {error && <p className="text-sm text-destructive">{error.message}</p>}
         </div>
+        {footer}
       </CardContent>
     </Card>
   );

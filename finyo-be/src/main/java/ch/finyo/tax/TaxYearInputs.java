@@ -38,4 +38,24 @@ public record TaxYearInputs(
                 taxYear.getNetWealth()
         );
     }
+
+    public static TaxYearInputs from(TaxScenario scenario) {
+        return new TaxYearInputs(
+                scenario.getCantonCode(),
+                scenario.getBfsNumber(),
+                scenario.getCivilStatus(),
+                scenario.getNumberOfChildren(),
+                scenario.getChurchAffiliation(),
+                scenario.getGrossEmploymentIncome(),
+                scenario.getSelfEmploymentIncome(),
+                scenario.getInvestmentIncome(),
+                scenario.getRentalIncome(),
+                scenario.getDeductionProfessionalExpenses(),
+                scenario.getDeductionInsurancePremiums(),
+                scenario.getDeductionCharitableDonations(),
+                scenario.getDeductionDebtInterest(),
+                scenario.getPillar3aContribution(),
+                scenario.getNetWealth()
+        );
+    }
 }

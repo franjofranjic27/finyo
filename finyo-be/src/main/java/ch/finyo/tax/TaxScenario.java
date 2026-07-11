@@ -7,18 +7,20 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Input snapshot of a tax year — each save creates a new row. The tax inputs
+ * themselves are immutable; only the default flag (and thus updatedAt) is mutable.
+ */
 @Entity
-@Table(name = "tax_year")
+@Table(name = "tax_scenario")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @SuperBuilder(toBuilder = true)
 @NoArgsConstructor
-public class TaxYear extends TaxInputs {
+public class TaxScenario extends TaxInputs {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -27,25 +29,14 @@ public class TaxYear extends TaxInputs {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    /** Renamed from "taxYear" to avoid clashing with the class name; the DB column stays "tax_year". */
-    @Column(name = "tax_year", nullable = false)
-    private int year;
+    @Column(name = "tax_year_id", nullable = false)
+    private UUID taxYearId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20, nullable = false)
-    private TaxYearStatus status;
+    @Column(length = 100, nullable = false)
+    private String name;
 
-    @Column(name = "filing_deadline")
-    private LocalDate filingDeadline;
-
-    @Column(name = "filed_at")
-    private LocalDate filedAt;
-
-    @Column(name = "assessed_at")
-    private LocalDate assessedAt;
-
-    @Column(name = "assessed_amount")
-    private BigDecimal assessedAmount;
+    @Column(name = "is_default", nullable = false)
+    private boolean isDefault;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

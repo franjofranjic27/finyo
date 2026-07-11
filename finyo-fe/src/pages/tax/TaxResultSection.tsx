@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ChevronRight, Printer } from 'lucide-react';
@@ -8,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import type { TaxResultResponse, TaxYearInputs } from '@/api/tax';
+import type { TaxResultResponse, TaxScenario, TaxYearInputs } from '@/api/tax';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
@@ -31,18 +32,47 @@ function buildDeductionRows(inputs: TaxYearInputs | null): DeductionRow[] {
   );
 }
 
+/**
+ * Grand-total difference of the selected scenario against the default one.
+ * Null (badge hidden) when the selection IS the default or a side lacks a
+ * calculation.
+ */
+function grandTotalDelta(
+  scenario: TaxScenario | null,
+  defaultScenario: TaxScenario | null,
+): number | null {
+  if (!scenario || scenario.isDefault) return null;
+  if (!scenario.calculation || !defaultScenario?.calculation) return null;
+  return scenario.calculation.grandTotal - defaultScenario.calculation.grandTotal;
+}
+
 // Module scope: recharts re-renders formatter results, nested components would remount.
 const renderLegendText = (value: string) => (
   <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
 );
 
 interface TaxResultSectionProps {
-  result: TaxResultResponse;
+  /** The year's own calculation — shown when no scenario is selected. */
+  result: TaxResultResponse | null;
+  /** The year's own inputs (deduction details for the fallback view). */
   inputs: TaxYearInputs | null;
+  /** Selected scenario; its stored calculation replaces the year's result. */
+  scenario?: TaxScenario | null;
+  /** The year's default scenario — baseline for the delta badge. */
+  defaultScenario?: TaxScenario | null;
+  /** Header slot for scenario actions (set default / delete). */
+  scenarioActions?: ReactNode;
   className?: string;
 }
 
-export function TaxResultSection({ result, inputs, className }: Readonly<TaxResultSectionProps>) {
+export function TaxResultSection({
+  result,
+  inputs,
+  scenario = null,
+  defaultScenario = null,
+  scenarioActions,
+  className,
+}: Readonly<TaxResultSectionProps>) {
   const { t } = useTranslation();
   // Controlled so the PDF export can force the deductions open before printing.
   const [deductionsOpen, setDeductionsOpen] = useState(false);
@@ -52,30 +82,60 @@ export function TaxResultSection({ result, inputs, className }: Readonly<TaxResu
     requestAnimationFrame(() => globalThis.print());
   };
 
-  const deductionRows = buildDeductionRows(inputs);
+  const displayedResult = scenario ? scenario.calculation : result;
+  const displayedInputs = scenario ? scenario.inputs : inputs;
 
+  const titleBase = t('tax.breakdownTitle', {
+    canton: displayedResult?.cantonCode ?? scenario?.inputs.cantonCode ?? '',
+    year: displayedResult?.taxYear ?? scenario?.taxYear ?? '',
+  });
+  const title = scenario
+    ? `${titleBase} · ${scenario.name}${scenario.isDefault ? ' ★' : ''}`
+    : titleBase;
+
+  // Scenario saved with insufficient inputs: show a hint instead of numbers.
+  if (!displayedResult) {
+    if (!scenario) return null;
+    return (
+      <Card className={className}>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-base">{title}</CardTitle>
+          {scenarioActions}
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t('tax.scenarioNoCalculation')}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const deductionRows = buildDeductionRows(displayedInputs);
+  const delta = grandTotalDelta(scenario, defaultScenario);
+
+  // Design palette: Kanton violet, Gemeinde indigo, Bund green, Kirche amber.
   const pieData = [
-    { name: t('tax.federalTax'), value: result.federalTax, colour: '#6366f1' },
-    { name: t('tax.cantonalTax'), value: result.cantonalTax, colour: '#8b5cf6' },
-    { name: t('tax.communalTax'), value: result.communalTax, colour: '#10b981' },
-    { name: t('tax.churchTax'), value: result.churchTax ?? 0, colour: '#f59e0b' },
+    { name: t('tax.cantonalTax'), value: displayedResult.cantonalTax, colour: '#8b5cf6' },
+    { name: t('tax.communalTax'), value: displayedResult.communalTax, colour: '#6366f1' },
+    { name: t('tax.federalTax'), value: displayedResult.federalTax, colour: '#10b981' },
+    { name: t('tax.churchTax'), value: displayedResult.churchTax ?? 0, colour: '#f59e0b' },
   ].filter((d) => d.value > 0);
 
   return (
     <div className={cn('grid gap-4 md:grid-cols-2 print:grid-cols-1', className)}>
       {/* Breakdown card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">
-            {t('tax.breakdownTitle', { canton: result.cantonCode, year: result.taxYear })}
-          </CardTitle>
-          <Button variant="outline" size="sm" className="print:hidden" onClick={exportPdf}>
-            <Printer className="mr-2 h-4 w-4" />
-            {t('tax.exportPdf')}
-          </Button>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="text-base">{title}</CardTitle>
+          <div className="flex shrink-0 items-center gap-1">
+            {scenarioActions}
+            <Button variant="outline" size="sm" className="print:hidden" onClick={exportPdf}>
+              <Printer className="mr-2 h-4 w-4" />
+              {t('tax.exportPdf')}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <Row label={t('tax.grossIncomeTotal')} value={formatCHF(result.grossIncome)} />
+          <Row label={t('tax.grossIncomeTotal')} value={formatCHF(displayedResult.grossIncome)} />
 
           <Collapsible open={deductionsOpen} onOpenChange={setDeductionsOpen}>
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-2">
@@ -85,7 +145,9 @@ export function TaxResultSection({ result, inputs, className }: Readonly<TaxResu
                 />
                 {t('tax.deductionsTotal')}
               </span>
-              <span className="text-muted-foreground">− {formatCHF(result.totalDeductions)}</span>
+              <span className="tabular-nums text-muted-foreground">
+                − {formatCHF(displayedResult.totalDeductions)}
+              </span>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-2 pl-5">
               {deductionRows.map((row) => (
@@ -96,24 +158,44 @@ export function TaxResultSection({ result, inputs, className }: Readonly<TaxResu
 
           <div className="flex justify-between rounded-md bg-indigo-500/10 px-3 py-2 font-semibold">
             <span>{t('tax.taxableIncome')}</span>
-            <span>{formatCHF(result.taxableIncome)}</span>
+            <span className="tabular-nums">{formatCHF(displayedResult.taxableIncome)}</span>
           </div>
 
-          <Row label={t('tax.federalTax')} value={formatCHF(result.federalTax)} />
-          <Row label={t('tax.cantonalTax')} value={formatCHF(result.cantonalTax)} />
-          <Row label={t('tax.communalTax')} value={formatCHF(result.communalTax)} />
-          {result.churchTax != null && result.churchTax > 0 && (
-            <Row label={t('tax.churchTax')} value={formatCHF(result.churchTax)} />
+          <Row label={t('tax.federalTax')} value={formatCHF(displayedResult.federalTax)} />
+          <Row label={t('tax.cantonalTax')} value={formatCHF(displayedResult.cantonalTax)} />
+          <Row label={t('tax.communalTax')} value={formatCHF(displayedResult.communalTax)} />
+          {displayedResult.churchTax != null && displayedResult.churchTax > 0 && (
+            <Row label={t('tax.churchTax')} value={formatCHF(displayedResult.churchTax)} />
           )}
-          {result.wealthTax != null && result.wealthTax > 0 && (
-            <Row label={t('tax.wealthTax')} value={formatCHF(result.wealthTax)} />
+          {displayedResult.wealthTax != null && displayedResult.wealthTax > 0 && (
+            <Row label={t('tax.wealthTax')} value={formatCHF(displayedResult.wealthTax)} />
           )}
           <Separator />
-          <Row label={t('tax.grandTotal')} value={formatCHF(result.grandTotal)} bold />
-          {result.pillar3aTaxSaving != null && result.pillar3aTaxSaving > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">{t('tax.grandTotal')}</span>
+            <span className="flex items-center gap-2">
+              <span className="font-semibold tabular-nums">
+                {formatCHF(displayedResult.grandTotal)}
+              </span>
+              {delta != null && delta !== 0 && (
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                    delta > 0
+                      ? 'bg-rose-600/10 text-rose-600'
+                      : 'bg-emerald-500/15 text-emerald-500',
+                  )}
+                >
+                  {delta > 0 ? '+' : '−'}
+                  {formatCHF(Math.abs(delta))} {t('tax.vsDefault')}
+                </span>
+              )}
+            </span>
+          </div>
+          {displayedResult.pillar3aTaxSaving != null && displayedResult.pillar3aTaxSaving > 0 && (
             <Row
               label={t('tax.pillar3Saving')}
-              value={`− ${formatCHF(result.pillar3aTaxSaving)}`}
+              value={`− ${formatCHF(displayedResult.pillar3aTaxSaving)}`}
               className="text-emerald-500"
             />
           )}
@@ -143,11 +225,15 @@ export function TaxResultSection({ result, inputs, className }: Readonly<TaxResu
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-lg bg-muted p-3 text-center">
               <p className="text-muted-foreground text-xs">{t('tax.effectiveRate')}</p>
-              <p className="text-xl font-bold">{formatPercent(result.effectiveRatePercent)}</p>
+              <p className="text-xl font-bold tabular-nums">
+                {formatPercent(displayedResult.effectiveRatePercent)}
+              </p>
             </div>
             <div className="rounded-lg bg-muted p-3 text-center">
               <p className="text-muted-foreground text-xs">{t('tax.marginalRate')}</p>
-              <p className="text-xl font-bold">{formatPercent(result.marginalRatePercent)}</p>
+              <p className="text-xl font-bold tabular-nums">
+                {formatPercent(displayedResult.marginalRatePercent)}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -172,7 +258,7 @@ function Row({
   return (
     <div className="flex justify-between">
       <span className={cn(muted && 'text-muted-foreground')}>{label}</span>
-      <span className={cn(bold && 'font-semibold', className)}>{value}</span>
+      <span className={cn('tabular-nums', bold && 'font-semibold', className)}>{value}</span>
     </div>
   );
 }
