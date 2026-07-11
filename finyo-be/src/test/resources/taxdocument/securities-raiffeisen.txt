@@ -1,0 +1,100 @@
+                               Raiffeisenbank Musterhausen
+                               Musterplatz 1
+                               9000 Musterhausen
+                               Telefon +41 71 000 00 00
+                               UID CHE-000.000.000
+                               www.raiffeisen.ch/musterhausen
+                               rbmusterhausen@raiffeisen.ch
+                                                                                                                           Herr
+                                                                                                                           Max Muster
+                                                                                                                           Musterstrasse 1
+                                                                                                                           9000 Musterhausen
+
+
+
+
+                               Für Sie zuständig:
+                               Kundenberatung +41 71 000 00 00
+                               rbmusterhausen@raiffeisen.ch                                                                Musterhausen, 11. Februar 2026
+
+
+                               Steuerverzeichnis vom 01.01.2025 bis 31.12.2025 in CHF
+
+
+                               Sehr geehrter Herr Muster
+
+                               In der Beilage erhalten Sie das Steuerverzeichnis für die oben erwähnte Periode.
+                               Das Steuerverzeichnis gilt für in der Schweiz steuerpflichtige Privatpersonen. Es umfasst sämtliche steuerrelevanten Daten wie Ver­
+                               mögenswerte und deren Erträge sowie Gebühren, Schuldzinsen und Schuldsaldi während des genannten Zeitraums.
+
+                               Freundliche Grüsse
+
+                               Raiffeisenbank Musterhausen Genossenschaft
+
+
+
+                                                                                                               Kundenname               Max Muster
+                                                                                                               Kunden-Nr.               111.111.111.1
+
+
+Raiffeisenbank Musterhausen
+
+
+Für Sie zuständig:
+Kundenberatung +41 71 000 00 00
+rbmusterhausen@raiffeisen.ch                                                                                   Musterhausen, 11. Februar 2026
+
+Steuerverzeichnis vom 01.01.2025 bis 31.12.2025 in CHF
+
+Zusammenfassung
+
+                                                                                                                                   Verrechnungs-         Anrechenbare         Zusätzlicher
+Guthaben und Wertschriften                                                Steuerwert    Ertrag Rubrik A         Ertrag Rubrik B
+                                                                                                                                          steuer         Quellensteuer   Steuerrückbehalt
+Werte mit Verrechnungssteuer (Rubrik A)                                        250.00                  8.75                                   3.06
+Werte ohne Verrechnungssteuer (Rubrik B)                                    89'416.50                                    421.30
+Total                                                                       89'666.50                   8.75            421.30                3.06
+
+
+
+
+Gebühren                                                                                                                 Betrag
+Depotgebühren                                                                                                            180.20
+Total Gebühren                                                                                                          180.20
+
+
+
+
+Raiffeisenbank Musterhausen Genossenschaft                                                                                                                                           1/6
+                                                                  1900000005001001
+                                                                                                                                   Kundenname              Max Muster
+                                                                                                                                   Kunden-Nr.              111.111.111.1
+
+
+Raiffeisenbank Musterhausen
+
+
+Steuerverzeichnis vom 01.01.2025 bis 31.12.2025 in CHF
+
+Werte Rubrik A und Rubrik B
+
+                                                                                    Stückzahl                                                                                                 Verrechnungs-
+Valor/IBAN                     Land Beschreibung                                                       Steuerkurs         Wechselkurs     Steuerwert    Ertrag Rubrik A     Ertrag Rubrik B
+                                                                                     Nominal                                                                                                         steuer
+Basisvermögen
+CH00 1234 5678 9012 3456 0            Privatkonto / Lohn (CHF)
+                                      Eröffnungsdatum: 01.01.20
+  31.12.25                            Zinszahlung                                                                                                                                     2.50
+  31.12.25                            Endsaldo                                          1'200.00                                            1'200.00
+CH00 1234 5678 9012 3456 1            Privatkonto / Sparen (CHF)
+                                      Eröffnungsdatum: 01.01.20
+  31.12.25                            Zinszahlung                                                                                                                                    18.80
+  31.12.25                            Endsaldo                                         12'466.50                                           12'466.50
+Total Basisvermögen                                                                                                                        13'666.50                                 21.30
+Anlagevermögen 111.111.111.9
+2308773                        IE     iShares PLC - iShares MSCI World UCITS ETF (CHF)
+  01.01.25                            Startsaldo                                          400.00
+  31.12.25                            Endsaldo                                            400.00    CHF 190.00000                          76'000.00                                400.00
+Total Anlagevermögen                                                                                                                       76'000.00                                400.00
+
+Total                                                                                                                                      89'666.50           8.75                421.30

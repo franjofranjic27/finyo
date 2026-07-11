@@ -231,6 +231,75 @@
       "filed": "Filed",
       "assessed": "Assessed",
       "paid": "Paid"
+    },
+    "upload": {
+      "button": "Upload document",
+      "title": "Upload document",
+      "subtitle": "Analyse a PDF and apply the extracted values to tax year {{year}}",
+      "dropzone": "Drag a PDF here",
+      "chooseFile": "or choose a file",
+      "dropzoneMax": "max. 10 MB",
+      "analyzing": "Analysing document…",
+      "supported": "supported",
+      "digitalOnly": "digital PDFs only",
+      "unknownType": "The document type could not be detected — pick it manually below.",
+      "processAs": "Process as {{type}}",
+      "notStored": "not stored",
+      "removeFile": "Remove file",
+      "confidence": "{{pct}}% confidence",
+      "documentYear": "Document year {{year}}",
+      "yearMismatch": "The document is for {{docYear}}, but you are editing {{year}}.",
+      "infoOnly": "info only",
+      "applyCount_one": "Apply {{count}} value",
+      "applyCount_other": "Apply {{count}} values",
+      "discard": "Discard",
+      "overwriteHint": "Applying overwrites only the selected fields.",
+      "table": {
+        "field": "Field",
+        "extracted": "Extracted",
+        "current": "Current in tax year",
+        "target": "Target"
+      },
+      "types": {
+        "SALARY_CERTIFICATE": "Salary certificate",
+        "HEALTH_INSURANCE": "Health insurance premium statement",
+        "SECURITIES_STATEMENT": "Securities statement",
+        "PILLAR_3A": "Pillar 3a statement",
+        "ASSESSMENT": "Assessment notice"
+      },
+      "hints": {
+        "SALARY_CERTIFICATE": "Applies the gross salary",
+        "HEALTH_INSURANCE": "Applies the premiums as insurance deduction",
+        "SECURITIES_STATEMENT": "Applies tax value and income",
+        "PILLAR_3A": "Applies the 3a contribution",
+        "ASSESSMENT": "Applies the assessed tax amount"
+      },
+      "targets": {
+        "grossEmploymentIncome": "Gross income",
+        "investmentIncome": "Investment income",
+        "netWealth": "Net wealth",
+        "deductionInsurancePremiums": "Insurance premiums",
+        "pillar3aContribution": "Pillar 3a",
+        "assessedAmount": "Assessed amount"
+      },
+      "fields": {
+        "socialSecurityContributions": "Social security contributions",
+        "pensionContributions": "Pension contributions",
+        "netSalary": "Net salary",
+        "basicPremium": "Basic insurance premium",
+        "supplementaryPremium": "Supplementary insurance premium",
+        "uncoveredTreatmentCosts": "Uncovered treatment costs",
+        "totalFees": "Total fees",
+        "institution": "Institution",
+        "taxType": "Tax type",
+        "taxableIncome": "Taxable income",
+        "taxableWealth": "Taxable wealth"
+      },
+      "errors": {
+        "invalidFile": "Please choose a PDF file.",
+        "tooLarge": "The file is larger than 10 MB.",
+        "wrongTypeTitle": "Wrong document type"
+      }
     }
   },
   "pillar3": {

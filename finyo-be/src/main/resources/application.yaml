@@ -10,7 +10,7 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-  # factsheet uploads: 10 MB PDF + multipart overhead
+  # tax document and factsheet uploads: 10 MB PDF + multipart overhead
   servlet:
     multipart:
       max-file-size: 10MB

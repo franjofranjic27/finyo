@@ -1,0 +1,45 @@
+                                                                                                                              Kunde              Max Muster
+                                                                                                                              Kdnr.              1234567
+                                                                                                                              Periode            01.01.2025 - 31.12.2025
+                                                                                                                              Erstellt am        11.02.2026
+                                                                                                                              Kanton             St. Gallen
+
+Steuerauszug in CHF 31.12.2025
+Zusammenfassung
+
+       Steuerwert der                    Bruttoertrag               Bruttoertrag
+       A- und B-Werte                  2025 Werte mit           2025 Werte ohne                Verrechnungs-
+       am 31.12.2025           A          VSt.-Abzug     B           VSt.-Abzug               steueranspruch                  Werte für Formular "Wertschriften- und Guthaben-
+                         (1)                                                                                                  verzeichnis" (inkl. Konti, ohne Werte DA-1 und USA)
+              24,750                                0                        85                        0.00                   (1) Davon A 0 und B 24,750
+
+
+
+       Steuerwert der                                                                          Anrechnung                     Werte für zusätzliches Formular "Antrag auf Anrechnung
+  DA-1 und USA-Werte                                           Bruttoertrag 2025              ausländischer     Steuerrück-   ausländischer Quellensteuern und zusätzlichen Steuer-
+        am 31.12.2025                                        DA-1 und USA-Werte               Quellensteuer     behalt USA    rückbehalt USA" (DA-1)
+                                                                                                                              (2) Davon DA-1 0 und USA 0
+                    0 (2)                                                     0 (3)                        0             0    (3) Davon DA-1 0 und USA 0
+
+
+
+  Total Steuerwert der         Total Bruttoertrag 2025   Total Bruttoertrag 2025      Total Bruttoertrag 2025
+  A, B, DA-1 und USA-                      A-Werte mit   B, DA-1 und USA-Werte           A, B, DA-1 und USA-
+  Werte am 31.12.2025                       VSt.-Abzug          ohne VSt.-Abzug                         Werte                 Falls keine Anrechnung ausländischer Quellensteuern (DA-1)
+                                                                                                                              geltend gemacht wird, dann sind diese Totalwerte im Wert-
+              24,750                                0                        85                           85                  schriftenverzeichnis einzusetzen.
+
+    Kryptowährungen
+       am 31.12.2025
+
+                  150 (4)                                                                                                     (4)   Im Total Steuerwerte enthalten
+
+            Schulden
+        am 31.12.2025                                         Schuldzinsen 2025
+                                                                                                                              Werte für zusätzliches Steuererklärungsformular "Schulden-
+                    0                                                         0                                               verzeichnis"
+
+                                                                                                                              Abzugsfähige Werte sind in der Steuererklärung unter der
+              Spesen                                                                                                          Rubrik "Abzüge" einzutragen
+                                                                                                                              (5) Über die Abzugsfähigkeit der Spesen entscheidet die
+                   25 (5)                                                                                                     zuständige Steuerbehörde

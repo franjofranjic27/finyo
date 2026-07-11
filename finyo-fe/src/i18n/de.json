@@ -231,6 +231,75 @@
       "filed": "Eingereicht",
       "assessed": "Veranlagt",
       "paid": "Bezahlt"
+    },
+    "upload": {
+      "button": "Dokument hochladen",
+      "title": "Dokument hochladen",
+      "subtitle": "PDF analysieren und erkannte Werte ins Steuerjahr {{year}} übernehmen",
+      "dropzone": "PDF hierher ziehen",
+      "chooseFile": "oder Datei auswählen",
+      "dropzoneMax": "max. 10 MB",
+      "analyzing": "Dokument wird analysiert …",
+      "supported": "unterstützt",
+      "digitalOnly": "nur digitale PDFs",
+      "unknownType": "Der Dokumenttyp konnte nicht erkannt werden — wähle ihn unten manuell aus.",
+      "processAs": "Als {{type}} verarbeiten",
+      "notStored": "wird nicht gespeichert",
+      "removeFile": "Datei entfernen",
+      "confidence": "{{pct}} % Konfidenz",
+      "documentYear": "Dokumentjahr {{year}}",
+      "yearMismatch": "Das Dokument betrifft das Jahr {{docYear}}, du bearbeitest gerade {{year}}.",
+      "infoOnly": "nur zur Info",
+      "applyCount_one": "{{count}} Wert übernehmen",
+      "applyCount_other": "{{count}} Werte übernehmen",
+      "discard": "Verwerfen",
+      "overwriteHint": "Übernahme überschreibt nur die ausgewählten Felder.",
+      "table": {
+        "field": "Feld",
+        "extracted": "Erkannt",
+        "current": "Aktuell im Steuerjahr",
+        "target": "Ziel"
+      },
+      "types": {
+        "SALARY_CERTIFICATE": "Lohnausweis",
+        "HEALTH_INSURANCE": "Krankenkassen-Prämienübersicht",
+        "SECURITIES_STATEMENT": "Wertschriftenverzeichnis",
+        "PILLAR_3A": "Säule-3a-Bescheinigung",
+        "ASSESSMENT": "Veranlagungsverfügung"
+      },
+      "hints": {
+        "SALARY_CERTIFICATE": "Übernimmt den Bruttolohn",
+        "HEALTH_INSURANCE": "Übernimmt die Prämien als Versicherungsabzug",
+        "SECURITIES_STATEMENT": "Übernimmt Steuerwert und Erträge",
+        "PILLAR_3A": "Übernimmt den 3a-Beitrag",
+        "ASSESSMENT": "Übernimmt den veranlagten Steuerbetrag"
+      },
+      "targets": {
+        "grossEmploymentIncome": "Bruttoeinkommen",
+        "investmentIncome": "Kapitalerträge",
+        "netWealth": "Reinvermögen",
+        "deductionInsurancePremiums": "Versicherungsprämien",
+        "pillar3aContribution": "Säule 3a",
+        "assessedAmount": "Veranlagter Betrag"
+      },
+      "fields": {
+        "socialSecurityContributions": "Sozialversicherungsbeiträge",
+        "pensionContributions": "Pensionskassenbeiträge",
+        "netSalary": "Nettolohn",
+        "basicPremium": "Prämie Grundversicherung",
+        "supplementaryPremium": "Prämie Zusatzversicherung",
+        "uncoveredTreatmentCosts": "Ungedeckte Heilungskosten",
+        "totalFees": "Gebühren total",
+        "institution": "Vorsorgeeinrichtung",
+        "taxType": "Steuerart",
+        "taxableIncome": "Steuerbares Einkommen",
+        "taxableWealth": "Steuerbares Vermögen"
+      },
+      "errors": {
+        "invalidFile": "Bitte eine PDF-Datei auswählen.",
+        "tooLarge": "Die Datei ist grösser als 10 MB.",
+        "wrongTypeTitle": "Falscher Dokumenttyp"
+      }
     }
   },
   "pillar3": {

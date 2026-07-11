@@ -71,6 +71,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(DocumentProcessingException.class)
+    public ProblemDetail handleDocumentProcessing(DocumentProcessingException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setType(URI.create("https://finyo.ch/errors/document-processing"));
+        problem.setTitle("Document Processing Failed");
+        if (ex.getDetectedType() != null) {
+            problem.setProperty("detectedType", ex.getDetectedType());
+        }
+        return problem;
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
