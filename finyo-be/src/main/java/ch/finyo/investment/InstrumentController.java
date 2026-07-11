@@ -78,7 +78,8 @@ public class InstrumentController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete an instrument")
+    @Operation(summary = "Delete an instrument",
+            description = "Also deletes all portfolio positions referencing this instrument (database cascade).")
     @ApiResponse(responseCode = "204", description = "Instrument deleted")
     @ApiResponse(responseCode = "404", description = "Instrument not found")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
