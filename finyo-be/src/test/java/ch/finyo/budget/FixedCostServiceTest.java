@@ -7,7 +7,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.mockito.ArgumentCaptor;
+
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +22,7 @@ import static org.mockito.BDDMockito.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.times;
 
 /**
  * Pure unit tests for FixedCostService.
@@ -28,6 +32,8 @@ import static org.mockito.BDDMockito.then;
  *      YEARLY costs are broken down (/12), both rounded to 2 dp HALF_UP.
  *   2. List ordering (amountPerYear DESC, then name) and totals.
  *   3. Standard CRUD multi-tenancy and not-found semantics.
+ *   4. bulkUpsert(): create-vs-update decision by normalized name,
+ *      duplicate handling within a batch and per-row error isolation.
  */
 @ExtendWith(MockitoExtension.class)
 class FixedCostServiceTest {
@@ -173,5 +179,126 @@ class FixedCostServiceTest {
         assertThatThrownBy(() -> fixedCostService.delete(id, "attacker"))
                 .isInstanceOf(ResourceNotFoundException.class);
         then(fixedCostRepository).should(never()).deleteById(any());
+    }
+
+    // =========================================================================
+    // bulkUpsert()
+    // =========================================================================
+
+    private FixedCostRequest item(String name, String amount) {
+        return new FixedCostRequest(name, "Living", PaymentInterval.MONTHLY, new BigDecimal(amount));
+    }
+
+    private FixedCost costCreatedAt(String name, OffsetDateTime createdAt) {
+        return FixedCost.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .name(name)
+                .paymentInterval(PaymentInterval.MONTHLY)
+                .amount(new BigDecimal("10"))
+                .createdAt(createdAt)
+                .build();
+    }
+
+    /** Mimics JPA identity assignment so in-batch duplicates can be traced by id. */
+    private void givenSaveAssignsIds() {
+        given(fixedCostRepository.save(any(FixedCost.class))).willAnswer(invocation -> {
+            FixedCost cost = invocation.getArgument(0);
+            if (cost.getId() != null) {
+                return cost;
+            }
+            return FixedCost.builder()
+                    .id(UUID.randomUUID())
+                    .userId(cost.getUserId())
+                    .name(cost.getName())
+                    .category(cost.getCategory())
+                    .paymentInterval(cost.getPaymentInterval())
+                    .amount(cost.getAmount())
+                    .build();
+        });
+    }
+
+    @Test
+    void bulkUpsert_matches_existing_costs_case_and_whitespace_insensitively() {
+        FixedCost existing = cost("Netflix", PaymentInterval.MONTHLY, "20");
+        given(fixedCostRepository.findByUserId(USER_ID)).willReturn(List.of(existing));
+        givenSaveAssignsIds();
+
+        FixedCostBulkResult result = fixedCostService.bulkUpsert(
+                new FixedCostBulkRequest(List.of(item("  NETFLIX ", "25"), item("Rent", "1500"))),
+                USER_ID);
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+        assertThat(result.errors()).isEmpty();
+
+        // the match updates the existing row, keeping the request's casing
+        then(fixedCostRepository).should().save(argThat(c ->
+                existing.getId().equals(c.getId())
+                        && "  NETFLIX ".equals(c.getName())
+                        && new BigDecimal("25").compareTo(c.getAmount()) == 0));
+        // the non-match is inserted as a new row for the same user
+        then(fixedCostRepository).should().save(argThat(c ->
+                c.getId() == null && "Rent".equals(c.getName()) && USER_ID.equals(c.getUserId())));
+    }
+
+    @Test
+    void bulkUpsert_lets_a_later_duplicate_in_the_batch_update_the_row_the_earlier_one_created() {
+        given(fixedCostRepository.findByUserId(USER_ID)).willReturn(List.of());
+        givenSaveAssignsIds();
+
+        FixedCostBulkResult result = fixedCostService.bulkUpsert(
+                new FixedCostBulkRequest(List.of(item("Netflix", "20"), item("netflix", "30"))),
+                USER_ID);
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+
+        ArgumentCaptor<FixedCost> captor = ArgumentCaptor.forClass(FixedCost.class);
+        then(fixedCostRepository).should(times(2)).save(captor.capture());
+        FixedCost secondSave = captor.getAllValues().get(1);
+        // the second item targets the id assigned to the first insert — last one wins
+        assertThat(secondSave.getId()).isNotNull();
+        assertThat(secondSave.getName()).isEqualTo("netflix");
+        assertThat(secondSave.getAmount()).isEqualByComparingTo("30");
+    }
+
+    @Test
+    void bulkUpsert_updates_the_oldest_row_when_existing_names_collide_after_normalization() {
+        FixedCost older = costCreatedAt("Netflix", OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+        FixedCost newer = costCreatedAt("NETFLIX", OffsetDateTime.parse("2026-06-01T00:00:00Z"));
+        given(fixedCostRepository.findByUserId(USER_ID)).willReturn(List.of(newer, older));
+        givenSaveAssignsIds();
+
+        FixedCostBulkResult result = fixedCostService.bulkUpsert(
+                new FixedCostBulkRequest(List.of(item("netflix", "25"))), USER_ID);
+
+        assertThat(result.updated()).isEqualTo(1);
+        then(fixedCostRepository).should(times(1)).save(argThat(c -> older.getId().equals(c.getId())));
+    }
+
+    @Test
+    void bulkUpsert_isolates_a_failing_row_and_processes_the_rest() {
+        given(fixedCostRepository.findByUserId(USER_ID)).willReturn(List.of());
+        given(fixedCostRepository.save(any(FixedCost.class))).willAnswer(invocation -> {
+            FixedCost cost = invocation.getArgument(0);
+            if ("Broken".equals(cost.getName())) {
+                throw new RuntimeException("boom");
+            }
+            return cost;
+        });
+
+        FixedCostBulkResult result = fixedCostService.bulkUpsert(
+                new FixedCostBulkRequest(List.of(
+                        item("Rent", "1500"), item("Broken", "10"), item("Netflix", "20"))),
+                USER_ID);
+
+        assertThat(result.created()).isEqualTo(2);
+        assertThat(result.updated()).isZero();
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.errors()).containsExactly("row 2: persistence error");
+        then(fixedCostRepository).should(times(3)).save(any(FixedCost.class));
     }
 }
