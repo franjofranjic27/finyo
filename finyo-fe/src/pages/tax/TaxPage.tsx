@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
+import type { TaxYearDetail } from '@/api/tax';
 import { formatDate } from '@/lib/formatters';
 import { buildYearList, toIsoDate } from './taxYearUtils';
 import { YearSidebar } from './YearSidebar';
@@ -13,11 +15,15 @@ import { CalculatorCard } from './CalculatorCard';
 import { TaxResultSection } from './TaxResultSection';
 import { MonthlyPaymentsCard } from './MonthlyPaymentsCard';
 import { DeadlinesPaymentsSection } from './DeadlinesPaymentsSection';
-import { ScenariosCard } from './ScenariosCard';
+import { ScenarioBar } from './ScenarioBar';
+import { ScenarioSavePanel } from './ScenarioSavePanel';
+import { ScenarioActionsMenu } from './ScenarioActionsMenu';
 import { YearComparisonCard } from './YearComparisonCard';
 
 // Matches the backend rate-data validation (@Min(2020) on the year path variable).
 const MIN_YEAR = 2020;
+
+const SAVED_FLASH_MS = 2400;
 
 function resolveYear(param: string | undefined, currentYear: number): number {
   const parsed = Number(param);
@@ -87,30 +93,121 @@ export function TaxPage() {
           <TaxPageSkeleton />
         ) : (
           <>
-            {!detail && (
-              <p className="text-sm text-muted-foreground print:hidden">
-                {t('tax.noYearData', { year })}
-              </p>
-            )}
-            <CalculatorCard
-              key={year}
-              year={year}
-              inputs={detail?.inputs ?? null}
-              className="print:hidden"
-            />
-            {detail?.calculation && (
-              <TaxResultSection result={detail.calculation} inputs={detail.inputs} />
-            )}
-            {detail && <MonthlyPaymentsCard detail={detail} className="print:hidden" />}
-            {detail && (
-              <DeadlinesPaymentsSection year={year} detail={detail} className="print:hidden" />
-            )}
-            <ScenariosCard year={year} inputs={detail?.inputs ?? null} className="print:hidden" />
+            {/* Keyed by year so scenario selection and save-panel state reset on year change */}
+            <TaxYearContent key={year} year={year} detail={detail ?? null} />
             <YearComparisonCard years={years ?? []} className="print:hidden" />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+interface TaxYearContentProps {
+  year: number;
+  detail: TaxYearDetail | null;
+}
+
+/** Calculator, scenario bar, results and payment sections for one tax year. */
+function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
+  const { t } = useTranslation();
+  const { accessToken } = useAuth();
+  const token = accessToken ?? '';
+
+  // Null = no scenario chip active, show the year's own current calculation.
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+  const [savePanelOpen, setSavePanelOpen] = useState(false);
+  // Counter instead of a boolean so a save while the flash is still visible
+  // restarts the timeout (the effect re-runs on every increment).
+  const [savedFlashCount, setSavedFlashCount] = useState(0);
+  const savedVisible = savedFlashCount > 0;
+
+  useEffect(() => {
+    if (savedFlashCount === 0) return;
+    const timer = setTimeout(() => setSavedFlashCount(0), SAVED_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [savedFlashCount]);
+
+  const { data: scenarios } = useQuery({
+    queryKey: ['tax', 'scenarios', String(year)],
+    queryFn: () => taxApi.getScenarios(token, year),
+    enabled: !!token,
+  });
+
+  // A deleted scenario resolves to null and falls back to the year's result.
+  const selectedScenario = scenarios?.find((s) => s.id === selectedScenarioId) ?? null;
+  const defaultScenario = scenarios?.find((s) => s.isDefault) ?? null;
+
+  return (
+    <>
+      {!detail && (
+        <p className="text-sm text-muted-foreground print:hidden">
+          {t('tax.noYearData', { year })}
+        </p>
+      )}
+      <CalculatorCard
+        year={year}
+        inputs={detail?.inputs ?? null}
+        className="print:hidden"
+        onCalculated={() => setSelectedScenarioId(null)}
+        // Persists the current form first so the panel never snapshots stale
+        // inputs; the panel below reads detail.inputs from the updated query.
+        onSaveScenarioRequested={() => setSavePanelOpen(true)}
+        actionsExtra={
+          savedVisible && (
+            <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-emerald-500">
+              ✓ {t('tax.scenarioSaved')}
+            </span>
+          )
+        }
+        footer={
+          savePanelOpen && detail?.inputs ? (
+            <ScenarioSavePanel
+              year={year}
+              inputs={detail.inputs}
+              hasDefault={defaultScenario != null}
+              onClose={() => setSavePanelOpen(false)}
+              onSaved={(scenario) => {
+                setSavePanelOpen(false);
+                setSelectedScenarioId(scenario.id);
+                setSavedFlashCount((count) => count + 1);
+              }}
+            />
+          ) : undefined
+        }
+      />
+      {detail && (
+        <ScenarioBar
+          scenarios={scenarios ?? []}
+          selectedScenarioId={selectedScenarioId}
+          onSelect={setSelectedScenarioId}
+          onAdd={() => setSavePanelOpen(true)}
+          addDisabled={!detail.inputs}
+          className="print:hidden"
+        />
+      )}
+      {(detail?.calculation || selectedScenario) && (
+        <TaxResultSection
+          result={detail?.calculation ?? null}
+          inputs={detail?.inputs ?? null}
+          scenario={selectedScenario}
+          defaultScenario={defaultScenario}
+          scenarioActions={
+            selectedScenario && (
+              <ScenarioActionsMenu
+                year={year}
+                scenario={selectedScenario}
+                onDeleted={() => setSelectedScenarioId(null)}
+              />
+            )
+          }
+        />
+      )}
+      {detail && <MonthlyPaymentsCard detail={detail} className="print:hidden" />}
+      {detail && (
+        <DeadlinesPaymentsSection year={year} detail={detail} className="print:hidden" />
+      )}
+    </>
   );
 }
 
