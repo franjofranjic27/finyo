@@ -1,0 +1,79 @@
+A    X            Lohnausweis - Certificat de salaire - Certificato di salario      00100000 (G05/100)
+
+B                 Rentenbescheinigung - Attestation de rentes - Attestazione delle rendite
+                                                                                                                               Unentgeltliche Beförderung zwischen Wohn- und Arbeitsort
+C   756.1234.5678.97                                   01.01.1990                                             F                Transport gratuit entre le domicile et le lieu de travail
+    AHV-Nr.   -   No AVS -     N.AVS                 Geburtsdatum - Date de naissance - Data di nascita                        Trasporto gratuito dal domicilio al luogo di lavoro
+                                                                                                                               Kantinenverpflegung / Lunch-Checks
+D    2025                           E    01.01.2025                  31.12.2025                               G     X          Repas à la cantine / chèques-repas
+    Jahr - Année - Anno                  von - du - dal             bis - au - al                                              Pasti alla mensa / buoni pasto
+
+H
+
+
+
+                                                                                                    Herrn
+                                                                                                    Muster Max
+                                                                                                    Musterstrasse 1
+                                                                                                    9000 Musterhausen
+
+
+
+
+                                                                                                                                                                Nur ganze Frankenbeträge
+                                                                                                                                                                Que des montants entiers
+1. Lohn soweit nicht unter Ziffer 2-7 aufzuführen                    / Rente                                                                                    Unicamente importi interi
+   Salaire qui ne concerne pas les chiffres 2 à 7 ci-dessous         / Rente
+   Salario se non da indicare sotto cifre da 2 a 7 più sotto         / Rendita                                                                                                      84000
+2. Gehaltsnebenleistungen             2.1 Verpflegung, Unterkunft - Pension, logement - Vitto, alloggio                                                     +
+   Prestations salariales accessoires
+   Prestazioni accessorie al salario 2.2 Privatanteil Geschäftsfahrzeug – Part privée voiture de service – Quota privata automobile di servizio             +
+                                             2.3 Andere - Autres - Altre                                                                                    +
+                                                  Art - Genre - Genere
+
+3. Unregelmässige Leistungen - Prestations non périodiques - Prestazioni aperiodiche                              Art - Genre - Genere
+
+                                                                                                                                                            +
+4. Kapitalleistungen - Prestations en capital - Prestazioni in capitale                                                                                     +
+    Art - Genre - Genere
+5. Beteiligungrechte gemäss Beiblatt - Droits de participation selon annexe - Diritti di partecipazione secondo allegato                                    +
+6. Verwaltungsratsentschädigungen - Indemnités des membres de l'administration - Indennità dei membri di consigli d’amministrazione                         +
+7. Andere Leistungen - Autres prestations - Altre prestazioni                                                                                               +
+    Art - Genre - Genere
+8 Bruttolohn total / Rente - Salaire brut total / Rente - Salario lordo totale / Rendita                                                                    =                       84000
+9. Beiträge AHV/IV/EO/ALV/NBUV - Cotisations AVS/AI/APG/AC/AANP - Contributi AVS/AI/IPG/AD/AINP                                                             -                         5334
+10 Berufliche Vorsorge        2. Säule              10.1 Ordentliche Beiträge - Cotisations ordinaries - Contributi ordinari                                -
+                               e
+   Prévoyance professionnelle 2 pilier                                                                                                                                                4200
+   Previdenza professionale 2° pilastro             10.2 Beiträge für den Einkauf - Cotisations pour le rachat - Contributi per il riscatto                 -
+
+11. Nettolohn / Rente - Salaire net / Rente - Salario netto / Rendita                                                                                       =                       74466
+    In die Steuererklärung übertragen - A reporter sur la déclaration d'impôt - Da riportare nella dichiarazione d’imposta
+
+12. Quellensteuerabzug - Retenue de I'impôt à la source - Ritenuta d’imposta alla fonte
+
+13. Spesenvergütungen - Allocations pour frais - Indennità per spese
+    Nicht im Bruttolohn (gemäss Ziffer 8) enthalten - Non comprises dans le salaire brut (au chiffre 8) - Non comprese nel salario lordo (sotto cifra 8)
+    13.1 Effektive Spesen         13.1.1 Reise, Verpflegung, Übernachtung - Voyage, repas, nuitées - Viaggio, vitto, alloggio
+         Frais effectifs
+         Spese effettive          13.1.2 Übrige - Autres - Altre
+                                            Art - Genre - Genere
+    13.2 Pauschalspesen           13.2.1 Repräsentation - Représentation - Rappresentanza
+         Frais forfaitaires
+         Spese forfettarie
+                                  13.2.2 Auto - Voiture - Automobile
+                                  13.2.3 Übrige - Autres - Altre
+                                            Art - Genre - Genere
+
+    13.3 Beiträge an die Weiterbildung - Contributions au perfectionnement - Contributi per il perfezionamento
+
+                                                          Art
+
+14. Weitere Gehaltsnebenleistungen - Autres prestations salariales accessoires - Altre prestazioni accessorie al salario
+
+
+15. Bemerkungen - Observations - Osservazioni
+
+
+Ort und Datum - Lieu et date - Luogo e data                        Die Richtigkeit bezeugt - Certifié exact - Certificato esatto
+Musterhausen, 15.01.2026                                           Muster AG, 9000 Musterhausen

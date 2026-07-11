@@ -79,6 +79,22 @@ class GlobalExceptionHandlerTest {
             throw new RuntimeException("something blew up unexpectedly");
         }
 
+        @GetMapping("/test/document-processing")
+        public void throwDocumentProcessing() {
+            throw new DocumentProcessingException("Document appears to be a scan");
+        }
+
+        @GetMapping("/test/document-processing-with-type")
+        public void throwDocumentProcessingWithDetectedType() {
+            throw new DocumentProcessingException(
+                    "Dokument wurde als 'Säule-3a-Bescheinigung' erkannt", "PILLAR_3A");
+        }
+
+        @GetMapping("/test/upload-too-large")
+        public void throwUploadTooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(10 * 1024 * 1024);
+        }
+
         @PostMapping("/test/validation")
         public void validate(@Valid @RequestBody SomeRequest req) {
             // If validation passes the handler is never reached in error tests
@@ -222,6 +238,42 @@ class GlobalExceptionHandlerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
+    }
+
+    // -------------------------------------------------------------------------
+    // DocumentProcessingException → 422 Unprocessable Entity
+    // -------------------------------------------------------------------------
+
+    @Test
+    void document_processing_exception_returns_422_problem_json() throws Exception {
+        mockMvc.perform(get("/test/document-processing").with(jwt()))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+            .andExpect(jsonPath("$.title").value("Document Processing Failed"))
+            .andExpect(jsonPath("$.type").value("https://finyo.ch/errors/document-processing"))
+            .andExpect(jsonPath("$.detail").value("Document appears to be a scan"))
+            .andExpect(jsonPath("$.detectedType").doesNotExist());
+    }
+
+    @Test
+    void document_processing_exception_with_detected_type_exposes_it_as_property() throws Exception {
+        mockMvc.perform(get("/test/document-processing-with-type").with(jwt()))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.detectedType").value("PILLAR_3A"));
+    }
+
+    // -------------------------------------------------------------------------
+    // MaxUploadSizeExceededException → 413 Payload Too Large
+    // -------------------------------------------------------------------------
+
+    @Test
+    void max_upload_size_exceeded_returns_413_problem_json() throws Exception {
+        mockMvc.perform(get("/test/upload-too-large").with(jwt()))
+            .andExpect(status().isPayloadTooLarge())
+            .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+            .andExpect(jsonPath("$.title").value("Payload Too Large"))
+            .andExpect(jsonPath("$.type").value("https://finyo.ch/errors/payload-too-large"))
+            .andExpect(jsonPath("$.detail").value("Uploaded file exceeds the maximum allowed size"));
     }
 
     // -------------------------------------------------------------------------
