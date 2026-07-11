@@ -4,13 +4,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth } from './auth/RequireAuth';
+import { RequireRole } from './auth/RequireRole';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Investments } from './pages/Investments';
 import { TaxPage } from './pages/tax/TaxPage';
-import { Pillar3 } from './pages/Pillar3';
+import { Pillar3Page } from './pages/pillar3/Pillar3Page';
 import { Insurance } from './pages/Insurance';
 import { Settings } from './pages/Settings';
+import { Pillar3ProductsAdminPage } from './pages/admin/Pillar3ProductsAdminPage';
 import './i18n/index';
 import './index.css';
 
@@ -36,9 +38,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 <Route path="/investments" element={<Investments />} />
                 <Route path="/tax" element={<TaxPage />} />
                 <Route path="/tax/:year" element={<TaxPage />} />
-                <Route path="/pillar3" element={<Pillar3 />} />
+                <Route path="/pillar3" element={<Pillar3Page />} />
                 <Route path="/insurance" element={<Insurance />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route
+                  path="/admin/pillar3-products"
+                  element={
+                    <RequireRole role="admin">
+                      <Pillar3ProductsAdminPage />
+                    </RequireRole>
+                  }
+                />
               </Route>
             </Routes>
           </RequireAuth>

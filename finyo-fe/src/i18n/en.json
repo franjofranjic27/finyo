@@ -6,6 +6,8 @@
     "pillar3": "Pillar 3a",
     "insurance": "Insurance",
     "settings": "Settings",
+    "admin": "Admin",
+    "adminPillar3Products": "3a Products",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
   },
@@ -144,7 +146,36 @@
     "balanceGrowth": "Balance Growth over {{years}} Years",
     "contributionCap": "You could contribute <strong>{{remaining}}</strong> more to reach the maximum of <strong>{{max}}</strong>, saving an additional <strong>{{saving}}</strong> in taxes.",
     "vsSavingsTitle": "Compared to taxable savings account",
-    "vsSavingsText": "Same gross contributions in a regular taxable account would yield approximately <strong>{{equivalent}}</strong> — the 3a account yields <emph>+{{advantage}}</emph> more after payout tax."
+    "vsSavingsText": "Same gross contributions in a regular taxable account would yield approximately <strong>{{equivalent}}</strong> — the 3a account yields <emph>+{{advantage}}</emph> more after payout tax.",
+    "tabs": {
+      "calculator": "Calculator",
+      "compare": "Product Comparison"
+    },
+    "compare": {
+      "formTitle": "Comparison Parameters",
+      "currentBalance": "Current 3a Balance",
+      "annualContribution": "Annual Contribution",
+      "years": "Investment Horizon (Years)",
+      "capHint": "Maximum annual contribution: {{max}}",
+      "searchLabel": "Add product",
+      "searchPlaceholder": "Search by name, provider, ISIN or valor …",
+      "noResults": "No matching products",
+      "maxProducts": "Maximum of {{max}} products reached",
+      "emptyCatalog": "No products available yet — an administrator has to add the product catalog first.",
+      "emptySelection": "Search for 3a products above to compare their projected final capital.",
+      "tableTitle": "Comparison",
+      "product": "Product",
+      "equity": "Equity",
+      "ter": "TER",
+      "avgReturn": "Ø Return",
+      "fees": "Fees over Term",
+      "finalCapital": "Final Capital",
+      "topBadge": "Top",
+      "remove": "Remove {{name}}",
+      "chartTitle": "Final Capital after {{years}} Years",
+      "totalPaidIn": "Total paid in: {{amount}}",
+      "footnote": "Model calculation: expected gross return = 1% + equity share × 5%; the TER is deducted annually from the grown balance. Values are projections, not guarantees."
+    }
   },
   "insurance": {
     "title": "Insurance Overview",
@@ -154,6 +185,37 @@
     "iHaveThis": "I have this",
     "typicalCost": "Typical annual cost",
     "compare": "Compare"
+  },
+  "admin": {
+    "products": {
+      "title": "3a Products",
+      "newProduct": "New Product",
+      "editProduct": "Edit Product",
+      "provider": "Provider",
+      "name": "Name",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "equity": "Equity",
+      "ter": "TER",
+      "sortOrder": "Sort Order",
+      "active": "Active",
+      "inactive": "Inactive",
+      "actions": "Actions",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "deleteTitle": "Delete Product",
+      "deleteText": "Delete \"{{name}}\" permanently? Consider deactivating it instead — deactivated products stay available for existing comparisons.",
+      "deactivateInstead": "Deactivate instead",
+      "empty": "No products yet. Create the first product or use the import endpoint.",
+      "validation": {
+        "providerRequired": "Provider is required",
+        "nameRequired": "Name is required",
+        "isinInvalid": "ISIN must be 12 characters: 2 letters, 9 alphanumeric characters, 1 digit",
+        "valorInvalid": "Valor must contain digits only",
+        "equityRange": "Equity share must be between 0 and 100",
+        "terRange": "TER must be between 0 and 10"
+      }
+    }
   },
   "common": {
     "save": "Save",

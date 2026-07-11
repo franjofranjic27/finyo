@@ -35,7 +35,7 @@ const renderLegendText = (value: string) => (
   <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
 );
 
-function Pillar3Form() {
+export function CalculatorTab() {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -126,12 +126,12 @@ function Pillar3Form() {
       </Card>
 
       {isPending && <Skeleton className="h-96 w-full" />}
-      {result && <Pillar3Result result={result} years={Number.parseInt(years)} />}
+      {result && <Pillar3ResultSection result={result} years={Number.parseInt(years)} />}
     </div>
   );
 }
 
-function Pillar3Result({ result, years }: Readonly<{ result: Pillar3Result; years: number }>) {
+function Pillar3ResultSection({ result, years }: Readonly<{ result: Pillar3Result; years: number }>) {
   const { t } = useTranslation();
 
   const chartData = result.yearlyProjection
@@ -229,16 +229,5 @@ function MetricCard({ label, value, highlight }: Readonly<{ label: string; value
         <p className={`text-xl font-bold mt-1 ${highlight ? 'text-emerald-500' : ''}`}>{value}</p>
       </CardContent>
     </Card>
-  );
-}
-
-export function Pillar3() {
-  const { t } = useTranslation();
-
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">{t('pillar3.title')}</h1>
-      <Pillar3Form />
-    </div>
   );
 }

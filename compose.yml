@@ -24,8 +24,8 @@ services:
       KC_DB: dev-mem
       KC_HEALTH_ENABLED: "true"
     volumes:
-      # mount only the dev realm — the prod file in the same folder carries
-      # unresolved ${FINYO_DOMAIN} placeholders that break --import-realm
+      # mount only the dev realm — finyo-realm.prod.json contains ${FINYO_DOMAIN}
+      # placeholders that are invalid URIs without the prod env
       - ./keycloak/finyo-realm.json:/opt/keycloak/data/import/finyo-realm.json:ro
     ports:
       - "8081:8080"
