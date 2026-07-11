@@ -3,9 +3,17 @@ import { apiRequest } from './client';
 /** Where the current price of a portfolio position comes from (mirrors the backend enum). */
 export type PriceSource = 'LIVE' | 'CACHE' | 'PURCHASE';
 
+/** Asset class of an instrument (mirrors the backend enum). */
+export type AssetClass = 'ETF' | 'FUND' | 'STOCK' | 'CRYPTO' | 'BOND';
+
+/** Display order of asset classes — used for table grouping and selects. */
+export const ASSET_CLASSES: readonly AssetClass[] = ['ETF', 'FUND', 'STOCK', 'CRYPTO', 'BOND'];
+
 export interface PortfolioPosition {
   id: string;
+  positionId: string;
   instrumentId: string;
+  assetClass: AssetClass;
   name: string | null;
   isin: string | null;
   valor: string | null;

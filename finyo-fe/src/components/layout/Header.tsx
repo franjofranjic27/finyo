@@ -13,10 +13,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/auth/useAuth';
+import { Breadcrumb } from './Breadcrumb';
+import { useBreadcrumbSegments } from './BreadcrumbContext';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'nav.dashboard',
-  '/investments': 'nav.investments',
+  // The investments top-bar title is "Portfolio"; the sidebar keeps nav.investments.
+  '/investments': 'breadcrumb.portfolio',
   '/tax': 'nav.tax',
   '/pillar3': 'nav.pillar3',
   '/insurance': 'nav.insurance',
@@ -34,8 +37,13 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
   const { isDark, toggle } = useTheme();
   const { user, logout } = useAuth();
 
-  // Match on the first path segment so nested routes like /tax/2025 resolve correctly.
-  const pageTitle = t(ROUTE_LABELS[`/${pathname.split('/')[1]}`] ?? 'nav.dashboard');
+  // Pages can publish multi-segment breadcrumbs; otherwise fall back to a
+  // single segment matched on the first path segment (so nested routes like
+  // /tax/2025 resolve correctly).
+  const contextSegments = useBreadcrumbSegments();
+  const segments = contextSegments ?? [
+    { label: t(ROUTE_LABELS[`/${pathname.split('/')[1]}`] ?? 'nav.dashboard') },
+  ];
   const username =
     (user?.profile?.preferred_username as string | undefined) ??
     (user?.profile?.name as string | undefined) ??
@@ -54,8 +62,8 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
         <span className="sr-only">Toggle menu</span>
       </Button>
 
-      {/* Page title */}
-      <h1 className="flex-1 text-lg font-semibold text-foreground">{pageTitle}</h1>
+      {/* Page breadcrumb */}
+      <Breadcrumb segments={segments} />
 
       {/* Right side controls */}
       <div className="flex items-center gap-2">

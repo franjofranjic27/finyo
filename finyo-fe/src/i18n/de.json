@@ -11,6 +11,18 @@
     "collapseSidebar": "Seitenleiste einklappen",
     "expandSidebar": "Seitenleiste ausklappen"
   },
+  "breadcrumb": {
+    "portfolio": "Portfolio",
+    "position": "Position – {{name}}",
+    "taxYear": "Steuerjahr {{year}}"
+  },
+  "assetClass": {
+    "ETF": "ETF",
+    "FUND": "Anlagefonds",
+    "STOCK": "Einzelaktien",
+    "CRYPTO": "Kryptowährungen",
+    "BOND": "Festgelder & Obligationen"
+  },
   "dashboard": {
     "title": "Dashboard",
     "netThisMonth": "Netto diesen Monat",
@@ -69,6 +81,56 @@
       "range1y": "1J",
       "range3y": "3J",
       "notEnoughData": "Noch nicht genügend Daten — die Historie wächst mit jedem Portfolio-Abruf"
+    },
+    "position": {
+      "loadError": "Position konnte nicht geladen werden",
+      "liveChip": "Kurs live · SIX",
+      "stats": {
+        "value": "Wert",
+        "quantity": "Anzahl",
+        "avgPurchasePrice": "Ø Kaufkurs",
+        "currentPrice": "Aktueller Kurs",
+        "gainLossReturn": "G/V · Rendite"
+      },
+      "product": {
+        "title": "Produktinformationen",
+        "name": "Titel",
+        "assetClass": "Anlageklasse",
+        "valor": "Valor",
+        "isin": "ISIN",
+        "currency": "Währung",
+        "ter": "TER",
+        "priceSource": "Kursquelle",
+        "portfolioShare": "Anteil am Portfolio"
+      },
+      "priceSourceValue": {
+        "LIVE": "Live (SIX)",
+        "CACHE": "Zwischengespeichert",
+        "PURCHASE": "Kaufkurs"
+      },
+      "editDialog": {
+        "title": "Produkt bearbeiten",
+        "name": "Titel",
+        "assetClass": "Anlageklasse",
+        "valor": "Valor",
+        "ter": "TER (%)",
+        "factsheetUrl": "Factsheet-Link (URL)",
+        "nameRequired": "Titel ist erforderlich",
+        "terInvalid": "TER muss eine Zahl zwischen 0 und 10 sein"
+      },
+      "factsheet": {
+        "title": "Factsheet",
+        "dropzone": "Factsheet (PDF) hochladen · max. 10 MB",
+        "view": "Ansehen",
+        "replace": "Ersetzen",
+        "delete": "Factsheet löschen",
+        "openLink": "Factsheet-Link öffnen",
+        "invalidType": "Nur PDF-Dateien sind erlaubt",
+        "tooLarge": "Die Datei ist grösser als 10 MB",
+        "uploading": "Wird hochgeladen…"
+      },
+      "deletePosition": "Position löschen",
+      "confirmDelete": "Position «{{name}}» wirklich löschen?"
     }
   },
   "tax": {

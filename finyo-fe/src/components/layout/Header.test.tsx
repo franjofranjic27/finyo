@@ -24,7 +24,8 @@ describe('Header', () => {
   it('shows the page title derived from the current route', () => {
     renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/investments' });
 
-    expect(screen.getByRole('heading', { name: 'Investments' })).toBeInTheDocument();
+    // The investments top bar is titled "Portfolio" per the approved design.
+    expect(screen.getByRole('heading', { name: 'Portfolio' })).toBeInTheDocument();
   });
 
   it('resolves nested routes such as /tax/2025 to the tax title', () => {

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 import { PositionsTable } from './PositionsTable';
 import { portfolioApi } from '@/api/portfolio';
+import type { PortfolioPosition } from '@/api/portfolio';
 import { renderWithProviders } from '@/test/test-utils';
 import { portfolioPosition } from '@/test/fixtures/portfolio';
 
@@ -19,15 +21,19 @@ vi.mock('@/auth/useAuth', () => ({
   }),
 }));
 
-vi.mock('@/api/portfolio', () => ({
-  portfolioApi: {
-    deletePosition: vi.fn(),
-  },
-}));
+vi.mock('@/api/portfolio', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/portfolio')>();
+  return {
+    ...actual,
+    portfolioApi: { deletePosition: vi.fn() },
+  };
+});
 
+// Deliberately unordered input: grouping must impose ETF → STOCK order.
 const positions = [
   portfolioPosition({
     id: 'p1',
+    assetClass: 'STOCK',
     name: 'Nestlé SA',
     isin: 'CH0038863350',
     quantity: 10,
@@ -36,65 +42,118 @@ const positions = [
     value: 1000,
     gainLoss: 100,
     returnPct: 11.1,
-    allocationPct: 60,
+    allocationPct: 50,
   }),
   portfolioPosition({
     id: 'p2',
-    name: 'Roche Holding AG',
-    isin: 'CH0012032048',
-    value: 666.67,
+    assetClass: 'ETF',
+    name: 'iShares Core SPI',
+    isin: 'CH0237935652',
+    value: 600,
     gainLoss: -33.33,
     returnPct: -4.8,
-    allocationPct: 40,
+    allocationPct: 30,
+  }),
+  portfolioPosition({
+    id: 'p3',
+    assetClass: 'STOCK',
+    name: 'Roche Holding AG',
+    isin: 'CH0012032048',
+    value: 400,
+    gainLoss: 20,
+    returnPct: 5.3,
+    allocationPct: 20,
   }),
 ];
+
+function renderTable(items: PortfolioPosition[] = positions) {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/investments" element={<PositionsTable positions={items} />} />
+      <Route path="/investments/positions/:positionId" element={<div>detail-page</div>} />
+    </Routes>,
+    { route: '/investments' },
+  );
+}
 
 describe('PositionsTable', () => {
   beforeEach(() => {
     vi.mocked(portfolioApi.deletePosition).mockResolvedValue(undefined);
   });
 
-  it('renders one row per position with formatted values', () => {
-    renderWithProviders(<PositionsTable positions={positions} />);
+  it('groups positions under asset-class subheaders in display order', () => {
+    renderTable();
 
-    expect(screen.getByText('Positions')).toBeInTheDocument();
-    expect(screen.getByText('Nestlé SA')).toBeInTheDocument();
-    expect(screen.getByText('CH0038863350')).toBeInTheDocument();
-    expect(screen.getByText("CHF 1'000.00")).toBeInTheDocument();
-    expect(screen.getByText('60.0%')).toBeInTheDocument();
-    expect(screen.getByText('Roche Holding AG')).toBeInTheDocument();
-    expect(screen.getByText('CHF -33.33')).toBeInTheDocument();
+    const rows = screen.getAllByRole('row');
+    const rowTexts = rows.map((row) => row.textContent ?? '');
+    const etfHeaderIndex = rowTexts.findIndex((text) => text.includes('ETF'));
+    const etfRowIndex = rowTexts.findIndex((text) => text.includes('iShares Core SPI'));
+    const stockHeaderIndex = rowTexts.findIndex((text) => text.includes('Individual stocks'));
+    const nestleIndex = rowTexts.findIndex((text) => text.includes('Nestlé SA'));
+
+    // ETF group (header + row) comes before the stock group.
+    expect(etfHeaderIndex).toBeGreaterThan(-1);
+    expect(etfHeaderIndex).toBeLessThan(etfRowIndex);
+    expect(etfRowIndex).toBeLessThan(stockHeaderIndex);
+    expect(stockHeaderIndex).toBeLessThan(nestleIndex);
+  });
+
+  it('shows group total and share in the subheader and hides empty groups', () => {
+    renderTable();
+
+    const stockHeader = screen.getByText('Individual stocks').closest('tr');
+    expect(stockHeader).not.toBeNull();
+    // 1000 + 400 of 2000 total → CHF 1'400.00 and 70.0%
+    expect(within(stockHeader as HTMLElement).getByText("CHF 1'400.00")).toBeInTheDocument();
+    expect(within(stockHeader as HTMLElement).getByText('70.0%')).toBeInTheDocument();
+
+    // No FUND/CRYPTO/BOND positions → no subheaders for them.
+    expect(screen.queryByText('Investment funds')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cryptocurrencies')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fixed deposits & bonds')).not.toBeInTheDocument();
+  });
+
+  it('navigates to the position detail page when a row is clicked', async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(screen.getByText('Nestlé SA'));
+
+    expect(screen.getByText('detail-page')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no positions', () => {
-    renderWithProviders(<PositionsTable positions={[]} />);
+    renderTable([]);
 
     expect(
       screen.getByText('No positions yet — add your first security above'),
     ).toBeInTheDocument();
   });
 
-  it('deletes a position after confirmation and invalidates the portfolio', async () => {
+  it('deletes a position after confirmation without navigating away', async () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
-    const { queryClient } = renderWithProviders(<PositionsTable positions={positions} />);
+    const { queryClient } = renderTable();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
+    // First remove button belongs to the ETF group (iShares).
     await user.click(screen.getAllByRole('button', { name: 'Remove position' })[0]);
 
-    expect(globalThis.confirm).toHaveBeenCalledWith('Remove position "Nestlé SA"?');
+    expect(globalThis.confirm).toHaveBeenCalledWith('Remove position "iShares Core SPI"?');
     await waitFor(() =>
-      expect(portfolioApi.deletePosition).toHaveBeenCalledWith('test-token', 'p1'),
+      expect(portfolioApi.deletePosition).toHaveBeenCalledWith('test-token', 'p2'),
     );
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['portfolio'] }),
     );
+    // The ✕ click must not bubble into the row navigation.
+    expect(screen.queryByText('detail-page')).not.toBeInTheDocument();
   });
 
   it('does not delete when the confirmation is declined', async () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
-    renderWithProviders(<PositionsTable positions={positions} />);
+    renderTable();
 
     await user.click(screen.getAllByRole('button', { name: 'Remove position' })[0]);
 

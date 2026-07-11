@@ -1,8 +1,10 @@
 package ch.finyo.investment;
 
+import ch.finyo.common.ResourceNotFoundException;
 import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -27,9 +29,13 @@ public class PortfolioService {
     private static final int PERCENT_SCALE = 2;
     private static final int MONEY_SCALE = 4;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+    private static final String POSITION_RESOURCE = "Position";
+    /** All SIX prices and stored purchase prices are in CHF; no per-instrument currency yet. */
+    private static final String CURRENCY_CHF = "CHF";
 
     private final PositionRepository positionRepository;
     private final InstrumentRepository instrumentRepository;
+    private final InstrumentFactsheetRepository factsheetRepository;
     private final PortfolioSnapshotRepository snapshotRepository;
     private final SixMarketDataClient sixClient;
 
@@ -69,6 +75,44 @@ public class PortfolioService {
         upsertSnapshot(userId, totalValue, totalCost);
         return new PortfolioResponse(rows, totalValue, totalCost, gainLoss,
                 percentOf(gainLoss, totalCost), asOf);
+    }
+
+    /**
+     * Builds the detail view of a single position using the same price
+     * fallback chain as the aggregated portfolio. Prices ALL positions of the
+     * user because the portfolio share needs the total portfolio value; the
+     * Caffeine cache absorbs the repeated SIX lookups. Deliberately does NOT
+     * upsert a snapshot — only the aggregated portfolio read does.
+     *
+     * @throws ResourceNotFoundException when the position does not exist or
+     *         belongs to another user
+     */
+    public PositionDetailResponse getPositionDetail(UUID positionId, String userId) {
+        log.debug("Building position detail id={} for user={}", positionId, userId);
+        positionRepository.findByIdAndUserId(positionId, userId)
+                .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
+
+        List<Position> positions = positionRepository.findByUserId(userId);
+        Map<UUID, Instrument> instruments = loadInstruments(positions, userId);
+        Map<String, BigDecimal> livePrices = fetchLivePrices(instruments.values());
+
+        List<PricedPosition> priced = positions.stream()
+                .map(position -> price(position, instruments, livePrices))
+                .toList();
+        BigDecimal totalValue = sum(priced, PricedPosition::value);
+
+        PricedPosition target = priced.stream()
+                .filter(p -> positionId.equals(p.position().getId()))
+                .findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
+        return toDetail(target, totalValue, loadFactsheetInfo(target.instrument().getId(), userId));
+    }
+
+    /** Metadata-only projection — the factsheet blob itself is never fetched here. */
+    private PositionDetailResponse.@Nullable FactsheetInfo loadFactsheetInfo(UUID instrumentId, String userId) {
+        return factsheetRepository.findMetadataByInstrumentIdAndUserId(instrumentId, userId)
+                .map(PositionDetailResponse.FactsheetInfo::from)
+                .orElse(null);
     }
 
     public PortfolioHistoryResponse getHistory(String userId, int months) {
@@ -139,7 +183,9 @@ public class PortfolioService {
         BigDecimal gainLoss = priced.value().subtract(priced.cost());
         return new PortfolioPositionResponse(
                 priced.position().getId(),
+                priced.position().getId(),
                 priced.instrument().getId(),
+                priced.instrument().getAssetClass(),
                 priced.instrument().getName(),
                 priced.instrument().getIsin(),
                 priced.instrument().getValor(),
@@ -151,6 +197,41 @@ public class PortfolioService {
                 gainLoss,
                 percentOf(gainLoss, priced.cost()),
                 percentOf(priced.value(), totalValue));
+    }
+
+    private PositionDetailResponse toDetail(PricedPosition priced, BigDecimal totalValue,
+                                            PositionDetailResponse.@Nullable FactsheetInfo factsheet) {
+        Instrument instrument = priced.instrument();
+        BigDecimal gainLoss = priced.value().subtract(priced.cost());
+        return new PositionDetailResponse(
+                priced.position().getId(),
+                instrument.getId(),
+                instrument.getName(),
+                instrument.getIsin(),
+                instrument.getValor(),
+                instrument.getAssetClass(),
+                instrument.getTer(),
+                CURRENCY_CHF,
+                priced.position().getQuantity(),
+                priced.position().getPurchasePrice(),
+                priced.currentPrice(),
+                priced.priceSource(),
+                priceUpdatedAt(priced),
+                priced.value(),
+                gainLoss,
+                percentOf(gainLoss, priced.cost()),
+                percentOf(priced.value(), totalValue),
+                instrument.getFactsheetUrl(),
+                factsheet);
+    }
+
+    /** LIVE prices were fetched during this request; CACHE carries the persisted timestamp. */
+    private static OffsetDateTime priceUpdatedAt(PricedPosition priced) {
+        return switch (priced.priceSource()) {
+            case LIVE -> OffsetDateTime.now(ZoneOffset.UTC);
+            case CACHE -> priced.instrument().getLastPriceUpdatedAt();
+            case PURCHASE -> null;
+        };
     }
 
     /** At most one snapshot per user and day — atomic upsert, safe under concurrent reads. */

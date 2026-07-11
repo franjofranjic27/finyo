@@ -14,7 +14,9 @@ import java.util.UUID;
 @Table(name = "instrument")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Builder
+// toBuilder: entities are immutable — every update copies via toBuilder() so
+// new columns can never be wiped by a forgotten field in a manual copy.
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class Instrument {
@@ -35,12 +37,27 @@ public class Instrument {
     @Column(length = 20)
     private String ticker;
 
-    @Column(length = 200)
+    @Column(length = 255)
     private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "instrument_type")
     private InstrumentType instrumentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "asset_class", nullable = false, length = 20)
+    @Builder.Default
+    private AssetClass assetClass = AssetClass.STOCK;
+
+    /** Total expense ratio in percent, e.g. 0.20 for 0.20 %. */
+    @Column(precision = 5, scale = 2)
+    private BigDecimal ter;
+
+    // The uploaded factsheet PDF lives in instrument_factsheet (own entity):
+    // keeping the blob off this hot entity avoids N x 10 MB heap amplification
+    // on every portfolio/detail read.
+    @Column(name = "factsheet_url", length = 500)
+    private String factsheetUrl;
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;

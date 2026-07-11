@@ -61,17 +61,15 @@ public class InstrumentService {
         var existing = instrumentRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
-        var updated = Instrument.builder()
-                .id(existing.getId())
-                .userId(userId)
+        // toBuilder keeps every field not covered by the request (prices,
+        // asset class, factsheet, …) instead of silently nulling it
+        var updated = existing.toBuilder()
                 .valor(request.valor() != null ? request.valor() : existing.getValor())
                 .isin(request.isin() != null ? request.isin() : existing.getIsin())
                 .ticker(request.ticker() != null ? request.ticker() : existing.getTicker())
                 .name(request.name() != null ? request.name() : existing.getName())
                 .instrumentType(request.instrumentType() != null ? request.instrumentType() : existing.getInstrumentType())
                 .sortOrder(request.sortOrder() != null ? request.sortOrder() : existing.getSortOrder())
-                .lastPrice(existing.getLastPrice())
-                .lastPriceUpdatedAt(existing.getLastPriceUpdatedAt())
                 .build();
 
         Instrument saved = instrumentRepository.save(updated);
@@ -139,15 +137,8 @@ public class InstrumentService {
             return instrument;
         }
         try {
-            var updated = Instrument.builder()
-                    .id(instrument.getId())
-                    .userId(instrument.getUserId())
-                    .valor(instrument.getValor())
-                    .isin(instrument.getIsin())
-                    .ticker(instrument.getTicker())
+            var updated = instrument.toBuilder()
                     .name(data.name() != null && !data.name().isBlank() ? data.name() : instrument.getName())
-                    .instrumentType(instrument.getInstrumentType())
-                    .sortOrder(instrument.getSortOrder())
                     .lastPrice(data.lastPrice())
                     .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
                     .build();
