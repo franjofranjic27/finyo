@@ -2,6 +2,7 @@ package ch.finyo.tax;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -15,10 +16,9 @@ import java.util.UUID;
 @Table(name = "tax_year")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Builder(toBuilder = true)
+@SuperBuilder(toBuilder = true)
 @NoArgsConstructor
-@AllArgsConstructor
-public class TaxYear {
+public class TaxYear extends TaxInputs {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -34,53 +34,6 @@ public class TaxYear {
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
     private TaxYearStatus status;
-
-    @Column(name = "canton_code", length = 2)
-    private String cantonCode;
-
-    @Column(name = "bfs_number")
-    private Integer bfsNumber;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "civil_status", length = 20)
-    private TaxCivilStatus civilStatus;
-
-    @Column(name = "number_of_children")
-    private Integer numberOfChildren;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "church_affiliation", length = 20)
-    private ChurchAffiliation churchAffiliation;
-
-    @Column(name = "gross_employment_income")
-    private BigDecimal grossEmploymentIncome;
-
-    @Column(name = "self_employment_income")
-    private BigDecimal selfEmploymentIncome;
-
-    @Column(name = "investment_income")
-    private BigDecimal investmentIncome;
-
-    @Column(name = "rental_income")
-    private BigDecimal rentalIncome;
-
-    @Column(name = "deduction_professional_expenses")
-    private BigDecimal deductionProfessionalExpenses;
-
-    @Column(name = "deduction_insurance_premiums")
-    private BigDecimal deductionInsurancePremiums;
-
-    @Column(name = "deduction_charitable_donations")
-    private BigDecimal deductionCharitableDonations;
-
-    @Column(name = "deduction_debt_interest")
-    private BigDecimal deductionDebtInterest;
-
-    @Column(name = "pillar3a_contribution")
-    private BigDecimal pillar3aContribution;
-
-    @Column(name = "net_wealth")
-    private BigDecimal netWealth;
 
     @Column(name = "filing_deadline")
     private LocalDate filingDeadline;

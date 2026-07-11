@@ -38,7 +38,7 @@ public class TaxYearService {
     @Transactional
     public TaxYearDetailResponse upsert(int year, TaxYearRequest request, String userId) {
         log.info("Upserting tax year={} for user={}", year, userId);
-        TaxYear.TaxYearBuilder builder = taxYearRepository.findByUserIdAndYear(userId, year)
+        TaxYear.TaxYearBuilder<?, ?> builder = taxYearRepository.findByUserIdAndYear(userId, year)
                 .map(TaxYear::toBuilder)
                 .orElseGet(() -> TaxYear.builder()
                         .userId(userId)
@@ -86,7 +86,7 @@ public class TaxYearService {
         }
 
         LocalDate effectiveDate = request.effectiveDate() != null ? request.effectiveDate() : LocalDate.now(SwissTime.ZONE);
-        TaxYear.TaxYearBuilder builder = taxYear.toBuilder().status(target);
+        TaxYear.TaxYearBuilder<?, ?> builder = taxYear.toBuilder().status(target);
 
         if (target.compareTo(TaxYearStatus.FILED) >= 0) {
             if (taxYear.getFiledAt() == null) {
