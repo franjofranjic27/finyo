@@ -6,18 +6,28 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Payment-card master data (name, provider, linked settlement account, fees).
+ *
+ * SECURITY: this entity deliberately stores NO sensitive card data — no card
+ * number / PAN, no CVV, no expiry date. It only describes which cards exist,
+ * not how to use them.
+ *
+ * accountId is a plain FK column (ON DELETE SET NULL in the DB, no JPA
+ * relation): deleting the linked account detaches the card instead of
+ * cascading into it.
+ */
 @Entity
-@Table(name = "account")
+@Table(name = "payment_card")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class Account {
+public class PaymentCard {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,28 +39,14 @@ public class Account {
     @Column(length = 100, nullable = false)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AccountType type;
+    @Column(length = 50)
+    private String provider;
 
-    @Column(length = 3, nullable = false)
+    @Column(name = "account_id")
+    private UUID accountId;
+
+    @Column(length = 3)
     private String currency;
-
-    @Column(name = "initial_balance", nullable = false)
-    private BigDecimal initialBalance;
-
-    @Column(length = 7)
-    private String color;
-
-    /** Stored normalized: no spaces, uppercase (see IbanValidator). */
-    @Column(length = 34)
-    private String iban;
-
-    @Column(length = 11)
-    private String bic;
-
-    @Column(name = "contract_number", length = 50)
-    private String contractNumber;
 
     @Column(name = "fee_note", length = 100)
     private String feeNote;
@@ -59,10 +55,6 @@ public class Account {
     @Column(length = 20, nullable = false)
     @Builder.Default
     private AccountScope scope = AccountScope.PRIVATE;
-
-    @Column(name = "to_close", nullable = false)
-    @Builder.Default
-    private boolean toClose = false;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

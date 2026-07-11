@@ -57,6 +57,13 @@ class AccountServiceTest {
                 .build();
     }
 
+    /** Request with only the pre-V24 fields set — the master-data fields stay null. */
+    private static AccountRequest accountRequest(String name, AccountType type, String currency,
+            BigDecimal initialBalance, String color) {
+        return new AccountRequest(name, type, currency, initialBalance, color,
+                null, null, null, null, null, null);
+    }
+
     // =========================================================================
     // getAll()
     // =========================================================================
@@ -145,7 +152,7 @@ class AccountServiceTest {
     @Test
     void create_sets_userId_on_the_persisted_account() {
         String userId = "user-42";
-        AccountRequest request = new AccountRequest("Savings", AccountType.SAVINGS, "CHF", BigDecimal.TEN, null);
+        AccountRequest request = accountRequest("Savings", AccountType.SAVINGS, "CHF", BigDecimal.TEN, null);
         Account savedAccount = buildAccount(UUID.randomUUID(), userId, "Savings");
         given(accountRepository.save(any(Account.class))).willReturn(savedAccount);
 
@@ -158,7 +165,7 @@ class AccountServiceTest {
     @Test
     void create_returns_response_with_the_correct_name() {
         String userId = "user-42";
-        AccountRequest request = new AccountRequest("Travel Fund", AccountType.SAVINGS, "CHF", BigDecimal.ZERO, null);
+        AccountRequest request = accountRequest("Travel Fund", AccountType.SAVINGS, "CHF", BigDecimal.ZERO, null);
         Account savedAccount = buildAccount(UUID.randomUUID(), userId, "Travel Fund");
         given(accountRepository.save(any(Account.class))).willReturn(savedAccount);
 
@@ -172,7 +179,7 @@ class AccountServiceTest {
         // AccountRequest.currency is @NotBlank but the service still defensively
         // coerces null to "CHF". Simulate a null by creating a request with null.
         String userId = "user-x";
-        AccountRequest request = new AccountRequest("Misc", AccountType.OTHER, null, null, null);
+        AccountRequest request = accountRequest("Misc", AccountType.OTHER, null, null, null);
         Account savedAccount = Account.builder()
                 .id(UUID.randomUUID()).userId(userId).name("Misc")
                 .type(AccountType.OTHER).currency("CHF").initialBalance(BigDecimal.ZERO)
@@ -189,7 +196,7 @@ class AccountServiceTest {
     @Test
     void create_defaults_initialBalance_to_zero_when_not_provided() {
         String userId = "user-x";
-        AccountRequest request = new AccountRequest("Misc", AccountType.OTHER, "CHF", null, null);
+        AccountRequest request = accountRequest("Misc", AccountType.OTHER, "CHF", null, null);
         Account savedAccount = Account.builder()
                 .id(UUID.randomUUID()).userId(userId).name("Misc")
                 .type(AccountType.OTHER).currency("CHF").initialBalance(BigDecimal.ZERO)
@@ -205,7 +212,7 @@ class AccountServiceTest {
     @Test
     void create_preserves_the_provided_color() {
         String userId = "user-x";
-        AccountRequest request = new AccountRequest("Visa", AccountType.CREDIT_CARD, "CHF", BigDecimal.ZERO, "#FF5733");
+        AccountRequest request = accountRequest("Visa", AccountType.CREDIT_CARD, "CHF", BigDecimal.ZERO, "#FF5733");
         Account savedAccount = Account.builder()
                 .id(UUID.randomUUID()).userId(userId).name("Visa")
                 .type(AccountType.CREDIT_CARD).currency("CHF").initialBalance(BigDecimal.ZERO)
@@ -221,13 +228,99 @@ class AccountServiceTest {
     }
 
     // =========================================================================
+    // create() — bank-account master data (IBAN/BIC/scope/toClose)
+    // =========================================================================
+
+    @Test
+    void create_normalizes_iban_before_persisting() {
+        String userId = "user-iban";
+        AccountRequest request = new AccountRequest("Main", AccountType.CHECKING, "CHF", null, null,
+                "ch93 0076 2011 6238 5295 7", null, null, null, null, null);
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        accountService.create(request, userId);
+
+        then(accountRepository).should().save(argThat(a ->
+                "CH9300762011623852957".equals(a.getIban())));
+    }
+
+    @Test
+    void create_rejects_invalid_iban_with_IllegalArgumentException() {
+        AccountRequest request = new AccountRequest("Main", AccountType.CHECKING, "CHF", null, null,
+                "CH9300762011623852958", null, null, null, null, null);
+
+        assertThatThrownBy(() -> accountService.create(request, "user-iban"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid IBAN");
+        then(accountRepository).should(never()).save(any());
+    }
+
+    @Test
+    void create_stores_null_iban_when_blank() {
+        AccountRequest request = new AccountRequest("Main", AccountType.CHECKING, "CHF", null, null,
+                "   ", null, null, null, null, null);
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        accountService.create(request, "user-iban");
+
+        then(accountRepository).should().save(argThat(a -> a.getIban() == null));
+    }
+
+    @Test
+    void create_uppercases_bic_and_rejects_invalid_format() {
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        AccountRequest valid = new AccountRequest("Main", AccountType.CHECKING, "CHF", null, null,
+                null, "pofichbexxx", null, null, null, null);
+
+        accountService.create(valid, "user-bic");
+        then(accountRepository).should().save(argThat(a -> "POFICHBEXXX".equals(a.getBic())));
+
+        AccountRequest invalid = new AccountRequest("Main", AccountType.CHECKING, "CHF", null, null,
+                null, "12INVALID", null, null, null, null);
+        assertThatThrownBy(() -> accountService.create(invalid, "user-bic"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid BIC");
+    }
+
+    @Test
+    void create_defaults_scope_to_private_and_toClose_to_false() {
+        AccountRequest request = accountRequest("Main", AccountType.CHECKING, "CHF", null, null);
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        accountService.create(request, "user-defaults");
+
+        then(accountRepository).should().save(argThat(a ->
+                a.getScope() == AccountScope.PRIVATE && !a.isToClose()));
+    }
+
+    @Test
+    void create_persists_explicit_master_data_fields() {
+        AccountRequest request = new AccountRequest("Business", AccountType.CHECKING, "CHF", null, null,
+                null, null, "K-123456", "CHF 5 / Monat", AccountScope.BUSINESS, true);
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        accountService.create(request, "user-master");
+
+        then(accountRepository).should().save(argThat(a ->
+                "K-123456".equals(a.getContractNumber())
+                        && "CHF 5 / Monat".equals(a.getFeeNote())
+                        && a.getScope() == AccountScope.BUSINESS
+                        && a.isToClose()));
+    }
+
+    // =========================================================================
     // update()
     // =========================================================================
 
     @Test
     void update_throws_ResourceNotFoundException_when_account_not_found() {
         UUID id = UUID.randomUUID();
-        AccountRequest request = new AccountRequest("New Name", AccountType.SAVINGS, "CHF", BigDecimal.ZERO, null);
+        AccountRequest request = accountRequest("New Name", AccountType.SAVINGS, "CHF", BigDecimal.ZERO, null);
         given(accountRepository.findByIdAndUserId(id, "user-1")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.update(id, request, "user-1"))
@@ -238,7 +331,7 @@ class AccountServiceTest {
     @Test
     void update_throws_when_account_belongs_to_different_user() {
         UUID id = UUID.randomUUID();
-        AccountRequest request = new AccountRequest("Hack", AccountType.OTHER, "CHF", BigDecimal.ZERO, null);
+        AccountRequest request = accountRequest("Hack", AccountType.OTHER, "CHF", BigDecimal.ZERO, null);
         given(accountRepository.findByIdAndUserId(id, "attacker-user")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.update(id, request, "attacker-user"))
@@ -256,7 +349,7 @@ class AccountServiceTest {
         given(accountRepository.findByIdAndUserId(id, userId)).willReturn(Optional.of(existing));
         given(accountRepository.save(any(Account.class))).willReturn(saved);
 
-        AccountResponse result = accountService.update(id, new AccountRequest("New Name", AccountType.CHECKING, "CHF", BigDecimal.ZERO, null), userId);
+        AccountResponse result = accountService.update(id, accountRequest("New Name", AccountType.CHECKING, "CHF", BigDecimal.ZERO, null), userId);
 
         assertThat(result.name()).isEqualTo("New Name");
         then(accountRepository).should().save(argThat(a ->
@@ -279,10 +372,31 @@ class AccountServiceTest {
         given(accountRepository.findByIdAndUserId(id, userId)).willReturn(Optional.of(existing));
         given(accountRepository.save(any(Account.class))).willReturn(saved);
 
-        accountService.update(id, new AccountRequest("My Account", AccountType.SAVINGS, null, null, null), userId);
+        accountService.update(id, accountRequest("My Account", AccountType.SAVINGS, null, null, null), userId);
 
         then(accountRepository).should().save(argThat(a ->
                 "EUR".equals(a.getCurrency())));
+    }
+
+    @Test
+    void update_normalizes_iban_and_rejects_invalid_iban() {
+        UUID id = UUID.randomUUID();
+        String userId = "user-upd";
+        Account existing = buildAccount(id, userId, "My Account");
+        given(accountRepository.findByIdAndUserId(id, userId)).willReturn(Optional.of(existing));
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        accountService.update(id, new AccountRequest("My Account", AccountType.CHECKING, "CHF", null, null,
+                "de89 3704 0044 0532 0130 00", null, null, null, null, null), userId);
+        then(accountRepository).should().save(argThat(a ->
+                "DE89370400440532013000".equals(a.getIban())));
+
+        AccountRequest invalid = new AccountRequest("My Account", AccountType.CHECKING, "CHF", null, null,
+                "DE00370400440532013000", null, null, null, null, null);
+        assertThatThrownBy(() -> accountService.update(id, invalid, userId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid IBAN");
     }
 
     // =========================================================================

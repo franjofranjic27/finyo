@@ -11,6 +11,12 @@ public record AccountResponse(
         String currency,
         BigDecimal initialBalance,
         String color,
+        String iban,
+        String bic,
+        String contractNumber,
+        String feeNote,
+        AccountScope scope,
+        boolean toClose,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
@@ -22,6 +28,12 @@ public record AccountResponse(
                 account.getCurrency(),
                 account.getInitialBalance(),
                 account.getColor(),
+                account.getIban(),
+                account.getBic(),
+                account.getContractNumber(),
+                account.getFeeNote(),
+                account.getScope(),
+                account.isToClose(),
                 account.getCreatedAt(),
                 account.getUpdatedAt()
         );
