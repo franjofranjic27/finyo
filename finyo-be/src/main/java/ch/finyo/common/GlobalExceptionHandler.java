@@ -3,6 +3,7 @@ package ch.finyo.common;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -93,6 +94,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setType(URI.create("https://finyo.ch/errors/conflict"));
+        problem.setTitle("Conflict");
+        return problem;
+    }
+
+    // Pre-check-then-insert races (e.g. two concurrent creates hitting a per-user
+    // unique constraint) surface here instead of as an opaque 500. The message is
+    // generic on purpose — constraint names are an implementation detail.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "The request conflicts with existing data");
         problem.setType(URI.create("https://finyo.ch/errors/conflict"));
         problem.setTitle("Conflict");
         return problem;
