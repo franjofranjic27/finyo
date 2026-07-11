@@ -1,5 +1,5 @@
 import type React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
@@ -7,10 +7,19 @@ import {
   Calculator,
   PiggyBank,
   Shield,
+  ShieldCheck,
   Settings,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Package,
 } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { useAuth } from '@/auth/useAuth';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -29,6 +38,8 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readonly<SidebarProps>) {
   const { t } = useTranslation();
+  const { hasRole } = useAuth();
+  const { pathname } = useLocation();
 
   const navItems: NavItem[] = [
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
@@ -37,6 +48,11 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readon
     { to: '/pillar3', label: t('nav.pillar3'), icon: PiggyBank },
     { to: '/insurance', label: t('nav.insurance'), icon: Shield },
   ];
+
+  const adminItems: NavItem[] = [
+    { to: '/admin/pillar3-products', label: t('nav.adminPillar3Products'), icon: Package },
+  ];
+  const isAdmin = hasRole('admin');
 
   const linkClassName = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -85,6 +101,35 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readon
             {!collapsed && label}
           </NavLink>
         ))}
+
+        {/* Admin group — realm role "admin" only */}
+        {isAdmin && !collapsed && (
+          <Collapsible defaultOpen={pathname.startsWith('/admin')} className="pt-2">
+            <CollapsibleTrigger className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">{t('nav.admin')}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-1 space-y-1 pl-4">
+              {adminItems.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} onClick={onClose} className={linkClassName}>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                </NavLink>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        {/* Collapsed rail: no group header, icon-only admin links with tooltips */}
+        {isAdmin && collapsed && (
+          <div className="space-y-1 pt-2">
+            {adminItems.map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to} onClick={onClose} title={label} className={linkClassName}>
+                <Icon className="h-4 w-4 shrink-0" />
+              </NavLink>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Settings — pinned at the bottom, separate from the main navigation */}
