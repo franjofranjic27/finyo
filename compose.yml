@@ -24,7 +24,9 @@ services:
       KC_DB: dev-mem
       KC_HEALTH_ENABLED: "true"
     volumes:
-      - ./keycloak:/opt/keycloak/data/import
+      # mount only the dev realm — finyo-realm.prod.json contains ${FINYO_DOMAIN}
+      # placeholders that break --import-realm on a fresh local start
+      - ./keycloak/finyo-realm.json:/opt/keycloak/data/import/finyo-realm.json:ro
     ports:
       - "8081:8080"
     healthcheck:
