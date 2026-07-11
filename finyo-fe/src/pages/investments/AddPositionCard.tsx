@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/auth/useAuth';
 import { portfolioApi } from '@/api/portfolio';
+import { CsvImportButton } from './CsvImportButton';
 
 export function AddPositionCard() {
   const { t } = useTranslation();
@@ -48,8 +49,9 @@ export function AddPositionCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <CardTitle className="text-base">{t('investments.add.title')}</CardTitle>
+        <CsvImportButton />
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
@@ -117,7 +119,10 @@ export function AddPositionCard() {
         )}
 
         <div className="flex items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">{t('investments.add.identifierHint')}</p>
+          <div className="space-y-0.5 text-xs text-muted-foreground">
+            <p>{t('investments.add.identifierHint')}</p>
+            <p>{t('investments.add.csvHint')}</p>
+          </div>
           <Button
             size="sm"
             onClick={() => addPosition.mutate()}

@@ -6,6 +6,8 @@ import { portfolioApi } from '@/api/portfolio';
 import { KpiTiles } from './KpiTiles';
 import { AddPositionCard } from './AddPositionCard';
 import { PositionsTable } from './PositionsTable';
+import { AllocationDonut } from './AllocationDonut';
+import { PerformanceChart } from './PerformanceChart';
 
 const KPI_SKELETON_KEYS = ['total', 'invested', 'gainloss', 'return'];
 
@@ -46,6 +48,10 @@ export function PortfolioPage() {
           <KpiTiles portfolio={portfolio} />
           <AddPositionCard />
           <PositionsTable positions={portfolio.positions} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AllocationDonut positions={portfolio.positions} />
+            <PerformanceChart />
+          </div>
         </>
       )}
     </div>

@@ -29,7 +29,8 @@ vi.mock('@/api/portfolio', () => ({
 }));
 
 describe('PortfolioPage', () => {
-  it('renders the title, KPI tiles and positions from the portfolio query', async () => {
+  it('renders the title, KPI tiles, positions and charts from the portfolio query', async () => {
+    vi.mocked(portfolioApi.getHistory).mockResolvedValue({ points: [] });
     vi.mocked(portfolioApi.getPortfolio).mockResolvedValue(
       portfolio({
         positions: [portfolioPosition({ id: 'p1', name: 'Nestlé SA' })],
@@ -44,6 +45,8 @@ describe('PortfolioPage', () => {
     expect(screen.getByText('Total Value')).toBeInTheDocument();
     expect(screen.getByText('Nestlé SA')).toBeInTheDocument();
     expect(screen.getByText('Add Security')).toBeInTheDocument();
+    expect(screen.getByText('Allocation')).toBeInTheDocument();
+    expect(screen.getByText('Performance')).toBeInTheDocument();
     expect(portfolioApi.getPortfolio).toHaveBeenCalledWith('test-token');
   });
 
