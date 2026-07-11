@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * (/api/v1/tax/years/{year}/scenarios).
  *
  * Runs against a real PostgreSQL Testcontainer with all Flyway migrations
- * applied, so V18 (tax_scenario incl. the partial unique index
+ * applied, so V20 (tax_scenario incl. the partial unique index
  * ux_tax_scenario_default_per_year and the ON DELETE CASCADE FK to tax_year)
  * and the seeded SG rate tables (V10/V11/V17) back the assertions.
  *
