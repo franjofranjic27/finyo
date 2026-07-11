@@ -3,9 +3,7 @@ package ch.finyo.investment;
 import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -37,11 +34,13 @@ public class PortfolioService {
     private final SixMarketDataClient sixClient;
 
     /**
-     * Aggregates all positions of the user with live prices where available.
-     * Deliberately a writing read: every portfolio fetch upserts today's
-     * snapshot so the performance history grows over time.
+     * Aggregates all positions of the user with live prices where available
+     * and upserts today's snapshot so the performance history grows over time.
+     *
+     * Deliberately NOT transactional: the SIX HTTP calls must not run inside
+     * a database transaction, and the snapshot upsert is a single atomic
+     * ON CONFLICT statement in its own repository-level transaction.
      */
-    @Transactional
     public PortfolioResponse getPortfolio(String userId) {
         log.debug("Building portfolio for user={}", userId);
         List<Position> positions = positionRepository.findByUserId(userId);
@@ -52,7 +51,7 @@ public class PortfolioService {
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, asOf);
         }
 
-        Map<UUID, Instrument> instruments = loadInstruments(positions);
+        Map<UUID, Instrument> instruments = loadInstruments(positions, userId);
         Map<String, BigDecimal> livePrices = fetchLivePrices(instruments.values());
 
         List<PricedPosition> priced = positions.stream()
@@ -83,12 +82,13 @@ public class PortfolioService {
         return new PortfolioHistoryResponse(points);
     }
 
-    private Map<UUID, Instrument> loadInstruments(List<Position> positions) {
+    /** User-scoped batch load: a foreign instrument id can never leak into the portfolio. */
+    private Map<UUID, Instrument> loadInstruments(List<Position> positions, String userId) {
         List<UUID> instrumentIds = positions.stream()
                 .map(Position::getInstrumentId)
                 .distinct()
                 .toList();
-        return instrumentRepository.findAllById(instrumentIds).stream()
+        return instrumentRepository.findByIdInAndUserId(instrumentIds, userId).stream()
                 .collect(Collectors.toMap(Instrument::getId, Function.identity()));
     }
 
@@ -153,46 +153,12 @@ public class PortfolioService {
                 percentOf(priced.value(), totalValue));
     }
 
-    /**
-     * At most one snapshot per user and day: update today's row when present,
-     * otherwise insert. A concurrent first request (e.g. React StrictMode
-     * double fetch) may win the insert race — the unique constraint surfaces
-     * that via saveAndFlush and the write is retried as an update.
-     */
+    /** At most one snapshot per user and day — atomic upsert, safe under concurrent reads. */
     private void upsertSnapshot(String userId, BigDecimal totalValue, BigDecimal totalCost) {
-        LocalDate today = LocalDate.now(SwissTime.ZONE);
-        BigDecimal value = totalValue.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-        BigDecimal cost = totalCost.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-
-        Optional<PortfolioSnapshot> existing = snapshotRepository.findByUserIdAndSnapshotDate(userId, today);
-        if (existing.isPresent()) {
-            snapshotRepository.save(withTotals(existing.get(), value, cost));
-            return;
-        }
-        try {
-            snapshotRepository.saveAndFlush(PortfolioSnapshot.builder()
-                    .userId(userId)
-                    .snapshotDate(today)
-                    .totalValue(value)
-                    .totalCost(cost)
-                    .build());
-        } catch (DataIntegrityViolationException e) {
-            log.debug("Snapshot insert race for user={} date={}, retrying as update", userId, today);
-            snapshotRepository.findByUserIdAndSnapshotDate(userId, today)
-                    .map(snapshot -> withTotals(snapshot, value, cost))
-                    .ifPresent(snapshotRepository::save);
-        }
-    }
-
-    private PortfolioSnapshot withTotals(PortfolioSnapshot snapshot, BigDecimal totalValue, BigDecimal totalCost) {
-        return PortfolioSnapshot.builder()
-                .id(snapshot.getId())
-                .userId(snapshot.getUserId())
-                .snapshotDate(snapshot.getSnapshotDate())
-                .totalValue(totalValue)
-                .totalCost(totalCost)
-                .createdAt(snapshot.getCreatedAt())
-                .build();
+        snapshotRepository.upsert(userId,
+                LocalDate.now(SwissTime.ZONE),
+                totalValue.setScale(MONEY_SCALE, RoundingMode.HALF_UP),
+                totalCost.setScale(MONEY_SCALE, RoundingMode.HALF_UP));
     }
 
     private static BigDecimal sum(List<PricedPosition> priced, Function<PricedPosition, BigDecimal> amount) {

@@ -1,10 +1,12 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,7 +19,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PositionService {
 
     private static final String RESOURCE_NAME = "Position";
@@ -26,6 +27,20 @@ public class PositionService {
     private final PositionRepository positionRepository;
     private final InstrumentRepository instrumentRepository;
     private final InstrumentService instrumentService;
+    private final TransactionTemplate bulkRowTransaction;
+
+    public PositionService(PositionRepository positionRepository,
+                           InstrumentRepository instrumentRepository,
+                           InstrumentService instrumentService,
+                           PlatformTransactionManager transactionManager) {
+        this.positionRepository = positionRepository;
+        this.instrumentRepository = instrumentRepository;
+        this.instrumentService = instrumentService;
+        // REQUIRES_NEW per bulk row: a failing row rolls back only itself,
+        // already imported rows stay committed (fault-tolerant import contract).
+        this.bulkRowTransaction = new TransactionTemplate(transactionManager);
+        this.bulkRowTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     @Transactional
     public PositionResponse create(PositionRequest request, String userId) {
@@ -41,7 +56,12 @@ public class PositionService {
         return PositionResponse.from(saved, instrument);
     }
 
-    @Transactional
+    /**
+     * Imports each row in its own REQUIRES_NEW transaction so any row failure
+     * (validation, SIX, database) is contained: successful rows stay committed
+     * and the failure is reported in the result instead of aborting the import.
+     * No outer transaction on purpose — it would defeat the per-row isolation.
+     */
     public BulkImportResultResponse createBulk(PositionBulkRequest request, String userId) {
         log.info("Bulk importing {} positions for user={}", request.positions().size(), userId);
         int imported = 0;
@@ -49,10 +69,14 @@ public class PositionService {
 
         List<PositionRequest> rows = request.positions();
         for (int i = 0; i < rows.size(); i++) {
+            PositionRequest row = rows.get(i);
             try {
-                create(rows.get(i), userId);
+                // self-invocation of create() is fine here: the row transaction
+                // is already active, the bypassed @Transactional would only join it
+                bulkRowTransaction.executeWithoutResult(status -> create(row, userId));
                 imported++;
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
+                log.warn("Bulk import row {} failed for user={}: {}", i + 1, userId, e.getMessage());
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
             }
         }
@@ -64,9 +88,9 @@ public class PositionService {
     @Transactional
     public void delete(UUID id, String userId) {
         log.info("Deleting position id={} for user={}", id, userId);
-        positionRepository.findByIdAndUserId(id, userId)
+        Position position = positionRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
-        positionRepository.deleteById(id);
+        positionRepository.delete(position);
         log.info("Deleted position id={} for user={}", id, userId);
     }
 

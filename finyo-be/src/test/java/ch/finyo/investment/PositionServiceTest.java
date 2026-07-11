@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -51,6 +53,9 @@ class PositionServiceTest {
 
     @Mock
     private InstrumentService instrumentService;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private PositionService positionService;
@@ -291,6 +296,33 @@ class PositionServiceTest {
         then(positionRepository).should(times(2)).save(any(Position.class));
     }
 
+    @Test
+    void createBulk_keeps_other_rows_imported_when_one_row_fails_with_an_unexpected_error() {
+        stubInstrumentSaveEchoesArgument();
+        stubSixRefreshReturnsInputUnchanged();
+        given(positionRepository.findByUserIdAndInstrumentId(any(), any()))
+                .willReturn(Optional.empty());
+        given(positionRepository.save(any(Position.class))).willAnswer(invocation -> {
+            Position p = invocation.getArgument(0);
+            if (new BigDecimal("99").compareTo(p.getQuantity()) == 0) {
+                throw new DataIntegrityViolationException("db constraint violated");
+            }
+            return p;
+        });
+
+        PositionBulkRequest bulk = new PositionBulkRequest(List.of(
+                request("Fund A", null, null, "10", "100.00", null),
+                request("Fund B", null, null, "99", "50.00", null),   // save blows up
+                request("Fund C", null, null, "2", "20.00", null)));
+
+        BulkImportResultResponse result = positionService.createBulk(bulk, USER_ID);
+
+        assertThat(result.imported()).isEqualTo(2);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0)).startsWith("Row 2:").contains("db constraint violated");
+    }
+
     // =========================================================================
     // delete()
     // =========================================================================
@@ -298,22 +330,22 @@ class PositionServiceTest {
     @Test
     void delete_removes_the_position_when_it_belongs_to_the_user() {
         UUID id = UUID.randomUUID();
-        given(positionRepository.findByIdAndUserId(id, USER_ID))
-                .willReturn(Optional.of(Position.builder().id(id).userId(USER_ID).build()));
+        Position position = Position.builder().id(id).userId(USER_ID).build();
+        given(positionRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(position));
 
         positionService.delete(id, USER_ID);
 
-        then(positionRepository).should().deleteById(id);
+        then(positionRepository).should().delete(position);
     }
 
     @Test
-    void delete_never_calls_deleteById_when_position_belongs_to_another_user() {
+    void delete_never_deletes_when_position_belongs_to_another_user() {
         UUID id = UUID.randomUUID();
         given(positionRepository.findByIdAndUserId(id, "attacker")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> positionService.delete(id, "attacker"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Position");
-        then(positionRepository).should(never()).deleteById(any());
+        then(positionRepository).should(never()).delete(any(Position.class));
     }
 }

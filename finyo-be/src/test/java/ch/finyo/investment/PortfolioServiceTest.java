@@ -6,7 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,9 +17,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.any;
-import static org.mockito.BDDMockito.argThat;
+import static org.mockito.BDDMockito.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.times;
 
@@ -30,8 +28,8 @@ import static org.mockito.BDDMockito.times;
  * Focus areas:
  *   1. Price fallback chain: SIX live -> persisted instrument price -> purchase price.
  *   2. Aggregation math incl. the zero guards (cost=0, totalValue=0).
- *   3. Snapshot upsert: insert vs. update, race retry, no snapshot for an
- *      empty portfolio.
+ *   3. Snapshot upsert: exactly one atomic upsert per portfolio read carrying
+ *      the aggregated totals, none for an empty portfolio.
  *   4. History window derived from months back.
  */
 @ExtendWith(MockitoExtension.class)
@@ -90,7 +88,7 @@ class PortfolioServiceTest {
 
     private void stubPortfolio(List<Position> positions, List<Instrument> instruments) {
         given(positionRepository.findByUserId(USER_ID)).willReturn(positions);
-        given(instrumentRepository.findAllById(any())).willReturn(instruments);
+        given(instrumentRepository.findByIdInAndUserId(any(), eq(USER_ID))).willReturn(instruments);
     }
 
     // =========================================================================
@@ -219,72 +217,19 @@ class PortfolioServiceTest {
     // =========================================================================
 
     @Test
-    void getPortfolio_inserts_a_snapshot_when_none_exists_for_today() {
+    void getPortfolio_upserts_todays_snapshot_with_the_aggregated_totals() {
         UUID instrumentId = UUID.randomUUID();
         stubPortfolio(
                 List.of(position(instrumentId, "10", "100.00")),
                 List.of(instrument(instrumentId, null, new BigDecimal("110.00"))));
-        given(snapshotRepository.findByUserIdAndSnapshotDate(USER_ID, LocalDate.now(SwissTime.ZONE)))
-                .willReturn(Optional.empty());
 
         portfolioService.getPortfolio(USER_ID);
 
-        then(snapshotRepository).should().saveAndFlush(argThat(s ->
-                USER_ID.equals(s.getUserId())
-                        && LocalDate.now(SwissTime.ZONE).equals(s.getSnapshotDate())
-                        && new BigDecimal("1100.0000").equals(s.getTotalValue())
-                        && new BigDecimal("1000.0000").equals(s.getTotalCost())));
-        then(snapshotRepository).should(never()).save(any());
-    }
-
-    @Test
-    void getPortfolio_updates_todays_snapshot_when_it_already_exists() {
-        UUID instrumentId = UUID.randomUUID();
-        stubPortfolio(
-                List.of(position(instrumentId, "10", "100.00")),
-                List.of(instrument(instrumentId, null, new BigDecimal("110.00"))));
-        UUID snapshotId = UUID.randomUUID();
-        given(snapshotRepository.findByUserIdAndSnapshotDate(USER_ID, LocalDate.now(SwissTime.ZONE)))
-                .willReturn(Optional.of(PortfolioSnapshot.builder()
-                        .id(snapshotId)
-                        .userId(USER_ID)
-                        .snapshotDate(LocalDate.now(SwissTime.ZONE))
-                        .totalValue(new BigDecimal("999.0000"))
-                        .totalCost(new BigDecimal("900.0000"))
-                        .build()));
-
-        portfolioService.getPortfolio(USER_ID);
-
-        then(snapshotRepository).should().save(argThat(s ->
-                snapshotId.equals(s.getId())
-                        && new BigDecimal("1100.0000").equals(s.getTotalValue())));
-        then(snapshotRepository).should(never()).saveAndFlush(any());
-    }
-
-    @Test
-    void getPortfolio_retries_the_snapshot_as_update_when_a_concurrent_insert_wins() {
-        UUID instrumentId = UUID.randomUUID();
-        stubPortfolio(
-                List.of(position(instrumentId, "10", "100.00")),
-                List.of(instrument(instrumentId, null, new BigDecimal("110.00"))));
-        UUID snapshotId = UUID.randomUUID();
-        PortfolioSnapshot concurrentlyInserted = PortfolioSnapshot.builder()
-                .id(snapshotId)
-                .userId(USER_ID)
-                .snapshotDate(LocalDate.now(SwissTime.ZONE))
-                .totalValue(new BigDecimal("1.0000"))
-                .totalCost(new BigDecimal("1.0000"))
-                .build();
-        given(snapshotRepository.findByUserIdAndSnapshotDate(USER_ID, LocalDate.now(SwissTime.ZONE)))
-                .willReturn(Optional.empty(), Optional.of(concurrentlyInserted));
-        given(snapshotRepository.saveAndFlush(any(PortfolioSnapshot.class)))
-                .willThrow(new DataIntegrityViolationException("uq_portfolio_snapshot_user_date"));
-
-        portfolioService.getPortfolio(USER_ID);
-
-        then(snapshotRepository).should().save(argThat(s ->
-                snapshotId.equals(s.getId())
-                        && new BigDecimal("1100.0000").equals(s.getTotalValue())));
+        then(snapshotRepository).should().upsert(
+                USER_ID,
+                LocalDate.now(SwissTime.ZONE),
+                new BigDecimal("1100.0000"),
+                new BigDecimal("1000.0000"));
     }
 
     @Test
