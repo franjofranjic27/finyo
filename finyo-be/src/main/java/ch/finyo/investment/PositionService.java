@@ -132,6 +132,7 @@ public class PositionService {
                 .isin(request.isin())
                 .valor(request.valor())
                 .instrumentType(InstrumentType.OTHER)
+                .assetClass(AssetClassifier.classify(request.name(), request.isin()))
                 .sortOrder(0)
                 .build());
     }
@@ -141,15 +142,7 @@ public class PositionService {
         if (currentPrice == null || instrument.getLastPrice() != null) {
             return instrument;
         }
-        return instrumentRepository.save(Instrument.builder()
-                .id(instrument.getId())
-                .userId(instrument.getUserId())
-                .valor(instrument.getValor())
-                .isin(instrument.getIsin())
-                .ticker(instrument.getTicker())
-                .name(instrument.getName())
-                .instrumentType(instrument.getInstrumentType())
-                .sortOrder(instrument.getSortOrder())
+        return instrumentRepository.save(instrument.toBuilder()
                 .lastPrice(currentPrice)
                 .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .build());

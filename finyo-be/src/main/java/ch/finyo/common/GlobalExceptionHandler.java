@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.net.URI;
@@ -44,6 +45,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setType(URI.create("https://finyo.ch/errors/validation"));
         problem.setTitle("Validation Failed");
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    /** Oversized uploads are a client error: 413 + WARN without stack trace, not a 500 + ERROR. */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        log.warn("Upload rejected: file exceeds the configured size limit");
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE,
+                "Uploaded file exceeds the maximum allowed size");
+        problem.setType(URI.create("https://finyo.ch/errors/payload-too-large"));
+        problem.setTitle("Payload Too Large");
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).headers(headers).body(problem);
     }
 
     /** Covers @Validated method-parameter constraints (e.g. @Min on path variables). */

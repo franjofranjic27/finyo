@@ -79,6 +79,11 @@ class GlobalExceptionHandlerTest {
             throw new RuntimeException("something blew up unexpectedly");
         }
 
+        @GetMapping("/test/upload-too-large")
+        public void throwUploadTooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(10 * 1024 * 1024);
+        }
+
         @PostMapping("/test/validation")
         public void validate(@Valid @RequestBody SomeRequest req) {
             // If validation passes the handler is never reached in error tests
@@ -222,6 +227,20 @@ class GlobalExceptionHandlerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
+    }
+
+    // -------------------------------------------------------------------------
+    // MaxUploadSizeExceededException → 413 Payload Too Large
+    // -------------------------------------------------------------------------
+
+    @Test
+    void max_upload_size_exceeded_returns_413_problem_json() throws Exception {
+        mockMvc.perform(get("/test/upload-too-large").with(jwt()))
+            .andExpect(status().isPayloadTooLarge())
+            .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+            .andExpect(jsonPath("$.title").value("Payload Too Large"))
+            .andExpect(jsonPath("$.type").value("https://finyo.ch/errors/payload-too-large"))
+            .andExpect(jsonPath("$.detail").value("Uploaded file exceeds the maximum allowed size"));
     }
 
     // -------------------------------------------------------------------------

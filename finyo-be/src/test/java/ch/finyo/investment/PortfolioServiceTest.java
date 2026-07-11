@@ -44,6 +44,9 @@ class PortfolioServiceTest {
     private InstrumentRepository instrumentRepository;
 
     @Mock
+    private InstrumentFactsheetRepository factsheetRepository;
+
+    @Mock
     private PortfolioSnapshotRepository snapshotRepository;
 
     @Mock
