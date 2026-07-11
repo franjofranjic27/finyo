@@ -20,15 +20,54 @@
   },
   "investments": {
     "title": "Portfolio",
-    "addInstrument": "Instrument hinzufügen",
-    "valor": "Valorennummer",
-    "isin": "ISIN",
-    "ticker": "Ticker",
-    "lastPrice": "Letzter Kurs",
-    "change": "Veränderung",
-    "marketCap": "Marktkapitalisierung",
-    "dividendYield": "Dividendenrendite",
-    "noInstruments": "Noch keine Instrumente erfasst"
+    "loadError": "Portfolio konnte nicht geladen werden",
+    "kpi": {
+      "totalValue": "Gesamtwert",
+      "invested": "Investiert",
+      "gainLoss": "Gewinn / Verlust",
+      "returnPct": "Rendite"
+    },
+    "add": {
+      "title": "Wertpapier hinzufügen",
+      "name": "Name",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "quantity": "Anzahl",
+      "purchasePrice": "Ø Kaufkurs",
+      "currentPrice": "Akt. Kurs (optional)",
+      "identifierHint": "Mindestens Name, ISIN oder Valor sowie Anzahl und Kaufkurs angeben",
+      "submit": "Hinzufügen",
+      "csvImport": "CSV importieren",
+      "csvHint": "CSV-Format: Name; ISIN; Anzahl; Kaufkurs; Kurs (optional) — Trennzeichen ; oder ,",
+      "csvResult": "{{imported}} importiert, {{failed}} fehlgeschlagen",
+      "csvNoRows": "Keine gültigen Zeilen in der Datei gefunden"
+    },
+    "table": {
+      "title": "Positionen",
+      "security": "Wertpapier",
+      "quantity": "Anzahl",
+      "purchasePrice": "Ø Kauf",
+      "currentPrice": "Kurs",
+      "value": "Wert",
+      "gainLoss": "G/V",
+      "returnPct": "Rendite",
+      "allocation": "Anteil",
+      "remove": "Position entfernen",
+      "confirmRemove": "Position «{{name}}» entfernen?",
+      "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
+    },
+    "allocation": {
+      "title": "Allokation",
+      "positions": "Positionen",
+      "empty": "Noch keine Positionen für die Allokation vorhanden"
+    },
+    "performance": {
+      "title": "Wertentwicklung",
+      "range6m": "6M",
+      "range1y": "1J",
+      "range3y": "3J",
+      "notEnoughData": "Noch nicht genügend Daten — die Historie wächst mit jedem Portfolio-Abruf"
+    }
   },
   "tax": {
     "title": "Steuerrechner",

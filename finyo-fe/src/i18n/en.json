@@ -20,15 +20,54 @@
   },
   "investments": {
     "title": "Portfolio",
-    "addInstrument": "Add Instrument",
-    "valor": "VALOR",
-    "isin": "ISIN",
-    "ticker": "Ticker",
-    "lastPrice": "Last Price",
-    "change": "Change",
-    "marketCap": "Market Cap",
-    "dividendYield": "Dividend Yield",
-    "noInstruments": "No instruments tracked yet"
+    "loadError": "Failed to load the portfolio",
+    "kpi": {
+      "totalValue": "Total Value",
+      "invested": "Invested",
+      "gainLoss": "Gain / Loss",
+      "returnPct": "Return"
+    },
+    "add": {
+      "title": "Add Security",
+      "name": "Name",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "quantity": "Quantity",
+      "purchasePrice": "Avg. Purchase Price",
+      "currentPrice": "Current Price (optional)",
+      "identifierHint": "Provide at least a name, ISIN or valor plus quantity and purchase price",
+      "submit": "Add",
+      "csvImport": "Import CSV",
+      "csvHint": "CSV format: Name; ISIN; Quantity; Purchase price; Price (optional) — delimiter ; or ,",
+      "csvResult": "{{imported}} imported, {{failed}} failed",
+      "csvNoRows": "No valid rows found in the file"
+    },
+    "table": {
+      "title": "Positions",
+      "security": "Security",
+      "quantity": "Quantity",
+      "purchasePrice": "Avg. Buy",
+      "currentPrice": "Price",
+      "value": "Value",
+      "gainLoss": "G/L",
+      "returnPct": "Return",
+      "allocation": "Share",
+      "remove": "Remove position",
+      "confirmRemove": "Remove position \"{{name}}\"?",
+      "empty": "No positions yet — add your first security above"
+    },
+    "allocation": {
+      "title": "Allocation",
+      "positions": "Positions",
+      "empty": "No positions for the allocation yet"
+    },
+    "performance": {
+      "title": "Performance",
+      "range6m": "6M",
+      "range1y": "1Y",
+      "range3y": "3Y",
+      "notEnoughData": "Not enough data yet — the history grows with every portfolio view"
+    }
   },
   "tax": {
     "title": "Tax Calculator",
