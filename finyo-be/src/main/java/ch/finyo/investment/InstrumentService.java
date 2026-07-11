@@ -93,7 +93,7 @@ public class InstrumentService {
         var instrument = instrumentRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
 
-        String identifier = resolveIdentifier(instrument);
+        String identifier = instrument.preferredIdentifier();
 
         if (identifier != null) {
             Optional<MarketDataResponse> liveData = sixClient.fetchByValorOrIsin(identifier);
@@ -114,22 +114,29 @@ public class InstrumentService {
                         + ". Please add a valid VALOR, ISIN, or ticker.");
     }
 
-    /** Prefer valor, fall back to ISIN, then ticker. */
-    private String resolveIdentifier(Instrument instrument) {
-        if (instrument.getValor() != null) {
-            return instrument.getValor();
+    /**
+     * Fetches live data from SIX for the instrument's preferred identifier and
+     * persists the fresh price (and SIX name) via {@link #updateCachedPrice}.
+     * Package-private so PositionService can reuse it during position creation.
+     *
+     * @return the refreshed instrument, or the unchanged one when the
+     *         instrument has no identifier or SIX returned no data
+     */
+    Instrument refreshPriceFromSix(Instrument instrument) {
+        String identifier = instrument.preferredIdentifier();
+        if (identifier == null) {
+            return instrument;
         }
-        if (instrument.getIsin() != null) {
-            return instrument.getIsin();
-        }
-        return instrument.getTicker();
+        return sixClient.fetchByValorOrIsin(identifier)
+                .map(data -> updateCachedPrice(instrument, data))
+                .orElse(instrument);
     }
 
     // No @Transactional here: the single repository save() runs in its own
     // transaction, and a self-invocation would bypass the Spring proxy anyway.
-    private void updateCachedPrice(Instrument instrument, MarketDataResponse data) {
+    private Instrument updateCachedPrice(Instrument instrument, MarketDataResponse data) {
         if (data.lastPrice() == null) {
-            return;
+            return instrument;
         }
         try {
             var updated = Instrument.builder()
@@ -144,9 +151,10 @@ public class InstrumentService {
                     .lastPrice(data.lastPrice())
                     .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
                     .build();
-            instrumentRepository.save(updated);
+            return instrumentRepository.save(updated);
         } catch (Exception e) {
             log.warn("Failed to update cached price for instrument id={}", instrument.getId(), e);
+            return instrument;
         }
     }
 

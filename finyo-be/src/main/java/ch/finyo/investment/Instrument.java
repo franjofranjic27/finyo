@@ -58,4 +58,15 @@ public class Instrument {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    /** Preferred market-data identifier: valor, then ISIN, then ticker; null when none is set. */
+    public String preferredIdentifier() {
+        if (valor != null) {
+            return valor;
+        }
+        if (isin != null) {
+            return isin;
+        }
+        return ticker;
+    }
 }

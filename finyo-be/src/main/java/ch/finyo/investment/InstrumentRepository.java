@@ -11,4 +11,8 @@ public interface InstrumentRepository extends JpaRepository<Instrument, UUID> {
     List<Instrument> findByUserIdOrderBySortOrderAscNameAsc(String userId);
 
     Optional<Instrument> findByIdAndUserId(UUID id, String userId);
+
+    Optional<Instrument> findFirstByUserIdAndIsinIgnoreCase(String userId, String isin);
+
+    Optional<Instrument> findFirstByUserIdAndValor(String userId, String valor);
 }
