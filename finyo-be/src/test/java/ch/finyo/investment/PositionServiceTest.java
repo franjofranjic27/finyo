@@ -261,8 +261,9 @@ class PositionServiceTest {
 
     @Test
     void create_throws_IllegalArgumentException_when_neither_name_nor_isin_nor_valor_is_given() {
-        assertThatThrownBy(() -> positionService.create(
-                request(null, " ", null, "10", "100.00", null), USER_ID))
+        PositionRequest withoutIdentifier = request(null, " ", null, "10", "100.00", null);
+
+        assertThatThrownBy(() -> positionService.create(withoutIdentifier, USER_ID))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("name, isin or valor");
         then(positionRepository).shouldHaveNoInteractions();

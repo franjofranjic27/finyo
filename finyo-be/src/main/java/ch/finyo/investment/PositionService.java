@@ -44,16 +44,7 @@ public class PositionService {
 
     @Transactional
     public PositionResponse create(PositionRequest request, String userId) {
-        validate(request);
-        log.info("Creating position isin={} valor={} for user={}", request.isin(), request.valor(), userId);
-
-        Instrument instrument = resolveOrCreateInstrument(request, userId);
-        instrument = instrumentService.refreshPriceFromSix(instrument);
-        instrument = applyCurrentPriceOverride(instrument, request.currentPrice());
-
-        Position saved = mergeOrCreatePosition(request, instrument.getId(), userId);
-        log.info("Created/merged position id={} instrument={} for user={}", saved.getId(), instrument.getId(), userId);
-        return PositionResponse.from(saved, instrument);
+        return doCreate(request, userId);
     }
 
     /**
@@ -71,9 +62,7 @@ public class PositionService {
         for (int i = 0; i < rows.size(); i++) {
             PositionRequest row = rows.get(i);
             try {
-                // self-invocation of create() is fine here: the row transaction
-                // is already active, the bypassed @Transactional would only join it
-                bulkRowTransaction.executeWithoutResult(status -> create(row, userId));
+                bulkRowTransaction.executeWithoutResult(status -> doCreate(row, userId));
                 imported++;
             } catch (RuntimeException e) {
                 log.warn("Bulk import row {} failed for user={}: {}", i + 1, userId, e.getMessage());
@@ -92,6 +81,20 @@ public class PositionService {
                 .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
         positionRepository.delete(position);
         log.info("Deleted position id={} for user={}", id, userId);
+    }
+
+    /** Shared create path: runs inside create()'s @Transactional or inside a bulk row transaction. */
+    private PositionResponse doCreate(PositionRequest request, String userId) {
+        validate(request);
+        log.info("Creating position isin={} valor={} for user={}", request.isin(), request.valor(), userId);
+
+        Instrument instrument = resolveOrCreateInstrument(request, userId);
+        instrument = instrumentService.refreshPriceFromSix(instrument);
+        instrument = applyCurrentPriceOverride(instrument, request.currentPrice());
+
+        Position saved = mergeOrCreatePosition(request, instrument.getId(), userId);
+        log.info("Created/merged position id={} instrument={} for user={}", saved.getId(), instrument.getId(), userId);
+        return PositionResponse.from(saved, instrument);
     }
 
     /** Bean Validation only covers the single-create path; bulk rows must report these rules per row. */
