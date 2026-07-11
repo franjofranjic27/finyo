@@ -1,24 +1,8 @@
 import type { FixedCostInput, PaymentInterval } from '@/api/budget';
+import { csvRows, parseSwissNumber } from '@/lib/csv';
 
 const MONTHLY_VARIANTS = new Set(['monatl.', 'monatlich', 'monthly', 'm']);
 const YEARLY_VARIANTS = new Set(['jährl.', 'jaehrlich', 'jährlich', 'yearly', 'j', 'y']);
-
-/**
- * Normalises Swiss-formatted numbers: strips apostrophe (' and ’) and space
- * thousand separators; a single comma without a dot is treated as the
- * decimal separator, otherwise commas are thousand separators.
- */
-function parseSwissNumber(raw: string): number {
-  let cleaned = raw.replaceAll(/['’\s]/g, '');
-  if (cleaned.includes(',')) {
-    const hasSingleComma = cleaned.indexOf(',') === cleaned.lastIndexOf(',');
-    cleaned = hasSingleComma && !cleaned.includes('.')
-      ? cleaned.replace(',', '.')
-      : cleaned.replaceAll(',', '');
-  }
-  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(cleaned)) return Number.NaN;
-  return Number.parseFloat(cleaned);
-}
 
 function parsePaymentInterval(raw: string): PaymentInterval | undefined {
   const normalized = raw.toLowerCase();
@@ -56,27 +40,14 @@ function parseRow(cells: string[]): FixedCostInput | undefined {
 /**
  * Parses a fixed-costs CSV with the columns
  * `Name; Category (optional); Billing (monthly/yearly); Amount`.
- * Detects the delimiter (`;` wins over `,`), skips an optional header row
- * and silently drops invalid rows — the backend reports upsert failures
+ * Invalid rows are silently dropped — the backend reports upsert failures
  * per row via its bulk result.
  */
 export function parseFixedCostsCsv(text: string): FixedCostInput[] {
-  const delimiter = text.includes(';') ? ';' : ',';
   const items: FixedCostInput[] = [];
-  let firstRowSeen = false;
-
-  text.split(/\r?\n/).forEach((line) => {
-    if (!line.trim()) return;
-
-    const cells = line.split(delimiter).map((cell) => cell.trim());
-    if (!firstRowSeen) {
-      firstRowSeen = true;
-      if (isHeaderRow(cells)) return;
-    }
-
+  for (const { cells } of csvRows(text, isHeaderRow)) {
     const item = parseRow(cells);
     if (item) items.push(item);
-  });
-
+  }
   return items;
 }

@@ -1,25 +1,9 @@
 import type { CreatePositionRequest } from '@/api/portfolio';
+import { csvRows, parseSwissNumber } from '@/lib/csv';
 
 export interface CsvParseResult {
   positions: CreatePositionRequest[];
   errors: string[];
-}
-
-/**
- * Normalises Swiss-formatted numbers: strips apostrophe (' and ’) and space
- * thousand separators; a single comma without a dot is treated as the
- * decimal separator, otherwise commas are thousand separators.
- */
-function parseSwissNumber(raw: string): number {
-  let cleaned = raw.replaceAll(/['’\s]/g, '');
-  if (cleaned.includes(',')) {
-    const hasSingleComma = cleaned.indexOf(',') === cleaned.lastIndexOf(',');
-    cleaned = hasSingleComma && !cleaned.includes('.')
-      ? cleaned.replace(',', '.')
-      : cleaned.replaceAll(',', '');
-  }
-  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(cleaned)) return Number.NaN;
-  return Number.parseFloat(cleaned);
 }
 
 /** A first row whose numeric columns (quantity/prices) do not parse is a header. */
@@ -68,32 +52,21 @@ function parseRow(cells: string[], lineNumber: number): CreatePositionRequest | 
 /**
  * Parses a positions CSV with the columns
  * `Name; ISIN (optional); Quantity; Purchase price; Price (optional)`.
- * Detects the delimiter (`;` wins over `,`), skips an optional header row
- * and collects per-line errors instead of aborting — mirroring the
- * backend's bulk import contract.
+ * Collects per-line errors instead of aborting — mirroring the backend's
+ * bulk import contract.
  */
 export function parsePositionsCsv(text: string): CsvParseResult {
-  const delimiter = text.includes(';') ? ';' : ',';
   const positions: CreatePositionRequest[] = [];
   const errors: string[] = [];
-  let firstRowSeen = false;
 
-  text.split(/\r?\n/).forEach((line, index) => {
-    if (!line.trim()) return;
-
-    const cells = line.split(delimiter).map((cell) => cell.trim());
-    if (!firstRowSeen) {
-      firstRowSeen = true;
-      if (isHeaderRow(cells)) return;
-    }
-
-    const result = parseRow(cells, index + 1);
+  for (const { cells, lineNumber } of csvRows(text, isHeaderRow)) {
+    const result = parseRow(cells, lineNumber);
     if (typeof result === 'string') {
       errors.push(result);
     } else {
       positions.push(result);
     }
-  });
+  }
 
   return { positions, errors };
 }
