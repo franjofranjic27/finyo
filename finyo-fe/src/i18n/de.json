@@ -6,6 +6,8 @@
     "pillar3": "Säule 3a",
     "insurance": "Versicherungen",
     "settings": "Einstellungen",
+    "admin": "Admin",
+    "adminPillar3Products": "3a-Produkte",
     "collapseSidebar": "Seitenleiste einklappen",
     "expandSidebar": "Seitenleiste ausklappen"
   },
@@ -132,7 +134,36 @@
     "balanceGrowth": "Guthabenentwicklung über {{years}} Jahre",
     "contributionCap": "Du könntest <strong>{{remaining}}</strong> zusätzlich einzahlen, um das Maximum von <strong>{{max}}</strong> zu erreichen und weitere <strong>{{saving}}</strong> Steuern zu sparen.",
     "vsSavingsTitle": "Im Vergleich zu einem steuerpflichtigen Sparkonto",
-    "vsSavingsText": "Dieselben Bruttoeinzahlungen auf ein reguläres steuerpflichtiges Konto ergäben ungefähr <strong>{{equivalent}}</strong> — das 3a-Konto liefert nach der Bezugssteuer <emph>+{{advantage}}</emph> mehr."
+    "vsSavingsText": "Dieselben Bruttoeinzahlungen auf ein reguläres steuerpflichtiges Konto ergäben ungefähr <strong>{{equivalent}}</strong> — das 3a-Konto liefert nach der Bezugssteuer <emph>+{{advantage}}</emph> mehr.",
+    "tabs": {
+      "calculator": "Rechner",
+      "compare": "Produktvergleich"
+    },
+    "compare": {
+      "formTitle": "Vergleichsparameter",
+      "currentBalance": "Aktuelles 3a-Guthaben",
+      "annualContribution": "Jährlicher Beitrag",
+      "years": "Anlagehorizont (Jahre)",
+      "capHint": "Maximaler Jahresbeitrag: {{max}}",
+      "searchLabel": "Produkt hinzufügen",
+      "searchPlaceholder": "Nach Name, Anbieter, ISIN oder Valor suchen …",
+      "noResults": "Keine passenden Produkte",
+      "maxProducts": "Maximal {{max}} Produkte erreicht",
+      "emptyCatalog": "Noch keine Produkte verfügbar – ein Administrator muss zuerst den Produktkatalog erfassen.",
+      "emptySelection": "Suche oben nach 3a-Produkten, um deren erwartetes Endkapital zu vergleichen.",
+      "tableTitle": "Vergleich",
+      "product": "Produkt",
+      "equity": "Aktienquote",
+      "ter": "TER",
+      "avgReturn": "Ø Rendite",
+      "fees": "Gebühren (Laufzeit)",
+      "finalCapital": "Endkapital",
+      "topBadge": "Top",
+      "remove": "{{name}} entfernen",
+      "chartTitle": "Endkapital nach {{years}} Jahren",
+      "totalPaidIn": "Total einbezahlt: {{amount}}",
+      "footnote": "Modellrechnung: erwartete Bruttorendite = 1 % + Aktienquote × 5 %; die TER wird jährlich vom gewachsenen Guthaben abgezogen. Die Werte sind Projektionen, keine Garantien."
+    }
   },
   "insurance": {
     "title": "Versicherungsübersicht",
@@ -142,6 +173,37 @@
     "iHaveThis": "Ich habe dies",
     "typicalCost": "Typische jährliche Kosten",
     "compare": "Vergleichen"
+  },
+  "admin": {
+    "products": {
+      "title": "3a-Produkte",
+      "newProduct": "Neues Produkt",
+      "editProduct": "Produkt bearbeiten",
+      "provider": "Anbieter",
+      "name": "Name",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "equity": "Aktienquote",
+      "ter": "TER",
+      "sortOrder": "Sortierung",
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "actions": "Aktionen",
+      "activate": "Aktivieren",
+      "deactivate": "Deaktivieren",
+      "deleteTitle": "Produkt löschen",
+      "deleteText": "«{{name}}» endgültig löschen? Alternativ kannst du das Produkt deaktivieren – deaktivierte Produkte bleiben für bestehende Vergleiche verfügbar.",
+      "deactivateInstead": "Stattdessen deaktivieren",
+      "empty": "Noch keine Produkte. Erstelle das erste Produkt oder nutze den Import-Endpoint.",
+      "validation": {
+        "providerRequired": "Anbieter ist erforderlich",
+        "nameRequired": "Name ist erforderlich",
+        "isinInvalid": "ISIN muss 12 Zeichen lang sein: 2 Buchstaben, 9 alphanumerische Zeichen, 1 Ziffer",
+        "valorInvalid": "Valor darf nur Ziffern enthalten",
+        "equityRange": "Aktienquote muss zwischen 0 und 100 liegen",
+        "terRange": "TER muss zwischen 0 und 10 liegen"
+      }
+    }
   },
   "common": {
     "save": "Speichern",

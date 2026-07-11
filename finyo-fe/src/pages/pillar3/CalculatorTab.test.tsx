@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Pillar3 } from './Pillar3';
+import { CalculatorTab } from './CalculatorTab';
 import { taxApi } from '@/api/tax';
 import type { Pillar3Result } from '@/api/tax';
 import { renderWithProviders } from '@/test/test-utils';
@@ -44,9 +44,9 @@ const result: Pillar3Result = {
   ],
 };
 
-describe('Pillar3', () => {
+describe('CalculatorTab', () => {
   it('renders the calculator form with default values', () => {
-    renderWithProviders(<Pillar3 />);
+    renderWithProviders(<CalculatorTab />);
 
     expect(screen.getAllByText('Pillar 3a Calculator').length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue('7258')).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe('Pillar3', () => {
   it('calculates and shows the projection metrics', async () => {
     vi.mocked(taxApi.calculatePillar3).mockResolvedValue(result);
     const user = userEvent.setup();
-    renderWithProviders(<Pillar3 />);
+    renderWithProviders(<CalculatorTab />);
 
     await user.click(screen.getByRole('button', { name: /Calculate/ }));
 
@@ -70,7 +70,7 @@ describe('Pillar3', () => {
   it('shows the contribution-cap hint when below the maximum', async () => {
     vi.mocked(taxApi.calculatePillar3).mockResolvedValue(result);
     const user = userEvent.setup();
-    renderWithProviders(<Pillar3 />);
+    renderWithProviders(<CalculatorTab />);
 
     await user.click(screen.getByRole('button', { name: /Calculate/ }));
 
@@ -85,7 +85,7 @@ describe('Pillar3', () => {
       remainingUntilMax: 0,
     });
     const user = userEvent.setup();
-    renderWithProviders(<Pillar3 />);
+    renderWithProviders(<CalculatorTab />);
 
     await user.click(screen.getByRole('button', { name: /Calculate/ }));
 
@@ -96,7 +96,7 @@ describe('Pillar3', () => {
   it('sends the tax-saving inputs only when an income is entered', async () => {
     vi.mocked(taxApi.calculatePillar3).mockResolvedValue(result);
     const user = userEvent.setup();
-    renderWithProviders(<Pillar3 />);
+    renderWithProviders(<CalculatorTab />);
 
     await user.type(screen.getByPlaceholderText('Optional'), '100000');
     await user.click(screen.getByRole('button', { name: /Calculate/ }));

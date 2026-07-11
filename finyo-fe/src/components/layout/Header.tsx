@@ -21,6 +21,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/pillar3': 'nav.pillar3',
   '/insurance': 'nav.insurance',
   '/settings': 'nav.settings',
+  '/admin': 'nav.admin',
 };
 
 interface HeaderProps {

@@ -1,0 +1,26 @@
+import { useTranslation } from 'react-i18next';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalculatorTab } from './CalculatorTab';
+import { CompareTab } from './CompareTab';
+
+export function Pillar3Page() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">{t('nav.pillar3')}</h1>
+      <Tabs defaultValue="calculator">
+        <TabsList>
+          <TabsTrigger value="calculator">{t('pillar3.tabs.calculator')}</TabsTrigger>
+          <TabsTrigger value="compare">{t('pillar3.tabs.compare')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="calculator" className="mt-4">
+          <CalculatorTab />
+        </TabsContent>
+        <TabsContent value="compare" className="mt-4">
+          <CompareTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
