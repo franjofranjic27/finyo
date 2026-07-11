@@ -1,27 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { PortfolioPosition } from '@/api/portfolio';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { displayName } from './positionName';
 
-const CHART_HEIGHT = 260;
-const LEGEND_HEIGHT = 36;
-// Vertical centre of the plot area (chart height minus the bottom legend).
-const DONUT_CENTRE_Y = (CHART_HEIGHT - LEGEND_HEIGHT) / 2;
-
-// Module scope: recharts re-renders formatter results, nested components would remount.
-const renderLegendText = (value: string) => (
-  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
-);
+const CHART_HEIGHT = 240;
 
 export function AllocationDonut({ positions }: Readonly<{ positions: PortfolioPosition[] }>) {
   const { t } = useTranslation();
 
   const chartData = positions.map((position) => ({
     id: position.id,
-    name: `${displayName(position)} · ${formatPercent(position.allocationPct)}`,
+    name: displayName(position),
     value: position.value,
   }));
 
@@ -36,46 +28,66 @@ export function AllocationDonut({ positions }: Readonly<{ positions: PortfolioPo
             {t('investments.allocation.empty')}
           </p>
         ) : (
-          <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy={DONUT_CENTRE_Y}
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={entry.id} fill={CHART_COLOURS[index % CHART_COLOURS.length]} />
-                ))}
-              </Pie>
-              <text
-                x="50%"
-                y={DONUT_CENTRE_Y - 6}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-foreground text-2xl font-bold"
-              >
-                {positions.length}
-              </text>
-              <text
-                x="50%"
-                y={DONUT_CENTRE_Y + 16}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-muted-foreground text-xs"
-              >
-                {t('investments.allocation.positions')}
-              </text>
-              <Tooltip
-                formatter={(value: number) => formatCHF(value)}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-              />
-              <Legend formatter={renderLegendText} height={LEGEND_HEIGHT} />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="flex flex-col gap-4">
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={entry.id} fill={CHART_COLOURS[index % CHART_COLOURS.length]} />
+                  ))}
+                </Pie>
+                <text
+                  x="50%"
+                  y="50%"
+                  dy={-6}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-foreground text-2xl font-bold"
+                >
+                  {positions.length}
+                </text>
+                <text
+                  x="50%"
+                  y="50%"
+                  dy={16}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-muted-foreground text-xs"
+                >
+                  {t('investments.allocation.positions')}
+                </text>
+                <Tooltip
+                  formatter={(value: number) => formatCHF(value)}
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Left-aligned legend list — truncating names cannot overflow the card. */}
+            <ul className="flex w-full flex-col gap-2">
+              {positions.map((position, index) => (
+                <li key={position.id} className="flex min-w-0 items-center gap-2 text-sm">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: CHART_COLOURS[index % CHART_COLOURS.length] }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 truncate">{displayName(position)}</span>
+                  <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+                    {formatPercent(position.allocationPct)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </CardContent>
     </Card>

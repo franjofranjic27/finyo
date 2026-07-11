@@ -18,15 +18,19 @@ vi.mock('@/auth/useAuth', () => ({
   }),
 }));
 
-vi.mock('@/api/portfolio', () => ({
-  portfolioApi: {
-    getPortfolio: vi.fn(),
-    getHistory: vi.fn(),
-    createPosition: vi.fn(),
-    createPositionsBulk: vi.fn(),
-    deletePosition: vi.fn(),
-  },
-}));
+vi.mock('@/api/portfolio', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/portfolio')>();
+  return {
+    ...actual,
+    portfolioApi: {
+      getPortfolio: vi.fn(),
+      getHistory: vi.fn(),
+      createPosition: vi.fn(),
+      createPositionsBulk: vi.fn(),
+      deletePosition: vi.fn(),
+    },
+  };
+});
 
 describe('PortfolioPage', () => {
   it('renders the title, KPI tiles, positions and charts from the portfolio query', async () => {
@@ -43,7 +47,8 @@ describe('PortfolioPage', () => {
     expect(screen.getByRole('heading', { name: 'Portfolio' })).toBeInTheDocument();
     expect(await screen.findByText("CHF 1'234.50")).toBeInTheDocument();
     expect(screen.getByText('Total Value')).toBeInTheDocument();
-    expect(screen.getByText('Nestlé SA')).toBeInTheDocument();
+    // Appears in the grouped positions table and in the allocation legend.
+    expect(screen.getAllByText('Nestlé SA').length).toBeGreaterThan(0);
     expect(screen.getByText('Add Security')).toBeInTheDocument();
     expect(screen.getByText('Allocation')).toBeInTheDocument();
     expect(screen.getByText('Performance')).toBeInTheDocument();

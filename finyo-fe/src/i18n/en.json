@@ -11,6 +11,18 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
   },
+  "breadcrumb": {
+    "portfolio": "Portfolio",
+    "position": "Position – {{name}}",
+    "taxYear": "Tax year {{year}}"
+  },
+  "assetClass": {
+    "ETF": "ETF",
+    "FUND": "Investment funds",
+    "STOCK": "Individual stocks",
+    "CRYPTO": "Cryptocurrencies",
+    "BOND": "Fixed deposits & bonds"
+  },
   "dashboard": {
     "title": "Dashboard",
     "netThisMonth": "Net This Month",
@@ -69,6 +81,56 @@
       "range1y": "1Y",
       "range3y": "3Y",
       "notEnoughData": "Not enough data yet — the history grows with every portfolio view"
+    },
+    "position": {
+      "loadError": "Failed to load the position",
+      "liveChip": "Price live · SIX",
+      "stats": {
+        "value": "Value",
+        "quantity": "Quantity",
+        "avgPurchasePrice": "Avg. Purchase Price",
+        "currentPrice": "Current Price",
+        "gainLossReturn": "G/L · Return"
+      },
+      "product": {
+        "title": "Product Information",
+        "name": "Title",
+        "assetClass": "Asset Class",
+        "valor": "Valor",
+        "isin": "ISIN",
+        "currency": "Currency",
+        "ter": "TER",
+        "priceSource": "Price Source",
+        "portfolioShare": "Portfolio Share"
+      },
+      "priceSourceValue": {
+        "LIVE": "Live (SIX)",
+        "CACHE": "Cached",
+        "PURCHASE": "Purchase price"
+      },
+      "editDialog": {
+        "title": "Edit product",
+        "name": "Title",
+        "assetClass": "Asset Class",
+        "valor": "Valor",
+        "ter": "TER (%)",
+        "factsheetUrl": "Factsheet link (URL)",
+        "nameRequired": "Title is required",
+        "terInvalid": "TER must be a number between 0 and 10"
+      },
+      "factsheet": {
+        "title": "Factsheet",
+        "dropzone": "Upload factsheet (PDF) · max. 10 MB",
+        "view": "View",
+        "replace": "Replace",
+        "delete": "Delete factsheet",
+        "openLink": "Open factsheet link",
+        "invalidType": "Only PDF files are allowed",
+        "tooLarge": "The file exceeds 10 MB",
+        "uploading": "Uploading…"
+      },
+      "deletePosition": "Delete position",
+      "confirmDelete": "Delete position \"{{name}}\"?"
     }
   },
   "tax": {

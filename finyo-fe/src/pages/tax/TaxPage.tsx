@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useBreadcrumb } from '@/components/layout/BreadcrumbContext';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
 import type { TaxYearDetail } from '@/api/tax';
@@ -39,6 +40,17 @@ export function TaxPage() {
 
   const currentYear = new Date().getFullYear();
   const year = resolveYear(yearParam, currentYear);
+
+  // Year detail routes (/tax/2025) get a two-segment breadcrumb; the plain
+  // /tax route keeps the single-segment fallback title.
+  useBreadcrumb(
+    yearParam
+      ? [
+          { label: t('nav.tax'), to: '/tax' },
+          { label: t('breadcrumb.taxYear', { year }) },
+        ]
+      : null,
+  );
 
   const { data: years } = useQuery({
     queryKey: ['tax', 'years'],

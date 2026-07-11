@@ -8,6 +8,7 @@ import { RequireRole } from './auth/RequireRole';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { PortfolioPage } from './pages/investments/PortfolioPage';
+import { PositionDetailPage } from './pages/investments/PositionDetailPage';
 import { TaxPage } from './pages/tax/TaxPage';
 import { Pillar3Page } from './pages/pillar3/Pillar3Page';
 import { Insurance } from './pages/Insurance';
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/investments" element={<PortfolioPage />} />
+                <Route path="/investments/positions/:positionId" element={<PositionDetailPage />} />
                 <Route path="/tax" element={<TaxPage />} />
                 <Route path="/tax/:year" element={<TaxPage />} />
                 <Route path="/pillar3" element={<Pillar3Page />} />

@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDateDE,
   formatDateEN,
+  formatFileSize,
   formatPercent,
 } from './formatters';
 
@@ -63,6 +64,20 @@ describe('formatPercent', () => {
 
   it('keeps zero as 0.0%', () => {
     expect(formatPercent(0)).toBe('0.0%');
+  });
+});
+
+describe('formatFileSize', () => {
+  it('formats sub-kilobyte sizes as bytes', () => {
+    expect(formatFileSize(512)).toBe('512 B');
+  });
+
+  it('formats kilobyte sizes without decimals', () => {
+    expect(formatFileSize(340 * 1024)).toBe('340 KB');
+  });
+
+  it('formats megabyte sizes with one decimal', () => {
+    expect(formatFileSize(2.5 * 1024 * 1024)).toBe('2.5 MB');
   });
 });
 
