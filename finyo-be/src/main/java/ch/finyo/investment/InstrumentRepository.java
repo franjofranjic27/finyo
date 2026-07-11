@@ -2,6 +2,7 @@ package ch.finyo.investment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,5 +11,11 @@ public interface InstrumentRepository extends JpaRepository<Instrument, UUID> {
 
     List<Instrument> findByUserIdOrderBySortOrderAscNameAsc(String userId);
 
+    List<Instrument> findByIdInAndUserId(Collection<UUID> ids, String userId);
+
     Optional<Instrument> findByIdAndUserId(UUID id, String userId);
+
+    Optional<Instrument> findFirstByUserIdAndIsinIgnoreCase(String userId, String isin);
+
+    Optional<Instrument> findFirstByUserIdAndValor(String userId, String valor);
 }

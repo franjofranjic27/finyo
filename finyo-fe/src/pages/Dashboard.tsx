@@ -20,9 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/auth/useAuth';
 import { analyticsApi } from '@/api/analytics';
 import { formatCHF, amountColour } from '@/lib/formatters';
+import { CHART_COLOURS } from '@/lib/chartColours';
 import type { CategoryBreakdown, MonthlyDataPoint } from '@/types';
-
-const CHART_COLOURS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#e0e7ff'];
 
 const SUMMARY_SKELETON_KEYS = ['net', 'income', 'expenses', 'category'];
 
