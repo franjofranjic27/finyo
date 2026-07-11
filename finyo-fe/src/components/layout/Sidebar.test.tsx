@@ -30,13 +30,13 @@ describe('Sidebar', () => {
     for (const label of ['Dashboard', 'Investments', 'Taxes', 'Pillar 3a', 'Insurance', 'Settings']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
     }
-    expect(screen.getByText('finyo')).toBeInTheDocument();
+    // The wordmark lives in the header now, not the sidebar.
+    expect(screen.queryByText('finyo')).not.toBeInTheDocument();
   });
 
-  it('hides labels and the logo when collapsed', () => {
+  it('hides labels when collapsed', () => {
     renderWithProviders(<Sidebar collapsed onToggleCollapse={() => {}} />);
 
-    expect(screen.queryByText('finyo')).not.toBeInTheDocument();
     expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
     // Links stay reachable via their title attribute.
     expect(screen.getByTitle('Dashboard')).toBeInTheDocument();

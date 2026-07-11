@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import { Breadcrumb } from './Breadcrumb';
+import { Breadcrumb, PageBreadcrumb } from './Breadcrumb';
+import { BreadcrumbProvider, useBreadcrumb, type BreadcrumbSegment } from './BreadcrumbContext';
 import { renderWithProviders } from '@/test/test-utils';
+
+function PublishSegments({ segments }: Readonly<{ segments: BreadcrumbSegment[] }>) {
+  useBreadcrumb(segments);
+  return null;
+}
 
 describe('Breadcrumb', () => {
   it('renders a single segment as the page heading without links', () => {
@@ -42,5 +48,28 @@ describe('Breadcrumb', () => {
     const { container } = renderWithProviders(<Breadcrumb segments={[]} />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('PageBreadcrumb', () => {
+  it('falls back to the route-derived title on nested routes', () => {
+    renderWithProviders(<PageBreadcrumb />, { route: '/tax/2025' });
+
+    expect(screen.getByRole('heading', { name: 'Taxes' })).toBeInTheDocument();
+  });
+
+  it('renders the segments published by the active page', () => {
+    renderWithProviders(
+      <BreadcrumbProvider>
+        <PublishSegments
+          segments={[{ label: 'Portfolio', to: '/investments' }, { label: 'Position – Nestlé SA' }]}
+        />
+        <PageBreadcrumb />
+      </BreadcrumbProvider>,
+      { route: '/investments/positions/1' },
+    );
+
+    expect(screen.getByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/investments');
+    expect(screen.getByRole('heading', { name: 'Position – Nestlé SA' })).toBeInTheDocument();
   });
 });

@@ -65,16 +65,14 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readon
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo + collapse toggle */}
+      {/* Collapse toggle — the wordmark lives in the header; the bar stays as
+          a spacer in the mobile sheet so links don't collide with its close X */}
       <div
         className={cn(
           'flex h-16 items-center border-b border-sidebar-border',
-          collapsed ? 'justify-center px-2' : 'justify-between px-4'
+          collapsed ? 'justify-center px-2' : 'justify-end px-4'
         )}
       >
-        {!collapsed && (
-          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">finyo</span>
-        )}
         {onToggleCollapse && (
           <button
             type="button"

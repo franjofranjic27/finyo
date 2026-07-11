@@ -46,7 +46,8 @@ describe('AppLayout', () => {
 
     expect(localStorage.getItem('finyo.sidebar.collapsed')).toBe('true');
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
-    expect(screen.queryByText('finyo')).not.toBeInTheDocument();
+    // The wordmark sits in the header and stays visible when the rail collapses.
+    expect(screen.getByText('finyo')).toBeInTheDocument();
   });
 
   it('restores the collapsed state from localStorage', () => {
