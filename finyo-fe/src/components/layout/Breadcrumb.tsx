@@ -5,11 +5,14 @@ import { useBreadcrumbSegments, type BreadcrumbSegment } from './BreadcrumbConte
 
 const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'nav.dashboard',
+  '/wealth': 'nav.wealth',
   // The investments page title is "Portfolio"; the sidebar keeps nav.investments.
   '/investments': 'breadcrumb.portfolio',
   '/tax': 'nav.tax',
   '/pillar3': 'nav.pillar3',
+  '/budget': 'nav.budget',
   '/insurance': 'nav.insurance',
+  '/accounts': 'nav.accounts',
   '/settings': 'nav.settings',
   '/admin': 'nav.admin',
 };
