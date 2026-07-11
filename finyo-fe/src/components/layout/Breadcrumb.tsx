@@ -1,9 +1,21 @@
 import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
-import type { BreadcrumbSegment } from './BreadcrumbContext';
+import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useBreadcrumbSegments, type BreadcrumbSegment } from './BreadcrumbContext';
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/dashboard': 'nav.dashboard',
+  // The investments page title is "Portfolio"; the sidebar keeps nav.investments.
+  '/investments': 'breadcrumb.portfolio',
+  '/tax': 'nav.tax',
+  '/pillar3': 'nav.pillar3',
+  '/insurance': 'nav.insurance',
+  '/settings': 'nav.settings',
+  '/admin': 'nav.admin',
+};
 
 /**
- * Top-bar breadcrumb: muted, clickable parent segments separated by "/",
+ * Content-area breadcrumb: muted, clickable parent segments separated by "/",
  * the current segment rendered bold as the page heading.
  */
 export function Breadcrumb({ segments }: Readonly<{ segments: BreadcrumbSegment[] }>) {
@@ -33,4 +45,19 @@ export function Breadcrumb({ segments }: Readonly<{ segments: BreadcrumbSegment[
       <h1 className="truncate font-semibold text-foreground">{current.label}</h1>
     </nav>
   );
+}
+
+/**
+ * Breadcrumb for the main content area: renders the segments published by the
+ * active page, falling back to a single segment derived from the first path
+ * segment (so nested routes like /tax/2025 resolve correctly).
+ */
+export function PageBreadcrumb() {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const contextSegments = useBreadcrumbSegments();
+  const segments = contextSegments ?? [
+    { label: t(ROUTE_LABELS[`/${pathname.split('/')[1]}`] ?? 'nav.dashboard') },
+  ];
+  return <Breadcrumb segments={segments} />;
 }

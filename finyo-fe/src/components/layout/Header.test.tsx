@@ -21,17 +21,10 @@ vi.mock('@/auth/useAuth', () => ({
 }));
 
 describe('Header', () => {
-  it('shows the page title derived from the current route', () => {
+  it('shows the finyo wordmark', () => {
     renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/investments' });
 
-    // The investments top bar is titled "Portfolio" per the approved design.
-    expect(screen.getByRole('heading', { name: 'Portfolio' })).toBeInTheDocument();
-  });
-
-  it('resolves nested routes such as /tax/2025 to the tax title', () => {
-    renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/tax/2025' });
-
-    expect(screen.getByRole('heading', { name: 'Taxes' })).toBeInTheDocument();
+    expect(screen.getByText('finyo')).toBeInTheDocument();
   });
 
   it('shows the user initials in the avatar', () => {

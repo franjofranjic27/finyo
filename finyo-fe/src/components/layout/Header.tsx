@@ -1,6 +1,5 @@
 import { Menu, Sun, Moon, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -13,19 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/auth/useAuth';
-import { Breadcrumb } from './Breadcrumb';
-import { useBreadcrumbSegments } from './BreadcrumbContext';
-
-const ROUTE_LABELS: Record<string, string> = {
-  '/dashboard': 'nav.dashboard',
-  // The investments top-bar title is "Portfolio"; the sidebar keeps nav.investments.
-  '/investments': 'breadcrumb.portfolio',
-  '/tax': 'nav.tax',
-  '/pillar3': 'nav.pillar3',
-  '/insurance': 'nav.insurance',
-  '/settings': 'nav.settings',
-  '/admin': 'nav.admin',
-};
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -33,17 +19,9 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: Readonly<HeaderProps>) {
   const { t, i18n } = useTranslation();
-  const { pathname } = useLocation();
   const { isDark, toggle } = useTheme();
   const { user, logout } = useAuth();
 
-  // Pages can publish multi-segment breadcrumbs; otherwise fall back to a
-  // single segment matched on the first path segment (so nested routes like
-  // /tax/2025 resolve correctly).
-  const contextSegments = useBreadcrumbSegments();
-  const segments = contextSegments ?? [
-    { label: t(ROUTE_LABELS[`/${pathname.split('/')[1]}`] ?? 'nav.dashboard') },
-  ];
   const username =
     (user?.profile?.preferred_username as string | undefined) ??
     (user?.profile?.name as string | undefined) ??
@@ -62,8 +40,9 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
         <span className="sr-only">Toggle menu</span>
       </Button>
 
-      {/* Page breadcrumb */}
-      <Breadcrumb segments={segments} />
+      {/* App wordmark — the page breadcrumb lives in the content area */}
+      <span className="text-xl font-bold tracking-tight">finyo</span>
+      <div className="flex-1" />
 
       {/* Right side controls */}
       <div className="flex items-center gap-2">
