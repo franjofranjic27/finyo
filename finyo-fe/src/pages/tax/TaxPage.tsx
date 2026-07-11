@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
@@ -11,6 +13,7 @@ import { buildYearList, toIsoDate } from './taxYearUtils';
 import { YearSidebar } from './YearSidebar';
 import { YearStatusBadge } from './YearStatusBadge';
 import { YearActionsMenu } from './YearActionsMenu';
+import { TaxDocumentUploadDialog } from './TaxDocumentUploadDialog';
 import { CalculatorCard } from './CalculatorCard';
 import { TaxResultSection } from './TaxResultSection';
 import { MonthlyPaymentsCard } from './MonthlyPaymentsCard';
@@ -39,6 +42,8 @@ export function TaxPage() {
 
   const currentYear = new Date().getFullYear();
   const year = resolveYear(yearParam, currentYear);
+
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const { data: years } = useQuery({
     queryKey: ['tax', 'years'],
@@ -78,6 +83,17 @@ export function TaxPage() {
             <>
               <YearStatusBadge status={detail.status} />
               <YearActionsMenu year={year} status={detail.status} />
+              <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                <Upload className="mr-1 h-4 w-4" />
+                {t('tax.upload.button')}
+              </Button>
+              <TaxDocumentUploadDialog
+                year={year}
+                inputs={detail.inputs}
+                assessedAmount={detail.assessedAmount}
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+              />
             </>
           )}
         </div>

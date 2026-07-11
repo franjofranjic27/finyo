@@ -91,6 +91,12 @@ export interface TaxYearInputs {
   netWealth: number | null;
 }
 
+/**
+ * PUT /tax/years/{year} payload: the inputs plus the optional assessed
+ * amount, which the backend applies only when non-null.
+ */
+export type TaxYearUpsertRequest = TaxYearInputs & { assessedAmount?: number | null };
+
 export interface TaxPayment {
   id: string;
   paymentDate: string;
@@ -198,7 +204,7 @@ export const taxApi = {
   getYear: (token: string, year: number) =>
     apiRequest<TaxYearDetail>(`/tax/years/${year}`, {}, token),
 
-  upsertYear: (token: string, year: number, inputs: TaxYearInputs) =>
+  upsertYear: (token: string, year: number, inputs: TaxYearUpsertRequest) =>
     apiRequest<TaxYearDetail>(
       `/tax/years/${year}`,
       { method: 'PUT', body: JSON.stringify(inputs) },

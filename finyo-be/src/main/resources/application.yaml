@@ -20,6 +20,11 @@ spring:
     type: caffeine
     caffeine:
       spec: maximumSize=500,expireAfterWrite=900s
+  # Tax document PDFs are 1-4 MB; the 1 MB default is too small
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 # /actuator is not routed by the reverse proxy — health and prometheus stay
 # reachable only inside the Docker network
