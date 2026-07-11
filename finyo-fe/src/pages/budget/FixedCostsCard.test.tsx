@@ -25,6 +25,7 @@ vi.mock('@/api/budget', () => ({
     createFixedCost: vi.fn(),
     updateFixedCost: vi.fn(),
     deleteFixedCost: vi.fn(),
+    importFixedCosts: vi.fn(),
     getMonthlyBudget: vi.fn(),
     updateMonthlyBudget: vi.fn(),
   },
@@ -35,6 +36,12 @@ describe('FixedCostsCard', () => {
     vi.mocked(budgetApi.createFixedCost).mockResolvedValue(fixedCost({ id: 'fc-new' }));
     vi.mocked(budgetApi.updateFixedCost).mockResolvedValue(fixedCost({ id: 'fc1' }));
     vi.mocked(budgetApi.deleteFixedCost).mockResolvedValue(undefined);
+    vi.mocked(budgetApi.importFixedCosts).mockResolvedValue({
+      created: 1,
+      updated: 1,
+      failed: 0,
+      errors: [],
+    });
   });
 
   it('renders the rows with category and interval badges and the totals', () => {
@@ -151,5 +158,64 @@ describe('FixedCostsCard', () => {
     await user.click(screen.getAllByRole('button', { name: 'Remove fixed cost' })[0]);
 
     expect(budgetApi.deleteFixedCost).not.toHaveBeenCalled();
+  });
+
+  describe('CSV import', () => {
+    function csvFile(content: string): File {
+      return new File([content], 'fixed-costs.csv', { type: 'text/csv' });
+    }
+
+    it('imports the parsed rows, shows the result and invalidates both queries', async () => {
+      const user = userEvent.setup();
+      const { queryClient } = renderWithProviders(<FixedCostsCard list={fixedCostList()} />);
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const file = csvFile(
+        "Bezeichnung;Kategorie;Zahlart;Betrag\nKrankenkasse;Versicherung;monatl.;2'460.00\nActiveFitness;;jährl.;699",
+      );
+      await user.upload(screen.getByLabelText('Import CSV'), file);
+
+      await waitFor(() =>
+        expect(budgetApi.importFixedCosts).toHaveBeenCalledWith('test-token', [
+          { name: 'Krankenkasse', category: 'Versicherung', paymentInterval: 'MONTHLY', amount: 2460 },
+          { name: 'ActiveFitness', category: undefined, paymentInterval: 'YEARLY', amount: 699 },
+        ]),
+      );
+      expect(await screen.findByText('1 created, 1 updated, 0 failed')).toBeInTheDocument();
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['fixed-costs'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['monthly-budget'] });
+    });
+
+    it('lists backend row errors from the bulk result', async () => {
+      vi.mocked(budgetApi.importFixedCosts).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        failed: 1,
+        errors: ['Row 2: duplicate name'],
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<FixedCostsCard list={fixedCostList()} />);
+
+      await user.upload(
+        screen.getByLabelText('Import CSV'),
+        csvFile('Krankenkasse;Versicherung;monatl.;205\nKrankenkasse;;m;205'),
+      );
+
+      expect(await screen.findByText('1 created, 0 updated, 1 failed')).toBeInTheDocument();
+      expect(screen.getByText('Row 2: duplicate name')).toBeInTheDocument();
+    });
+
+    it('shows the no-rows message and skips the import when nothing parses', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<FixedCostsCard list={fixedCostList()} />);
+
+      await user.upload(
+        screen.getByLabelText('Import CSV'),
+        csvFile(';Versicherung;weekly;-5'),
+      );
+
+      expect(await screen.findByText('No valid rows found in the file')).toBeInTheDocument();
+      expect(budgetApi.importFixedCosts).not.toHaveBeenCalled();
+    });
   });
 });
