@@ -15,13 +15,16 @@ import { useAuth } from '@/auth/useAuth';
 import { pillar3Api } from '@/api/pillar3';
 import type { Pillar3Scenario } from '@/api/pillar3';
 import { formatCHF } from '@/lib/formatters';
+import {
+  chartAxisProps,
+  chartGridProps,
+  chartTooltipStyle,
+  formatThousandsTick,
+  formatTooltipCHF,
+  renderLegendText,
+} from '@/components/charts/chartStyle';
 import { productColor } from './productColors';
 import { ScenarioActionsMenu } from './ScenarioActionsMenu';
-
-// Module scope: recharts re-renders formatter results, nested components would remount.
-const renderLegendText = (value: string) => (
-  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
-);
 
 /** One chart row per calendar year: shorter horizons simply end (no connectNulls). */
 function mergeProjections(
@@ -158,18 +161,10 @@ export function ScenariosTab() {
         <CardContent>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="year" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip
-                formatter={(v: number) => formatCHF(v)}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-              />
+              <CartesianGrid {...chartGridProps} />
+              <XAxis dataKey="year" {...chartAxisProps} />
+              <YAxis {...chartAxisProps} tickFormatter={formatThousandsTick} />
+              <Tooltip formatter={formatTooltipCHF} contentStyle={chartTooltipStyle} />
               <Legend formatter={renderLegendText} />
               {items.map((scenario, index) => (
                 <Line

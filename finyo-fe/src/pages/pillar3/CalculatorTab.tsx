@@ -19,6 +19,14 @@ import type { Pillar3Result, TaxCivilStatus } from '@/api/tax';
 import { pillar3Api } from '@/api/pillar3';
 import type { Pillar3Product, Pillar3Scenario, Pillar3ScenarioInputs } from '@/api/pillar3';
 import { formatCHF } from '@/lib/formatters';
+import {
+  chartAxisProps,
+  chartGridProps,
+  chartTooltipStyle,
+  formatThousandsTick,
+  formatTooltipCHF,
+  renderLegendText,
+} from '@/components/charts/chartStyle';
 import { ProductSearchCombobox } from './ProductSearchCombobox';
 import { ScenarioActionsMenu } from './ScenarioActionsMenu';
 import { ScenarioBar } from './ScenarioBar';
@@ -35,11 +43,6 @@ const CIVIL_STATUS_OPTIONS: { value: TaxCivilStatus; labelKey: string }[] = [
   { value: 'MARRIED', labelKey: 'tax.civilStatus.married' },
   { value: 'SINGLE_PARENT', labelKey: 'tax.civilStatus.singleParent' },
 ];
-
-// Module scope: recharts re-renders formatter results, nested components would remount.
-const renderLegendText = (value: string) => (
-  <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>
-);
 
 export function CalculatorTab() {
   const { t } = useTranslation();
@@ -317,18 +320,10 @@ function Pillar3ResultSection({ result, years }: Readonly<{ result: Pillar3Resul
         <CardContent>
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="year" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip
-                formatter={(v: number) => formatCHF(v)}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-              />
+              <CartesianGrid {...chartGridProps} />
+              <XAxis dataKey="year" {...chartAxisProps} />
+              <YAxis {...chartAxisProps} tickFormatter={formatThousandsTick} />
+              <Tooltip formatter={formatTooltipCHF} contentStyle={chartTooltipStyle} />
               <Legend formatter={renderLegendText} />
               <Area type="monotone" dataKey="Contributions" stackId="1" stroke="#6366f1" fill="#6366f1" fillOpacity={0.6} />
               <Area type="monotone" dataKey="Returns" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
