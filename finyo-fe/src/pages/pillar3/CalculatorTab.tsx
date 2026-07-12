@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AreaChart, Area, Tooltip, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Legend,
 } from 'recharts';
-import { Calculator } from 'lucide-react';
+import { Calculator, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
 import type { Pillar3Result, TaxCivilStatus } from '@/api/tax';
+import { pillar3Api } from '@/api/pillar3';
+import type { Pillar3Product, Pillar3Scenario, Pillar3ScenarioInputs } from '@/api/pillar3';
 import { formatCHF } from '@/lib/formatters';
+import { ProductSearchCombobox } from './ProductSearchCombobox';
+import { ScenarioActionsMenu } from './ScenarioActionsMenu';
+import { ScenarioBar } from './ScenarioBar';
+import { ScenarioSavePanel } from './ScenarioSavePanel';
 
 const CANTONS = [
   'AG','AI','AR','BE','BL','BS','FR','GE','GL','GR',
@@ -48,6 +54,39 @@ export function CalculatorTab() {
   const [income, setIncome] = useState('');
   const [canton, setCanton] = useState('SG');
   const [civilStatus, setCivilStatus] = useState<TaxCivilStatus>('SINGLE');
+  const [selectedProduct, setSelectedProduct] = useState<Pillar3Product | null>(null);
+
+  // Null = no scenario chip active, show the fresh calculation result.
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+  const [savePanelOpen, setSavePanelOpen] = useState(false);
+
+  const { data: products } = useQuery({
+    queryKey: ['pillar3-products'],
+    queryFn: () => pillar3Api.getProducts(token),
+    enabled: !!token,
+  });
+
+  const { data: scenarios } = useQuery({
+    queryKey: ['pillar3-scenarios'],
+    queryFn: () => pillar3Api.getScenarios(token),
+    enabled: !!token,
+  });
+
+  // A deleted scenario resolves to null and falls back to the fresh result.
+  const selectedScenario = scenarios?.find((s) => s.id === selectedScenarioId) ?? null;
+  const hasDefault = scenarios?.some((s) => s.isDefault) ?? false;
+
+  const scenarioInputs: Pillar3ScenarioInputs = {
+    currentBalance: Number.parseFloat(balance) || 0,
+    annualContribution: Number.parseFloat(contribution) || 0,
+    assumedAnnualReturnPercent: Number.parseFloat(returnPct) || 5,
+    yearsToRetirement: Number.parseInt(years) || 30,
+    grossEmploymentIncome: income ? Number.parseFloat(income) : null,
+    civilStatus: income ? civilStatus : null,
+    cantonCode: income ? canton : null,
+    taxYear: currentYear,
+    productId: selectedProduct?.id ?? null,
+  };
 
   const { mutate, data: result, isPending } = useMutation({
     mutationFn: () =>
@@ -61,7 +100,38 @@ export function CalculatorTab() {
         cantonCode: income ? canton : null,
         taxYear: currentYear,
       }),
+    // A fresh calculation always replaces an active scenario chip.
+    onSuccess: () => setSelectedScenarioId(null),
   });
+
+  const pickProduct = (product: Pillar3Product) => {
+    setSelectedProduct(product);
+    setReturnPct(String(product.netReturnPct));
+  };
+
+  const applyScenario = (scenario: Pillar3Scenario) => {
+    const { inputs } = scenario;
+    setBalance(String(inputs.currentBalance));
+    setContribution(String(inputs.annualContribution));
+    setReturnPct(String(scenario.effectiveReturnPercent));
+    setYears(String(inputs.yearsToRetirement));
+    setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
+    if (inputs.cantonCode) setCanton(inputs.cantonCode);
+    if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
+    // The product may have been deleted since the scenario was saved.
+    setSelectedProduct(products?.find((p) => p.id === inputs.productId) ?? null);
+  };
+
+  const selectScenario = (scenarioId: string | null) => {
+    setSelectedScenarioId(scenarioId);
+    const scenario = scenarioId ? scenarios?.find((s) => s.id === scenarioId) : null;
+    if (scenario) applyScenario(scenario);
+  };
+
+  const displayedResult = selectedScenario ? selectedScenario.calculation : result;
+  const displayedYears = selectedScenario
+    ? selectedScenario.inputs.yearsToRetirement
+    : Number.parseInt(years);
 
   return (
     <div className="space-y-6">
@@ -81,7 +151,15 @@ export function CalculatorTab() {
             </div>
             <div className="space-y-2">
               <Label>{t('pillar3.returnRate')}</Label>
-              <Input type="number" value={returnPct} onChange={(e) => setReturnPct(e.target.value)} step={0.1} min={0} max={20} />
+              <Input
+                type="number"
+                value={returnPct}
+                onChange={(e) => setReturnPct(e.target.value)}
+                step={0.1}
+                min={0}
+                max={20}
+                disabled={selectedProduct != null}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t('pillar3.yearsToRetirement')}</Label>
@@ -116,17 +194,85 @@ export function CalculatorTab() {
               </>
             )}
           </div>
-          <div className="mt-4">
+
+          {/* Optional product picker: the product's net return drives the calculation. */}
+          <div className="mt-4 space-y-2">
+            <Label>{t('pillar3.scenarios.product')}</Label>
+            <ProductSearchCombobox
+              products={products ?? []}
+              selectedIds={selectedProduct ? [selectedProduct.id] : []}
+              onSelect={pickProduct}
+            />
+            {selectedProduct && (
+              <span className="inline-flex items-center gap-2 rounded-full border bg-secondary py-1 pl-3.5 pr-1.5 text-[13px] font-medium">
+                <span className="max-w-64 truncate">{selectedProduct.name}</span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {selectedProduct.provider} · {selectedProduct.netReturnPct.toFixed(1)} %
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  aria-label={t('pillar3.scenarios.removeProduct')}
+                  onClick={() => setSelectedProduct(null)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button onClick={() => mutate()} disabled={isPending}>
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculate')}
             </Button>
+            <Button variant="outline" onClick={() => setSavePanelOpen(true)}>
+              {t('pillar3.scenarios.save')}
+            </Button>
           </div>
+
+          {savePanelOpen && (
+            <ScenarioSavePanel
+              inputs={scenarioInputs}
+              hasDefault={hasDefault}
+              onClose={() => setSavePanelOpen(false)}
+              onSaved={(scenario) => {
+                setSavePanelOpen(false);
+                setSelectedScenarioId(scenario.id);
+              }}
+            />
+          )}
         </CardContent>
       </Card>
 
+      <ScenarioBar
+        scenarios={scenarios ?? []}
+        selectedScenarioId={selectedScenarioId}
+        onSelect={selectScenario}
+        onAdd={() => setSavePanelOpen(true)}
+      />
+
       {isPending && <Skeleton className="h-96 w-full" />}
-      {result && <Pillar3ResultSection result={result} years={Number.parseInt(years)} />}
+      {displayedResult && (
+        <div className="space-y-4">
+          {selectedScenario && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">
+                {selectedScenario.isDefault && (
+                  <span aria-hidden="true" className="mr-1 text-amber-500">★</span>
+                )}
+                {selectedScenario.name}
+              </p>
+              <ScenarioActionsMenu
+                scenario={selectedScenario}
+                onDeleted={() => setSelectedScenarioId(null)}
+              />
+            </div>
+          )}
+          <Pillar3ResultSection result={displayedResult} years={displayedYears} />
+        </div>
+      )}
     </div>
   );
 }

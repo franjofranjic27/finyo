@@ -1,9 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CalculatorTab } from './CalculatorTab';
 import { taxApi } from '@/api/tax';
 import type { Pillar3Result } from '@/api/tax';
+import { pillar3Api } from '@/api/pillar3';
+import {
+  pillar3Product,
+  pillar3Result,
+  pillar3Scenario,
+  pillar3ScenarioInputs,
+} from '@/test/fixtures/pillar3';
 import { renderWithProviders } from '@/test/test-utils';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -25,6 +32,16 @@ vi.mock('@/api/tax', () => ({
   },
 }));
 
+vi.mock('@/api/pillar3', () => ({
+  pillar3Api: {
+    getProducts: vi.fn(),
+    getScenarios: vi.fn(),
+    createScenario: vi.fn(),
+    setDefaultScenario: vi.fn(),
+    deleteScenario: vi.fn(),
+  },
+}));
+
 const result: Pillar3Result = {
   annualContribution: 5000,
   maxContribution: 7258,
@@ -43,6 +60,25 @@ const result: Pillar3Result = {
     { year: 2028, balance: 10_762, totalContributed: 10_000, totalReturns: 762 },
   ],
 };
+
+const savedScenario = pillar3Scenario({
+  id: 's1',
+  name: 'My plan',
+  effectiveReturnPercent: 4.2,
+  inputs: pillar3ScenarioInputs({
+    currentBalance: 20_000,
+    annualContribution: 6000,
+    yearsToRetirement: 25,
+  }),
+  calculation: pillar3Result({ projectedBalanceAtRetirement: 111_000 }),
+});
+
+// vi.restoreAllMocks in the global afterEach wipes implementations, so the
+// query defaults have to be re-established before every test.
+beforeEach(() => {
+  vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
+  vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+});
 
 describe('CalculatorTab', () => {
   it('renders the calculator form with default values', () => {
@@ -110,6 +146,85 @@ describe('CalculatorTab', () => {
         cantonCode: 'SG',
         annualContribution: 7258,
         yearsToRetirement: 30,
+      }),
+    );
+  });
+
+  it('locks the return rate to the selected product and releases it on removal', async () => {
+    vi.mocked(pillar3Api.getProducts).mockResolvedValue([
+      pillar3Product({ id: 'p1', name: 'Alpha Fund', netReturnPct: 3.2 }),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Add product' }), 'Alpha');
+    await user.click(await screen.findByRole('button', { name: /Alpha Fund/ }));
+
+    const returnInput = screen.getByDisplayValue('3.2');
+    expect(returnInput).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Remove product' }));
+
+    expect(returnInput).toBeEnabled();
+    expect(returnInput).toHaveValue(3.2);
+  });
+
+  it('loads a saved scenario into the form and shows its stored calculation', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([savedScenario]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(await screen.findByRole('button', { name: /My plan/ }));
+
+    expect(await screen.findByText("CHF 111'000.00")).toBeInTheDocument();
+    expect(screen.getByDisplayValue('20000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('6000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('4.2')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Scenario actions' })).toBeInTheDocument();
+  });
+
+  it('clears the scenario selection when a fresh calculation runs', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([savedScenario]);
+    vi.mocked(taxApi.calculatePillar3).mockResolvedValue(result);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(await screen.findByRole('button', { name: /My plan/ }));
+    await screen.findByText("CHF 111'000.00");
+
+    await user.click(screen.getByRole('button', { name: /Calculate/ }));
+
+    expect(await screen.findByText("CHF 350'000.00")).toBeInTheDocument();
+    expect(screen.queryByText("CHF 111'000.00")).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /My plan/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('saves the current form state as a scenario via the inline panel', async () => {
+    vi.mocked(pillar3Api.createScenario).mockResolvedValue(savedScenario);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(screen.getByRole('button', { name: 'Save scenario' }));
+    await user.type(screen.getByLabelText('Name'), 'My plan');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(pillar3Api.createScenario).toHaveBeenCalledWith('test-token', {
+        currentBalance: 0,
+        annualContribution: 7258,
+        assumedAnnualReturnPercent: 5,
+        yearsToRetirement: 30,
+        grossEmploymentIncome: null,
+        civilStatus: null,
+        cantonCode: null,
+        taxYear: new Date().getFullYear(),
+        productId: null,
+        name: 'My plan',
+        isDefault: false,
       }),
     );
   });

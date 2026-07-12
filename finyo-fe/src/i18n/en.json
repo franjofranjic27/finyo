@@ -319,7 +319,8 @@
     "vsSavingsText": "Same gross contributions in a regular taxable account would yield approximately <strong>{{equivalent}}</strong> — the 3a account yields <emph>+{{advantage}}</emph> more after payout tax.",
     "tabs": {
       "calculator": "Calculator",
-      "compare": "Product Comparison"
+      "compare": "Product Comparison",
+      "scenarios": "Scenarios"
     },
     "compare": {
       "formTitle": "Comparison Parameters",
@@ -345,6 +346,28 @@
       "chartTitle": "Final Capital after {{years}} Years",
       "totalPaidIn": "Total paid in: {{amount}}",
       "footnote": "Model calculation: expected gross return = 1% + equity share × 5%; the TER is deducted annually from the grown balance. Values are projections, not guarantees."
+    },
+    "scenarios": {
+      "title": "Saved Scenarios",
+      "empty": "No scenarios saved yet — save a scenario in the calculator to compare it here.",
+      "save": "Save scenario",
+      "new": "New scenario",
+      "name": "Name",
+      "setAsDefault": "Set as default scenario",
+      "default": "Default",
+      "actions": "Scenario actions",
+      "delete": "Delete scenario",
+      "confirmDelete": "Delete scenario \"{{name}}\"?",
+      "product": "Pension product (optional)",
+      "removeProduct": "Remove product",
+      "manualReturn": "Manual return",
+      "colName": "Name",
+      "colProduct": "Product / Return",
+      "colContribution": "Annual Contribution",
+      "colFinalBalance": "Final Balance",
+      "colTaxSaving": "Annual Tax Saving",
+      "colNetAfterTax": "Net After Payout Tax",
+      "chartTitle": "Balance Growth"
     }
   },
   "insurance": {
