@@ -1,10 +1,13 @@
 {
   "nav": {
     "dashboard": "Dashboard",
+    "wealth": "Wealth",
     "investments": "Investments",
     "tax": "Taxes",
     "pillar3": "Pillar 3a",
+    "budget": "Budget",
     "insurance": "Insurance",
+    "accounts": "Accounts",
     "settings": "Settings",
     "admin": "Admin",
     "adminPillar3Products": "3a Products",
@@ -23,6 +26,14 @@
     "CRYPTO": "Cryptocurrencies",
     "BOND": "Fixed deposits & bonds"
   },
+  "accountType": {
+    "CHECKING": "Checking",
+    "SAVINGS": "Savings",
+    "CREDIT_CARD": "Credit card",
+    "INVESTMENT": "Brokerage",
+    "CASH": "Cash",
+    "OTHER": "Other"
+  },
   "dashboard": {
     "title": "Dashboard",
     "netThisMonth": "Net This Month",
@@ -31,6 +42,57 @@
     "biggestCategory": "Biggest Category",
     "spendingByCategory": "Spending by Category",
     "monthlyOverview": "Monthly Overview"
+  },
+  "wealth": {
+    "loadError": "Could not load wealth overview",
+    "kpi": {
+      "total": "Total wealth",
+      "asOf": "as of {{date}}",
+      "ytd": "Year to date",
+      "ytdEmpty": "no comparison data yet",
+      "monthlyRate": "Monthly savings rate",
+      "monthlyRateHint": "across all buckets",
+      "forecast": "Forecast Dec 31",
+      "forecastHint": "without return assumption"
+    },
+    "buckets": {
+      "title": "Buckets",
+      "subtitle": "Portfolio buckets take their value from the portfolio automatically; manual buckets are maintained by you",
+      "add": "Add bucket",
+      "bucket": "Bucket",
+      "source": "Source",
+      "balance": "Balance",
+      "share": "Share",
+      "monthlyRate": "Monthly deposit",
+      "forecast": "Forecast Dec 31",
+      "total": "Total",
+      "sourcePortfolio": "Portfolio",
+      "sourceManual": "manual",
+      "empty": "No buckets yet — create your first wealth bucket",
+      "confirmDelete": "Remove bucket “{{name}}”?",
+      "deleteLabel": "Remove bucket"
+    },
+    "form": {
+      "createTitle": "Add bucket",
+      "editTitle": "Edit bucket",
+      "name": "Name",
+      "note": "Note (e.g. bank/depot)",
+      "source": "Source",
+      "sourceManual": "Maintained manually",
+      "sourcePortfolio": "From portfolio (asset classes)",
+      "manualBalance": "Balance",
+      "assetClasses": "Asset classes",
+      "assetClassesHint": "Each asset class can be assigned to only one bucket",
+      "monthlyRate": "Monthly deposit",
+      "submitCreate": "Add",
+      "submitEdit": "Save"
+    },
+    "chart": {
+      "title": "History & forecast",
+      "history": "History (daily snapshots)",
+      "forecast": "Forecast (balance + savings rates)",
+      "empty": "Not enough data yet — the history grows with every visit of this overview"
+    }
   },
   "investments": {
     "title": "Portfolio",
@@ -370,6 +432,53 @@
       "chartTitle": "Balance Growth"
     }
   },
+  "budget": {
+    "loadError": "Could not load budget",
+    "fixedCosts": {
+      "title": "Fixed costs & subscriptions",
+      "subtitle": "Yearly payments are spread across the month automatically",
+      "add": "Add fixed cost",
+      "name": "Name",
+      "category": "Category",
+      "interval": "Billing",
+      "intervalMonthly": "monthly",
+      "intervalYearly": "yearly",
+      "perYear": "Cost / year",
+      "perMonth": "Cost / month",
+      "total": "Total",
+      "empty": "No fixed costs yet",
+      "confirmDelete": "Remove “{{name}}”?",
+      "deleteLabel": "Remove fixed cost",
+      "createTitle": "Add fixed cost",
+      "editTitle": "Edit fixed cost",
+      "amount": "Amount",
+      "amountHint": "Amount per billing interval",
+      "submitCreate": "Add",
+      "submitEdit": "Save"
+    },
+    "monthly": {
+      "title": "Monthly budget",
+      "subtitle": "Monthly allocation of your net income",
+      "netIncome": "Net income",
+      "netIncomeHint": "e.g. from your payslip",
+      "savings": "Savings",
+      "savingsHint": "standing order to savings account",
+      "investing": "Investing",
+      "investingHint": "brokerage savings plan",
+      "pillar3a": "Pillar 3a",
+      "pillar3aHint": "monthly pension rate",
+      "taxReserve": "Tax reserve",
+      "taxReserveHint": "set aside for the tax bill",
+      "workCosts": "Work costs",
+      "workCostsHint": "e.g. parking, meals",
+      "fixedCosts": "Fixed costs & subscriptions",
+      "fixedCostsHint": "derived from the table",
+      "available": "Available",
+      "availableHint": "per month · {{pct}} of net income",
+      "edit": "Edit amounts",
+      "editTitle": "Edit monthly budget"
+    }
+  },
   "insurance": {
     "title": "Insurance Overview",
     "mandatory": "Mandatory",
@@ -378,6 +487,56 @@
     "iHaveThis": "I have this",
     "typicalCost": "Typical annual cost",
     "compare": "Compare"
+  },
+  "accounts": {
+    "loadError": "Could not load accounts",
+    "scopePrivate": "Private",
+    "scopeBusiness": "Business",
+    "list": {
+      "title": "Bank accounts",
+      "subtitle": "Copy the IBAN with one click — e.g. for payment orders or forms",
+      "add": "Add account",
+      "account": "Account",
+      "currency": "Currency",
+      "iban": "IBAN",
+      "bic": "SWIFT / BIC",
+      "contractNumber": "Contract no.",
+      "fees": "Fees",
+      "status": "Status",
+      "toClose": "To close",
+      "copyIban": "Copy IBAN",
+      "ibanCopied": "IBAN copied",
+      "empty": "No accounts yet",
+      "confirmDelete": "Remove account “{{name}}”?",
+      "deleteLabel": "Remove account",
+      "createTitle": "Add account",
+      "editTitle": "Edit account",
+      "name": "Account name",
+      "scope": "Scope",
+      "type": "Account type",
+      "submitCreate": "Add",
+      "submitEdit": "Save"
+    },
+    "cards": {
+      "title": "Cards",
+      "subtitle": "Card type and fee only — card numbers are deliberately not stored",
+      "add": "Add card",
+      "card": "Card",
+      "provider": "Provider",
+      "account": "Linked account",
+      "currency": "Currency",
+      "fees": "Fees",
+      "empty": "No cards yet",
+      "confirmDelete": "Remove card “{{name}}”?",
+      "deleteLabel": "Remove card",
+      "createTitle": "Add card",
+      "editTitle": "Edit card",
+      "name": "Name",
+      "scope": "Scope",
+      "submitCreate": "Add",
+      "submitEdit": "Save"
+    },
+    "privacyNote": "IBANs and contract numbers are stored per user; card numbers (PAN), CVV or e-banking credentials are never captured."
   },
   "admin": {
     "products": {

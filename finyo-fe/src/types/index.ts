@@ -1,6 +1,9 @@
 // Account types
 export type AccountType = 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'INVESTMENT' | 'CASH' | 'OTHER';
 
+/** Grouping of accounts and cards (mirrors the backend enum). */
+export type AccountScope = 'PRIVATE' | 'BUSINESS';
+
 export interface Account {
   id: string;
   name: string;
@@ -8,6 +11,13 @@ export interface Account {
   currency: string;
   initialBalance: string;
   color?: string;
+  /** Normalized (no spaces, uppercase) — format for display with formatIban */
+  iban: string | null;
+  bic: string | null;
+  contractNumber: string | null;
+  feeNote: string | null;
+  scope: AccountScope;
+  toClose: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -18,6 +28,32 @@ export interface CreateAccountRequest {
   currency: string;
   initialBalance: string;
   color?: string;
+  iban?: string;
+  bic?: string;
+  contractNumber?: string;
+  feeNote?: string;
+  scope?: AccountScope;
+  toClose?: boolean;
+}
+
+export interface PaymentCard {
+  id: string;
+  name: string;
+  provider: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  currency: string | null;
+  feeNote: string | null;
+  scope: AccountScope;
+}
+
+export interface PaymentCardInput {
+  name: string;
+  provider?: string;
+  accountId?: string;
+  currency?: string;
+  feeNote?: string;
+  scope?: AccountScope;
 }
 
 // Category types

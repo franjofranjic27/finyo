@@ -1,10 +1,13 @@
 {
   "nav": {
     "dashboard": "Dashboard",
+    "wealth": "Vermögen",
     "investments": "Investitionen",
     "tax": "Steuern",
     "pillar3": "Säule 3a",
+    "budget": "Budget",
     "insurance": "Versicherungen",
+    "accounts": "Konten",
     "settings": "Einstellungen",
     "admin": "Admin",
     "adminPillar3Products": "3a-Produkte",
@@ -23,6 +26,14 @@
     "CRYPTO": "Kryptowährungen",
     "BOND": "Festgelder & Obligationen"
   },
+  "accountType": {
+    "CHECKING": "Kontokorrent",
+    "SAVINGS": "Sparkonto",
+    "CREDIT_CARD": "Kreditkarte",
+    "INVESTMENT": "Depot",
+    "CASH": "Bargeld",
+    "OTHER": "Sonstiges"
+  },
   "dashboard": {
     "title": "Dashboard",
     "netThisMonth": "Netto diesen Monat",
@@ -31,6 +42,57 @@
     "biggestCategory": "Grösste Kategorie",
     "spendingByCategory": "Ausgaben nach Kategorie",
     "monthlyOverview": "Monatsübersicht"
+  },
+  "wealth": {
+    "loadError": "Vermögensübersicht konnte nicht geladen werden",
+    "kpi": {
+      "total": "Gesamtvermögen",
+      "asOf": "per {{date}}",
+      "ytd": "Seit Jahresbeginn",
+      "ytdEmpty": "noch keine Vergleichsdaten",
+      "monthlyRate": "Monatliche Sparrate",
+      "monthlyRateHint": "über alle Töpfe",
+      "forecast": "Prognose 31.12.",
+      "forecastHint": "ohne Renditeannahme"
+    },
+    "buckets": {
+      "title": "Töpfe",
+      "subtitle": "Portfolio-Töpfe übernehmen ihren Wert automatisch aus dem Portfolio; manuelle Töpfe führst du selbst nach",
+      "add": "Topf hinzufügen",
+      "bucket": "Topf",
+      "source": "Quelle",
+      "balance": "Saldo",
+      "share": "Anteil",
+      "monthlyRate": "Mtl. Einzahlung",
+      "forecast": "Prognose 31.12.",
+      "total": "Total",
+      "sourcePortfolio": "Portfolio",
+      "sourceManual": "manuell",
+      "empty": "Noch keine Töpfe erfasst — lege deinen ersten Vermögenstopf an",
+      "confirmDelete": "Topf «{{name}}» entfernen?",
+      "deleteLabel": "Topf entfernen"
+    },
+    "form": {
+      "createTitle": "Topf hinzufügen",
+      "editTitle": "Topf bearbeiten",
+      "name": "Name",
+      "note": "Notiz (z. B. Bank/Depot)",
+      "source": "Quelle",
+      "sourceManual": "Manuell gepflegt",
+      "sourcePortfolio": "Aus Portfolio (Anlageklassen)",
+      "manualBalance": "Saldo",
+      "assetClasses": "Anlageklassen",
+      "assetClassesHint": "Jede Anlageklasse kann nur einem Topf zugeordnet werden",
+      "monthlyRate": "Monatliche Einzahlung",
+      "submitCreate": "Hinzufügen",
+      "submitEdit": "Speichern"
+    },
+    "chart": {
+      "title": "Verlauf & Prognose",
+      "history": "Verlauf (Tages-Snapshots)",
+      "forecast": "Prognose (Saldo + Sparraten)",
+      "empty": "Noch nicht genügend Daten — die Historie wächst mit jedem Aufruf der Übersicht"
+    }
   },
   "investments": {
     "title": "Portfolio",
@@ -370,6 +432,53 @@
       "chartTitle": "Guthabenentwicklung"
     }
   },
+  "budget": {
+    "loadError": "Budget konnte nicht geladen werden",
+    "fixedCosts": {
+      "title": "Fixkosten & Abos",
+      "subtitle": "Jährliche Zahlarten werden automatisch auf den Monat umgelegt",
+      "add": "Fixkosten hinzufügen",
+      "name": "Bezeichnung",
+      "category": "Kategorie",
+      "interval": "Zahlart",
+      "intervalMonthly": "monatl.",
+      "intervalYearly": "jährl.",
+      "perYear": "Kosten / Jahr",
+      "perMonth": "Kosten / Monat",
+      "total": "Total",
+      "empty": "Noch keine Fixkosten erfasst",
+      "confirmDelete": "«{{name}}» entfernen?",
+      "deleteLabel": "Fixkosten entfernen",
+      "createTitle": "Fixkosten hinzufügen",
+      "editTitle": "Fixkosten bearbeiten",
+      "amount": "Betrag",
+      "amountHint": "Betrag pro Zahlintervall",
+      "submitCreate": "Hinzufügen",
+      "submitEdit": "Speichern"
+    },
+    "monthly": {
+      "title": "Monatsbudget",
+      "subtitle": "Monatliche Zuteilung des Nettoeinkommens",
+      "netIncome": "Nettoeinkommen",
+      "netIncomeHint": "z. B. aus der Lohnabrechnung",
+      "savings": "Sparen",
+      "savingsHint": "Dauerauftrag Sparkonto",
+      "investing": "Investieren",
+      "investingHint": "Sparplan Depot",
+      "pillar3a": "Säule 3a",
+      "pillar3aHint": "Monatsrate Vorsorge",
+      "taxReserve": "Steuer-Rückstellung",
+      "taxReserveHint": "Rücklage für die Steuerrechnung",
+      "workCosts": "Arbeitskosten",
+      "workCostsHint": "z. B. Parking, Verpflegung",
+      "fixedCosts": "Fixkosten & Abos",
+      "fixedCostsHint": "automatisch aus der Tabelle",
+      "available": "Total zur Verfügung",
+      "availableHint": "pro Monat · {{pct}} des Nettoeinkommens",
+      "edit": "Beträge bearbeiten",
+      "editTitle": "Monatsbudget bearbeiten"
+    }
+  },
   "insurance": {
     "title": "Versicherungsübersicht",
     "mandatory": "Obligatorisch",
@@ -378,6 +487,56 @@
     "iHaveThis": "Ich habe dies",
     "typicalCost": "Typische jährliche Kosten",
     "compare": "Vergleichen"
+  },
+  "accounts": {
+    "loadError": "Konten konnten nicht geladen werden",
+    "scopePrivate": "Privat",
+    "scopeBusiness": "Unternehmen",
+    "list": {
+      "title": "Bankkonten",
+      "subtitle": "IBAN per Klick kopieren — z. B. für Zahlungsaufträge oder Formulare",
+      "add": "Konto hinzufügen",
+      "account": "Konto",
+      "currency": "Währung",
+      "iban": "IBAN",
+      "bic": "SWIFT / BIC",
+      "contractNumber": "Vertrags-Nr.",
+      "fees": "Gebühren",
+      "status": "Status",
+      "toClose": "Auflösen",
+      "copyIban": "IBAN kopieren",
+      "ibanCopied": "IBAN kopiert",
+      "empty": "Noch keine Konten erfasst",
+      "confirmDelete": "Konto «{{name}}» entfernen?",
+      "deleteLabel": "Konto entfernen",
+      "createTitle": "Konto hinzufügen",
+      "editTitle": "Konto bearbeiten",
+      "name": "Kontoname",
+      "scope": "Bereich",
+      "type": "Kontoart",
+      "submitCreate": "Hinzufügen",
+      "submitEdit": "Speichern"
+    },
+    "cards": {
+      "title": "Karten",
+      "subtitle": "Nur Kartentyp und Gebühr — Kartennummern werden bewusst nicht erfasst",
+      "add": "Karte hinzufügen",
+      "card": "Karte",
+      "provider": "Dienstleister",
+      "account": "Zugehöriges Konto",
+      "currency": "Währung",
+      "fees": "Kosten",
+      "empty": "Noch keine Karten erfasst",
+      "confirmDelete": "Karte «{{name}}» entfernen?",
+      "deleteLabel": "Karte entfernen",
+      "createTitle": "Karte hinzufügen",
+      "editTitle": "Karte bearbeiten",
+      "name": "Bezeichnung",
+      "scope": "Bereich",
+      "submitCreate": "Hinzufügen",
+      "submitEdit": "Speichern"
+    },
+    "privacyNote": "IBAN und Vertragsnummern werden pro Nutzer gespeichert; Kartennummern (PAN), CVV oder E-Banking-Zugangsdaten werden nicht erfasst."
   },
   "admin": {
     "products": {

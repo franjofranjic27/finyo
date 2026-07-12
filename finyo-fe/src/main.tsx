@@ -7,6 +7,9 @@ import { RequireAuth } from './auth/RequireAuth';
 import { RequireRole } from './auth/RequireRole';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
+import { WealthPage } from './pages/wealth/WealthPage';
+import { BudgetPage } from './pages/budget/BudgetPage';
+import { AccountsPage } from './pages/accounts/AccountsPage';
 import { PortfolioPage } from './pages/investments/PortfolioPage';
 import { PositionDetailPage } from './pages/investments/PositionDetailPage';
 import { TaxPage } from './pages/tax/TaxPage';
@@ -36,6 +39,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/wealth" element={<WealthPage />} />
+                <Route path="/budget" element={<BudgetPage />} />
+                <Route path="/accounts" element={<AccountsPage />} />
                 <Route path="/investments" element={<PortfolioPage />} />
                 <Route path="/investments/positions/:positionId" element={<PositionDetailPage />} />
                 <Route path="/tax" element={<TaxPage />} />

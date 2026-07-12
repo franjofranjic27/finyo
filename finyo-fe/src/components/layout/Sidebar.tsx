@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
+  Landmark,
+  ReceiptText,
   TrendingUp,
   Calculator,
   PiggyBank,
@@ -13,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Package,
+  Wallet,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -43,10 +46,13 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readon
 
   const navItems: NavItem[] = [
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { to: '/wealth', label: t('nav.wealth'), icon: Wallet },
     { to: '/investments', label: t('nav.investments'), icon: TrendingUp },
     { to: '/tax', label: t('nav.tax'), icon: Calculator },
     { to: '/pillar3', label: t('nav.pillar3'), icon: PiggyBank },
+    { to: '/budget', label: t('nav.budget'), icon: ReceiptText },
     { to: '/insurance', label: t('nav.insurance'), icon: Shield },
+    { to: '/accounts', label: t('nav.accounts'), icon: Landmark },
   ];
 
   const adminItems: NavItem[] = [

@@ -11,5 +11,11 @@ public record AccountRequest(
         @NotNull AccountType type,
         @NotBlank @Size(max = 3) String currency,
         BigDecimal initialBalance,
-        @Size(max = 7) String color
+        @Size(max = 7) String color,
+        @Size(max = 34) String iban,
+        @Size(max = 11) String bic,
+        @Size(max = 50) String contractNumber,
+        @Size(max = 100) String feeNote,
+        AccountScope scope,
+        Boolean toClose
 ) {}

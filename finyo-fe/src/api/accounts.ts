@@ -1,4 +1,4 @@
-import type { Account, CreateAccountRequest } from '@/types';
+import type { Account, CreateAccountRequest, PaymentCard, PaymentCardInput } from '@/types';
 import { apiRequest } from './client';
 
 export const accountsApi = {
@@ -14,4 +14,20 @@ export const accountsApi = {
 
   delete: (token: string, id: string) =>
     apiRequest<void>(`/accounts/${id}`, { method: 'DELETE' }, token),
+
+  getCards: (token: string) => apiRequest<PaymentCard[]>('/cards', {}, token),
+
+  createCard: (token: string, data: PaymentCardInput) =>
+    apiRequest<PaymentCard>('/cards', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  updateCard: (token: string, id: string, data: PaymentCardInput) =>
+    apiRequest<PaymentCard>(`/cards/${id}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  deleteCard: (token: string, id: string) =>
+    apiRequest<void>(`/cards/${id}`, { method: 'DELETE' }, token),
 };
+
+/** Formats a normalized IBAN in groups of four for display. */
+export function formatIban(iban: string): string {
+  return iban.replace(/(.{4})/g, '$1 ').trim();
+}

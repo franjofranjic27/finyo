@@ -14,7 +14,7 @@ import java.util.UUID;
 @Table(name = "account")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class Account {
@@ -41,6 +41,28 @@ public class Account {
 
     @Column(length = 7)
     private String color;
+
+    /** Stored normalized: no spaces, uppercase (see IbanValidator). */
+    @Column(length = 34)
+    private String iban;
+
+    @Column(length = 11)
+    private String bic;
+
+    @Column(name = "contract_number", length = 50)
+    private String contractNumber;
+
+    @Column(name = "fee_note", length = 100)
+    private String feeNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private AccountScope scope = AccountScope.PRIVATE;
+
+    @Column(name = "to_close", nullable = false)
+    @Builder.Default
+    private boolean toClose = false;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
