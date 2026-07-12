@@ -42,6 +42,21 @@ public class FixedCostController {
         return ResponseEntity.status(HttpStatus.CREATED).body(fixedCostService.create(request, userId));
     }
 
+    @PostMapping("/bulk")
+    @Operation(summary = "Bulk import fixed costs (upsert by normalized name)",
+            description = "Each item is matched against the user's existing fixed costs by "
+                    + "normalized name (trimmed, lowercased). A match updates that row — keeping "
+                    + "the request's casing for the name — otherwise a new row is created. Items "
+                    + "in the same payload that normalize to the same name resolve last-wins. "
+                    + "A failing row is reported in the result without aborting the batch.")
+    @ApiResponse(responseCode = "200", description = "Import processed; result contains per-row counts and errors")
+    @ApiResponse(responseCode = "400", description = "Payload is empty, exceeds 500 items or contains invalid items")
+    public ResponseEntity<FixedCostBulkResult> bulkImport(@Valid @RequestBody FixedCostBulkRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("POST /api/v1/fixed-costs/bulk user={} rows={}", userId, request.items().size());
+        return ResponseEntity.ok(fixedCostService.bulkUpsert(request, userId));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update a fixed cost")
     @ApiResponse(responseCode = "200", description = "Fixed cost updated")

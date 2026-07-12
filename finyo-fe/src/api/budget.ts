@@ -27,6 +27,14 @@ export interface FixedCostInput {
   amount: number;
 }
 
+/** Result of the bulk import — rows are matched by normalized name (upsert). */
+export interface FixedCostBulkResult {
+  created: number;
+  updated: number;
+  failed: number;
+  errors: string[];
+}
+
 export interface MonthlyBudget {
   netIncome: number;
   savings: number;
@@ -59,6 +67,13 @@ export const budgetApi = {
     apiRequest<FixedCost>(
       `/fixed-costs/${id}`,
       { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  importFixedCosts: (token: string, items: FixedCostInput[]) =>
+    apiRequest<FixedCostBulkResult>(
+      '/fixed-costs/bulk',
+      { method: 'POST', body: JSON.stringify({ items }) },
       token,
     ),
 
