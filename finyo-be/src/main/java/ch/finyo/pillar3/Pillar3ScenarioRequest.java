@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -23,8 +24,8 @@ public record Pillar3ScenarioRequest(
         // Optional — required for the tax-saving part of the calculation
         @DecimalMin("0") @Digits(integer = 15, fraction = 4) BigDecimal grossEmploymentIncome,
         TaxCivilStatus civilStatus,
-        @Size(max = 2) String cantonCode,
-        Integer taxYear,
+        @Pattern(regexp = "[A-Z]{2}") String cantonCode,
+        @Min(2020) @Max(2100) Integer taxYear,
         UUID productId
 ) {
     public Pillar3ScenarioRequest {
