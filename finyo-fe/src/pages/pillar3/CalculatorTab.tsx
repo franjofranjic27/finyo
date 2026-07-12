@@ -137,9 +137,10 @@ function Pillar3ResultSection({ result, years }: Readonly<{ result: Pillar3Resul
   const chartData = result.yearlyProjection
     .filter((_, i) => i < 5 || (i + 1) % 5 === 0 || i === result.yearlyProjection.length - 1)
     .map((p) => ({
-      year: `Y${p.year}`,
-      Contributions: Math.round(p.contribution * p.year),
-      Returns: Math.round(p.balance - p.contribution * p.year),
+      year: String(p.year),
+      // Start balance + paid-in contributions, so both areas stack up to the exact balance.
+      Contributions: Math.round(p.balance - p.totalReturns),
+      Returns: Math.round(p.totalReturns),
     }));
 
   return (

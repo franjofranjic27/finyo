@@ -39,8 +39,8 @@ const result: Pillar3Result = {
   netValueAfterPayoutTax: 332_000,
   equivalentTaxableSavings: 300_000,
   yearlyProjection: [
-    { year: 1, balance: 5250, contribution: 5000, returns: 250, taxSaving: 1200 },
-    { year: 2, balance: 10_762, contribution: 5000, returns: 512, taxSaving: 1200 },
+    { year: 2027, balance: 5250, totalContributed: 5000, totalReturns: 250 },
+    { year: 2028, balance: 10_762, totalContributed: 10_000, totalReturns: 762 },
   ],
 };
 
@@ -65,6 +65,7 @@ describe('CalculatorTab', () => {
     expect(screen.getByText("CHF 1'200.00")).toBeInTheDocument();
     expect(screen.getByText("CHF 18'000.00")).toBeInTheDocument();
     expect(screen.getByText("CHF 332'000.00")).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
   });
 
   it('shows the contribution-cap hint when below the maximum', async () => {
