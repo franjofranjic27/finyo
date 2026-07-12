@@ -112,7 +112,7 @@ public class Pillar3ScenarioService {
                 scenario.getName(),
                 scenario.isDefault(),
                 Pillar3ScenarioInputs.from(scenario),
-                product.map(this::toProductResponse).orElse(null),
+                product.map(Pillar3ProductResponse::from).orElse(null),
                 effectiveReturnPercent,
                 recompute(scenario, effectiveReturnPercent),
                 scenario.getCreatedAt()
@@ -131,21 +131,5 @@ public class Pillar3ScenarioService {
                 // 0 means "current year" in Pillar3CalculationService
                 scenario.getTaxYear() != null ? scenario.getTaxYear() : 0
         ));
-    }
-
-    private Pillar3ProductResponse toProductResponse(Pillar3Product product) {
-        return new Pillar3ProductResponse(
-                product.getId(),
-                product.getProvider(),
-                product.getName(),
-                product.getIsin(),
-                product.getValor(),
-                product.getEquityPct(),
-                product.getTerPct(),
-                product.isActive(),
-                product.getSortOrder(),
-                Pillar3ReturnModel.grossReturnPct(product.getEquityPct()),
-                Pillar3ReturnModel.netReturnPct(product.getEquityPct(), product.getTerPct())
-        );
     }
 }

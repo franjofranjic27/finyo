@@ -89,17 +89,8 @@ export function CalculatorTab() {
   };
 
   const { mutate, data: result, isPending } = useMutation({
-    mutationFn: () =>
-      taxApi.calculatePillar3(token, {
-        currentBalance: Number.parseFloat(balance) || 0,
-        annualContribution: Number.parseFloat(contribution) || 0,
-        assumedAnnualReturnPercent: Number.parseFloat(returnPct) || 5,
-        yearsToRetirement: Number.parseInt(years) || 30,
-        grossEmploymentIncome: income ? Number.parseFloat(income) : null,
-        civilStatus: income ? civilStatus : null,
-        cantonCode: income ? canton : null,
-        taxYear: currentYear,
-      }),
+    // The extra `productId` in the scenario shape is ignored by the calculate endpoint.
+    mutationFn: () => taxApi.calculatePillar3(token, scenarioInputs),
     // A fresh calculation always replaces an active scenario chip.
     onSuccess: () => setSelectedScenarioId(null),
   });

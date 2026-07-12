@@ -19,4 +19,20 @@ public record Pillar3ProductResponse(
         int sortOrder,
         BigDecimal expectedReturnPct,
         BigDecimal netReturnPct
-) {}
+) {
+    public static Pillar3ProductResponse from(Pillar3Product product) {
+        return new Pillar3ProductResponse(
+                product.getId(),
+                product.getProvider(),
+                product.getName(),
+                product.getIsin(),
+                product.getValor(),
+                product.getEquityPct(),
+                product.getTerPct(),
+                product.isActive(),
+                product.getSortOrder(),
+                Pillar3ReturnModel.grossReturnPct(product.getEquityPct()),
+                Pillar3ReturnModel.netReturnPct(product.getEquityPct(), product.getTerPct())
+        );
+    }
+}

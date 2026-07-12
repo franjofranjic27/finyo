@@ -49,13 +49,14 @@ export function ScenariosTab() {
     enabled: !!token,
   });
 
-  const chartData = useMemo(() => mergeProjections(scenarios ?? []), [scenarios]);
+  const items = useMemo(() => scenarios ?? [], [scenarios]);
+  const chartData = useMemo(() => mergeProjections(items), [items]);
 
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
   }
 
-  if ((scenarios ?? []).length === 0) {
+  if (items.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
@@ -88,7 +89,7 @@ export function ScenariosTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(scenarios ?? []).map((scenario, index) => (
+              {items.map((scenario, index) => (
                 <TableRow key={scenario.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -170,7 +171,7 @@ export function ScenariosTab() {
                 contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
               />
               <Legend formatter={renderLegendText} />
-              {(scenarios ?? []).map((scenario, index) => (
+              {items.map((scenario, index) => (
                 <Line
                   key={scenario.id}
                   type="monotone"
