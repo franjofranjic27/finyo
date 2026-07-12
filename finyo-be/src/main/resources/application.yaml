@@ -26,6 +26,12 @@ spring:
     caffeine:
       spec: maximumSize=500,expireAfterWrite=900s
 
+# Behind the TLS-terminating reverse proxy Spring must honor X-Forwarded-*,
+# otherwise same-origin browser POSTs (Origin: https://…) look cross-origin
+# to the CORS filter and are rejected with 403 "Invalid CORS request".
+server:
+  forward-headers-strategy: framework
+
 # /actuator is not routed by the reverse proxy — health and prometheus stay
 # reachable only inside the Docker network
 management:
@@ -49,3 +55,6 @@ finyo:
   six:
     base-url: ${SIX_API_BASE_URL:https://api.six-group.com/api/findata/v1}
     api-key: ${SIX_API_KEY:}
+  cors:
+    # Comma-separated; deployments append their public origin via env
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173}
