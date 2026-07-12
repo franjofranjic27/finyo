@@ -16,7 +16,10 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error((error as { detail?: string }).detail ?? `Request failed: ${response.status}`);
+    const detail = (error as { detail?: string }).detail;
+    // detail can be '' — over HTTP/2 statusText is empty and 401/403 bodies are blank,
+    // which used to surface as an invisible, empty error message in the UI.
+    throw new Error(detail?.trim() ? detail : `Request failed: ${response.status}`);
   }
 
   if (response.status === 204) return undefined as T;

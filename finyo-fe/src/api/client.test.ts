@@ -104,4 +104,10 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/boom')).rejects.toThrow('Request failed: 502');
   });
+
+  it('falls back to a generic message when the body is blank and statusText is empty (HTTP/2)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(failingJsonResponse(403, '')));
+
+    await expect(apiRequest('/forbidden')).rejects.toThrow('Request failed: 403');
+  });
 });
