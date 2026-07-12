@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Pillar3Page } from './Pillar3Page';
@@ -25,23 +25,32 @@ vi.mock('@/api/tax', () => ({
 vi.mock('@/api/pillar3', () => ({
   pillar3Api: {
     getProducts: vi.fn(),
+    getScenarios: vi.fn(),
     compare: vi.fn(),
+    createScenario: vi.fn(),
+    setDefaultScenario: vi.fn(),
+    deleteScenario: vi.fn(),
   },
 }));
 
+beforeEach(() => {
+  vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
+  vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+});
+
 describe('Pillar3Page', () => {
-  it('renders both tabs with the calculator as the default', () => {
+  it('renders all three tabs with the calculator as the default', () => {
     renderWithProviders(<Pillar3Page />);
 
     expect(screen.getByRole('tab', { name: 'Calculator' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Product Comparison' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Scenarios' })).toBeInTheDocument();
     // Calculator content is visible by default, the compare form is not.
     expect(screen.getAllByText('Pillar 3a Calculator').length).toBeGreaterThan(0);
     expect(screen.queryByText('Comparison Parameters')).not.toBeInTheDocument();
   });
 
   it('switches to the product comparison tab', async () => {
-    vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
     const user = userEvent.setup();
     renderWithProviders(<Pillar3Page />);
 
@@ -49,5 +58,14 @@ describe('Pillar3Page', () => {
 
     expect(await screen.findByText('Comparison Parameters')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Calculate/ })).not.toBeInTheDocument();
+  });
+
+  it('switches to the scenarios tab', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Pillar3Page />);
+
+    await user.click(screen.getByRole('tab', { name: 'Scenarios' }));
+
+    expect(await screen.findByText(/No scenarios saved yet/)).toBeInTheDocument();
   });
 });

@@ -159,9 +159,8 @@ export interface Pillar3Request {
 export interface Pillar3YearlyProjection {
   year: number;
   balance: number;
-  contribution: number;
-  returns: number;
-  taxSaving: number;
+  totalContributed: number;
+  totalReturns: number;
 }
 
 export interface Pillar3Result {

@@ -187,18 +187,6 @@ public class Pillar3ProductService {
     }
 
     private Pillar3ProductResponse toResponse(Pillar3Product product) {
-        return new Pillar3ProductResponse(
-                product.getId(),
-                product.getProvider(),
-                product.getName(),
-                product.getIsin(),
-                product.getValor(),
-                product.getEquityPct(),
-                product.getTerPct(),
-                product.isActive(),
-                product.getSortOrder(),
-                Pillar3ReturnModel.grossReturnPct(product.getEquityPct()),
-                Pillar3ReturnModel.netReturnPct(product.getEquityPct(), product.getTerPct())
-        );
+        return Pillar3ProductResponse.from(product);
     }
 }

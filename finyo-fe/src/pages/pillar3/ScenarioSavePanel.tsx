@@ -1,22 +1,20 @@
 import { useTranslation } from 'react-i18next';
 import { ScenarioSaveForm } from '@/components/scenarios/ScenarioSaveForm';
 import { useAuth } from '@/auth/useAuth';
-import { taxApi } from '@/api/tax';
-import type { TaxScenario, TaxYearInputs } from '@/api/tax';
+import { pillar3Api } from '@/api/pillar3';
+import type { Pillar3Scenario, Pillar3ScenarioInputs } from '@/api/pillar3';
 
 interface ScenarioSavePanelProps {
-  year: number;
-  /** The year's current inputs — saved as the scenario snapshot. */
-  inputs: TaxYearInputs;
-  /** Whether a default scenario already exists for the year. */
+  /** The calculator's current inputs — saved as the scenario snapshot. */
+  inputs: Pillar3ScenarioInputs;
+  /** Whether a default scenario already exists. */
   hasDefault: boolean;
   onClose: () => void;
-  onSaved: (scenario: TaxScenario) => void;
+  onSaved?: (scenario: Pillar3Scenario) => void;
 }
 
-/** Save panel for a tax year's scenarios; the shared form drives the inputs. */
+/** Save panel for 3a scenarios; the shared form drives name and default flag. */
 export function ScenarioSavePanel({
-  year,
   inputs,
   hasDefault,
   onClose,
@@ -29,23 +27,23 @@ export function ScenarioSavePanel({
   // When a default already exists, create as non-default first and then
   // switch: the backend swaps atomically, avoiding a 409 on create.
   const saveScenario = async (name: string, makeDefault: boolean) => {
-    const created = await taxApi.createScenario(token, year, {
+    const created = await pillar3Api.createScenario(token, {
       ...inputs,
       name,
       isDefault: makeDefault && !hasDefault,
     });
     return makeDefault && hasDefault
-      ? taxApi.setDefaultScenario(token, year, created.id)
+      ? pillar3Api.setDefaultScenario(token, created.id)
       : created;
   };
 
   return (
     <ScenarioSaveForm
-      title={t('tax.saveScenario')}
-      nameLabel={t('tax.scenarioName')}
-      nameInputId="scenario-name"
-      defaultCheckboxLabel={t('tax.setAsDefaultFor', { year })}
-      queryKey={['tax', 'scenarios', String(year)]}
+      title={t('pillar3.scenarios.save')}
+      nameLabel={t('pillar3.scenarios.name')}
+      nameInputId="pillar3-scenario-name"
+      defaultCheckboxLabel={t('pillar3.scenarios.setAsDefault')}
+      queryKey={['pillar3-scenarios']}
       saveScenario={saveScenario}
       onClose={onClose}
       onSaved={onSaved}

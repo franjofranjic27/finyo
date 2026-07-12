@@ -319,7 +319,8 @@
     "vsSavingsText": "Dieselben Bruttoeinzahlungen auf ein reguläres steuerpflichtiges Konto ergäben ungefähr <strong>{{equivalent}}</strong> — das 3a-Konto liefert nach der Bezugssteuer <emph>+{{advantage}}</emph> mehr.",
     "tabs": {
       "calculator": "Rechner",
-      "compare": "Produktvergleich"
+      "compare": "Produktvergleich",
+      "scenarios": "Szenarien"
     },
     "compare": {
       "formTitle": "Vergleichsparameter",
@@ -345,6 +346,28 @@
       "chartTitle": "Endkapital nach {{years}} Jahren",
       "totalPaidIn": "Total einbezahlt: {{amount}}",
       "footnote": "Modellrechnung: erwartete Bruttorendite = 1 % + Aktienquote × 5 %; die TER wird jährlich vom gewachsenen Guthaben abgezogen. Die Werte sind Projektionen, keine Garantien."
+    },
+    "scenarios": {
+      "title": "Gespeicherte Szenarien",
+      "empty": "Noch keine Szenarien gespeichert – speichere im Rechner ein Szenario, um es hier zu vergleichen.",
+      "save": "Szenario speichern",
+      "new": "Neues Szenario",
+      "name": "Name",
+      "setAsDefault": "Als Standard-Szenario setzen",
+      "default": "Standard",
+      "actions": "Szenario-Aktionen",
+      "delete": "Szenario löschen",
+      "confirmDelete": "Szenario «{{name}}» löschen?",
+      "product": "Vorsorgeprodukt (optional)",
+      "removeProduct": "Produkt entfernen",
+      "manualReturn": "Manuelle Rendite",
+      "colName": "Name",
+      "colProduct": "Produkt / Rendite",
+      "colContribution": "Jährlicher Beitrag",
+      "colFinalBalance": "Endguthaben",
+      "colTaxSaving": "Jährl. Steuerersparnis",
+      "colNetAfterTax": "Netto nach Bezugssteuer",
+      "chartTitle": "Guthabenentwicklung"
     }
   },
   "insurance": {

@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import type { Pillar3Result, TaxCivilStatus } from './tax';
 
 export interface Pillar3Product {
   id: string;
@@ -64,6 +65,34 @@ export interface Pillar3ImportResult {
   errors: string[];
 }
 
+export interface Pillar3ScenarioInputs {
+  currentBalance: number;
+  annualContribution: number;
+  assumedAnnualReturnPercent: number;
+  yearsToRetirement: number;
+  grossEmploymentIncome: number | null;
+  civilStatus: TaxCivilStatus | null;
+  cantonCode: string | null;
+  taxYear: number | null;
+  productId: string | null;
+}
+
+/** Flat request payload (backend convention: flat request, nested response). */
+export type Pillar3ScenarioRequest = Pillar3ScenarioInputs & { name: string; isDefault?: boolean };
+
+export interface Pillar3Scenario {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  inputs: Pillar3ScenarioInputs;
+  /** Null when the return was entered manually or the product was deleted. */
+  product: Pillar3Product | null;
+  /** The return rate actually used for the calculation. */
+  effectiveReturnPercent: number;
+  calculation: Pillar3Result;
+  createdAt: string;
+}
+
 export const pillar3Api = {
   getProducts: (token: string, search?: string) =>
     apiRequest<Pillar3Product[]>(
@@ -78,6 +107,26 @@ export const pillar3Api = {
       { method: 'POST', body: JSON.stringify(data) },
       token,
     ),
+
+  getScenarios: (token: string) =>
+    apiRequest<Pillar3Scenario[]>('/pillar3/scenarios', {}, token),
+
+  createScenario: (token: string, scenario: Pillar3ScenarioRequest) =>
+    apiRequest<Pillar3Scenario>(
+      '/pillar3/scenarios',
+      { method: 'POST', body: JSON.stringify(scenario) },
+      token,
+    ),
+
+  setDefaultScenario: (token: string, scenarioId: string) =>
+    apiRequest<Pillar3Scenario>(
+      `/pillar3/scenarios/${scenarioId}/default`,
+      { method: 'PATCH' },
+      token,
+    ),
+
+  deleteScenario: (token: string, scenarioId: string) =>
+    apiRequest<void>(`/pillar3/scenarios/${scenarioId}`, { method: 'DELETE' }, token),
 
   adminList: (token: string) =>
     apiRequest<Pillar3Product[]>('/admin/pillar3/products', {}, token),
