@@ -73,6 +73,9 @@ services:
       # keys are fetched via the internal network, hence the separate JWK URI
       KEYCLOAK_ISSUER_URI: https://${FINYO_DOMAIN}/auth/realms/finyo
       KEYCLOAK_JWK_URI: http://keycloak:8080/auth/realms/finyo/protocol/openid-connect/certs
+      # browsers send an Origin header on POST even same-origin — the public
+      # origin must be allowed or the CORS filter rejects every mutation
+      CORS_ALLOWED_ORIGINS: https://${FINYO_DOMAIN}
       SIX_API_KEY: ${SIX_API_KEY:-}
     networks:
       - default
