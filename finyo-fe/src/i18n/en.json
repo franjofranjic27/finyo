@@ -434,6 +434,52 @@
   },
   "budget": {
     "loadError": "Could not load budget",
+    "tabs": {
+      "plan": "Monthly budget",
+      "salary": "Salary calculator"
+    },
+    "salary": {
+      "loadError": "Could not load the salary calculator",
+      "inputs": {
+        "title": "Inputs",
+        "grossMonthly": "Gross salary per month",
+        "grossYearly": "= {{amount}} per year",
+        "thirteenth": "13th month salary",
+        "ratesTitle": "Deduction rates (adjustable)",
+        "pension": "Pension fund (fixed)",
+        "other": "Other deductions (fixed)",
+        "submit": "Calculate & save"
+      },
+      "result": {
+        "title": "Result",
+        "subtitle": "Rounded to 5 centimes, as on the payslip",
+        "position": "Position",
+        "rate": "Rate",
+        "perMonth": "Per month",
+        "perYear": "Per year",
+        "gross": "Gross salary",
+        "totalDeductions": "Total deductions",
+        "net": "Net salary",
+        "fixed": "fixed",
+        "legendNet": "Net",
+        "legendSocial": "Social insurance",
+        "legendFixed": "Pension & fixed",
+        "apply": "Apply net as monthly budget income",
+        "applied": "Applied"
+      },
+      "deduction": {
+        "AHV": "AHV / IV / EO",
+        "ALV": "ALV",
+        "NBU": "NBU",
+        "KTG": "KTG",
+        "PENSION": "Pension fund",
+        "OTHER": "Other deductions"
+      },
+      "deductionHint": {
+        "NBU": "Non-occupational accident",
+        "KTG": "Daily sickness allowance"
+      }
+    },
     "fixedCosts": {
       "title": "Fixed costs & subscriptions",
       "subtitle": "Yearly payments are spread across the month automatically",

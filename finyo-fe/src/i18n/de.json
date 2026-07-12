@@ -434,6 +434,52 @@
   },
   "budget": {
     "loadError": "Budget konnte nicht geladen werden",
+    "tabs": {
+      "plan": "Monatsbudget",
+      "salary": "Lohnrechner"
+    },
+    "salary": {
+      "loadError": "Lohnrechner konnte nicht geladen werden",
+      "inputs": {
+        "title": "Eingaben",
+        "grossMonthly": "Bruttolohn pro Monat",
+        "grossYearly": "= {{amount}} pro Jahr",
+        "thirteenth": "13. Monatslohn",
+        "ratesTitle": "Abzugssätze (anpassbar)",
+        "pension": "Pensionskasse (fix)",
+        "other": "Weitere Abzüge (fix)",
+        "submit": "Berechnen & speichern"
+      },
+      "result": {
+        "title": "Ergebnis",
+        "subtitle": "Rundung auf 5 Rappen, wie in der Lohnabrechnung",
+        "position": "Position",
+        "rate": "Satz",
+        "perMonth": "Pro Monat",
+        "perYear": "Pro Jahr",
+        "gross": "Bruttolohn",
+        "totalDeductions": "Total Abzüge",
+        "net": "Nettolohn",
+        "fixed": "fix",
+        "legendNet": "Netto",
+        "legendSocial": "Sozialversicherungen",
+        "legendFixed": "PK & Fixabzüge",
+        "apply": "Netto ins Monatsbudget übernehmen",
+        "applied": "Übernommen"
+      },
+      "deduction": {
+        "AHV": "AHV / IV / EO",
+        "ALV": "ALV",
+        "NBU": "NBU",
+        "KTG": "KTG",
+        "PENSION": "Pensionskasse",
+        "OTHER": "Weitere Abzüge"
+      },
+      "deductionHint": {
+        "NBU": "Nichtberufsunfall",
+        "KTG": "Krankentaggeld"
+      }
+    },
     "fixedCosts": {
       "title": "Fixkosten & Abos",
       "subtitle": "Jährliche Zahlarten werden automatisch auf den Monat umgelegt",

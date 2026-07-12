@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/auth/useAuth';
 import { budgetApi } from '@/api/budget';
 import { FixedCostsCard } from './FixedCostsCard';
 import { MonthlyBudgetCard } from './MonthlyBudgetCard';
+import { SalaryTab } from './SalaryTab';
 
 function BudgetSkeleton() {
   return (
@@ -36,18 +38,29 @@ export function BudgetPage() {
   const isError = fixedCosts.isError || monthlyBudget.isError;
 
   return (
-    <div className="space-y-6">
-      {isLoading && <BudgetSkeleton />}
-      {isError && <p className="text-sm text-destructive">{t('budget.loadError')}</p>}
+    <Tabs defaultValue="plan">
+      <TabsList>
+        <TabsTrigger value="plan">{t('budget.tabs.plan')}</TabsTrigger>
+        <TabsTrigger value="salary">{t('budget.tabs.salary')}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="plan" className="mt-4">
+        <div className="space-y-6">
+          {isLoading && <BudgetSkeleton />}
+          {isError && <p className="text-sm text-destructive">{t('budget.loadError')}</p>}
 
-      {fixedCosts.data && monthlyBudget.data && (
-        <div className="grid items-start gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <FixedCostsCard list={fixedCosts.data} />
-          </div>
-          <MonthlyBudgetCard budget={monthlyBudget.data} />
+          {fixedCosts.data && monthlyBudget.data && (
+            <div className="grid items-start gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <FixedCostsCard list={fixedCosts.data} />
+              </div>
+              <MonthlyBudgetCard budget={monthlyBudget.data} />
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </TabsContent>
+      <TabsContent value="salary" className="mt-4">
+        <SalaryTab />
+      </TabsContent>
+    </Tabs>
   );
 }
