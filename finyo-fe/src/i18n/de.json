@@ -86,6 +86,7 @@
       "total": "Total",
       "sourcePortfolio": "Portfolio",
       "sourceManual": "manuell",
+      "sourcePillar3": "Säule 3a",
       "empty": "Noch keine Töpfe erfasst — lege deinen ersten Vermögenstopf an",
       "confirmDelete": "Topf «{{name}}» entfernen?",
       "deleteLabel": "Topf entfernen"
@@ -98,9 +99,11 @@
       "source": "Quelle",
       "sourceManual": "Manuell gepflegt",
       "sourcePortfolio": "Aus Portfolio (Anlageklassen)",
+      "sourcePillar3": "Säule 3a (Standard-Szenario)",
       "manualBalance": "Saldo",
       "assetClasses": "Anlageklassen",
       "assetClassesHint": "Jede Anlageklasse kann nur einem Topf zugeordnet werden",
+      "pillar3Hint": "Saldo wird live aus deinem Standard-Szenario der Säule 3a übernommen",
       "monthlyRate": "Monatliche Einzahlung",
       "submitCreate": "Hinzufügen",
       "submitEdit": "Speichern"
@@ -146,6 +149,7 @@
       "gainLoss": "G/V",
       "returnPct": "Rendite",
       "allocation": "Anteil",
+      "edit": "Position bearbeiten",
       "remove": "Position entfernen",
       "confirmRemove": "Position «{{name}}» entfernen?",
       "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
@@ -197,6 +201,18 @@
         "factsheetUrl": "Factsheet-Link (URL)",
         "nameRequired": "Titel ist erforderlich",
         "terInvalid": "TER muss eine Zahl zwischen 0 und 10 sein"
+      },
+      "editPositionDialog": {
+        "title": "Position bearbeiten",
+        "quantity": "Anzahl",
+        "purchasePrice": "Ø Kaufkurs",
+        "purchaseDate": "Kaufdatum",
+        "currentPrice": "Aktueller Kurs (optional)",
+        "currentPriceHint": "Überschreibt den Marktkurs — ein Live-Kursabruf kann ihn wieder ersetzen",
+        "save": "Speichern",
+        "quantityInvalid": "Anzahl muss grösser als 0 sein",
+        "purchasePriceInvalid": "Kaufkurs muss 0 oder grösser sein",
+        "currentPriceInvalid": "Aktueller Kurs muss 0 oder grösser sein"
       },
       "factsheet": {
         "title": "Factsheet",
@@ -304,6 +320,11 @@
     "deleteScenario": "Szenario löschen",
     "confirmDeleteScenario": "Szenario «{{name}}» löschen?",
     "scenarioNoCalculation": "Für dieses Szenario liegt noch keine Berechnung vor – die gespeicherten Eingaben sind unvollständig.",
+    "prefill": {
+      "fromScenario": "Aus Szenario ‹{{name}}› übernommen",
+      "fromSalary": "Aus deinem Bruttolohn übernommen",
+      "pickScenario": "3a-Szenario übernehmen …"
+    },
     "status": {
       "planned": "Geplant",
       "current": "Aktuell",
@@ -393,6 +414,7 @@
     "payoutTax": "Geschätzte Bezugssteuer",
     "netValue": "Nettowert nach Bezugssteuer",
     "grossIncomeForSaving": "Bruttoeinkommen (CHF, für Steuerersparnis)",
+    "prefilledFromProfile": "Aus deinem Profil übernommen",
     "balanceGrowth": "Guthabenentwicklung über {{years}} Jahre",
     "contributionCap": "Du könntest <strong>{{remaining}}</strong> zusätzlich einzahlen, um das Maximum von <strong>{{max}}</strong> zu erreichen und weitere <strong>{{saving}}</strong> Steuern zu sparen.",
     "vsSavingsTitle": "Im Vergleich zu einem steuerpflichtigen Sparkonto",
@@ -461,8 +483,14 @@
       "loadError": "Lohnrechner konnte nicht geladen werden",
       "inputs": {
         "title": "Eingaben",
+        "mode": "Eingabe",
+        "modeMonthly": "CHF pro Monat",
+        "modeYearly": "CHF pro Jahr",
         "grossMonthly": "Bruttolohn pro Monat",
+        "grossYearlyLabel": "Bruttolohn pro Jahr",
         "grossYearly": "= {{amount}} pro Jahr",
+        "monthlyDerived": "≈ {{amount}} pro Monat",
+        "yearlyIncludesThirteenth": "Der Jahresbetrag versteht sich inklusive 13. Monatslohn.",
         "thirteenth": "13. Monatslohn",
         "ratesTitle": "Abzugssätze (anpassbar)",
         "pension": "Pensionskasse (fix)",
@@ -712,6 +740,85 @@
       }
     }
   },
+  "profile": {
+    "birthDate": "Geburtsdatum",
+    "derivedInfo": "Alter: {{age}} · Jahre bis Pensionierung (65): {{years}}",
+    "retirementYear": "Pensionierung im Jahr {{year}}",
+    "theme": {
+      "label": "Erscheinungsbild",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "saved": "Gespeichert",
+    "loadError": "Profil konnte nicht geladen werden"
+  },
+  "onboarding": {
+    "title": "Willkommen bei finyo",
+    "subtitle": "Richte dein Profil in drei kurzen Schritten ein",
+    "stepIndicator": "Schritt {{current}} von {{total}}",
+    "steps": {
+      "basics": "Persönliches",
+      "income": "Einkommen",
+      "preferences": "Darstellung"
+    },
+    "back": "Zurück",
+    "next": "Weiter",
+    "skip": "Überspringen",
+    "finish": "Abschliessen",
+    "basics": {
+      "hint": "Diese Angaben fliessen in Steuer- und Vorsorgeberechnungen ein."
+    },
+    "income": {
+      "hint": "Optional — du kannst den Lohn später im Budget anpassen."
+    },
+    "preferences": {
+      "hint": "Sprache und Erscheinungsbild kannst du jederzeit in den Einstellungen ändern."
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "tabs": {
+      "profile": "Profil",
+      "preferences": "Darstellung",
+      "accounts": "Konten",
+      "categories": "Kategorien"
+    },
+    "accounts": {
+      "add": "Konto hinzufügen",
+      "empty": "Noch keine Konten erfasst.",
+      "initial": "{{amount}} Anfangssaldo · {{currency}}",
+      "confirmDelete": "Konto «{{name}}» löschen? Dies kann nicht rückgängig gemacht werden.",
+      "dialog": {
+        "title": "Konto hinzufügen",
+        "name": "Name *",
+        "namePlaceholder": "UBS Privatkonto",
+        "type": "Kontoart",
+        "initialBalance": "Anfangssaldo (CHF)",
+        "color": "Farbe (Hex, optional)"
+      }
+    },
+    "categories": {
+      "add": "Kategorie hinzufügen",
+      "expenses": "Ausgaben",
+      "income": "Einnahmen",
+      "emptyExpenses": "Keine Ausgabenkategorien",
+      "emptyIncome": "Keine Einnahmenkategorien",
+      "confirmDelete": "Kategorie «{{name}}» löschen?",
+      "dialog": {
+        "title": "Kategorie hinzufügen",
+        "name": "Name *",
+        "namePlaceholder": "Lebensmittel",
+        "type": "Typ",
+        "expense": "Ausgabe",
+        "income": "Einnahme",
+        "parent": "Übergeordnete Kategorie (optional)",
+        "noParent": "Keine (oberste Ebene)",
+        "icon": "Icon (Emoji)",
+        "color": "Farbe (Hex)"
+      }
+    }
+  },
   "common": {
     "save": "Speichern",
     "cancel": "Abbrechen",
@@ -725,7 +832,8 @@
     "chf": "CHF",
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus",
-    "language": "Sprache"
+    "language": "Sprache",
+    "toggleMenu": "Menü umschalten"
   },
   "auth": {
     "redirecting": "Anmeldung wird geladen …",

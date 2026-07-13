@@ -86,6 +86,7 @@
       "total": "Total",
       "sourcePortfolio": "Portfolio",
       "sourceManual": "manual",
+      "sourcePillar3": "Pillar 3a",
       "empty": "No buckets yet — create your first wealth bucket",
       "confirmDelete": "Remove bucket “{{name}}”?",
       "deleteLabel": "Remove bucket"
@@ -98,9 +99,11 @@
       "source": "Source",
       "sourceManual": "Maintained manually",
       "sourcePortfolio": "From portfolio (asset classes)",
+      "sourcePillar3": "Pillar 3a (default scenario)",
       "manualBalance": "Balance",
       "assetClasses": "Asset classes",
       "assetClassesHint": "Each asset class can be assigned to only one bucket",
+      "pillar3Hint": "The balance is taken live from your default pillar 3a scenario",
       "monthlyRate": "Monthly deposit",
       "submitCreate": "Add",
       "submitEdit": "Save"
@@ -146,6 +149,7 @@
       "gainLoss": "G/L",
       "returnPct": "Return",
       "allocation": "Share",
+      "edit": "Edit position",
       "remove": "Remove position",
       "confirmRemove": "Remove position \"{{name}}\"?",
       "empty": "No positions yet — add your first security above"
@@ -197,6 +201,18 @@
         "factsheetUrl": "Factsheet link (URL)",
         "nameRequired": "Title is required",
         "terInvalid": "TER must be a number between 0 and 10"
+      },
+      "editPositionDialog": {
+        "title": "Edit position",
+        "quantity": "Quantity",
+        "purchasePrice": "Avg. Purchase Price",
+        "purchaseDate": "Purchase Date",
+        "currentPrice": "Current Price (optional)",
+        "currentPriceHint": "Overrides the market price — a live price refresh may replace it again",
+        "save": "Save",
+        "quantityInvalid": "Quantity must be greater than 0",
+        "purchasePriceInvalid": "Purchase price must be 0 or greater",
+        "currentPriceInvalid": "Current price must be 0 or greater"
       },
       "factsheet": {
         "title": "Factsheet",
@@ -304,6 +320,11 @@
     "deleteScenario": "Delete scenario",
     "confirmDeleteScenario": "Delete scenario \"{{name}}\"?",
     "scenarioNoCalculation": "This scenario has no calculation yet — the saved inputs are incomplete.",
+    "prefill": {
+      "fromScenario": "Prefilled from scenario “{{name}}”",
+      "fromSalary": "Prefilled from your gross salary",
+      "pickScenario": "Apply a 3a scenario …"
+    },
     "status": {
       "planned": "Planned",
       "current": "Current",
@@ -393,6 +414,7 @@
     "payoutTax": "Estimated Payout Tax",
     "netValue": "Net Value After Payout Tax",
     "grossIncomeForSaving": "Gross Income (CHF, for tax saving)",
+    "prefilledFromProfile": "Prefilled from your profile",
     "balanceGrowth": "Balance Growth over {{years}} Years",
     "contributionCap": "You could contribute <strong>{{remaining}}</strong> more to reach the maximum of <strong>{{max}}</strong>, saving an additional <strong>{{saving}}</strong> in taxes.",
     "vsSavingsTitle": "Compared to taxable savings account",
@@ -461,8 +483,14 @@
       "loadError": "Could not load the salary calculator",
       "inputs": {
         "title": "Inputs",
+        "mode": "Input",
+        "modeMonthly": "CHF per month",
+        "modeYearly": "CHF per year",
         "grossMonthly": "Gross salary per month",
+        "grossYearlyLabel": "Gross salary per year",
         "grossYearly": "= {{amount}} per year",
+        "monthlyDerived": "≈ {{amount}} per month",
+        "yearlyIncludesThirteenth": "The yearly amount includes the 13th month salary.",
         "thirteenth": "13th month salary",
         "ratesTitle": "Deduction rates (adjustable)",
         "pension": "Pension fund (fixed)",
@@ -712,6 +740,85 @@
       }
     }
   },
+  "profile": {
+    "birthDate": "Date of birth",
+    "derivedInfo": "Age: {{age}} · Years to retirement (65): {{years}}",
+    "retirementYear": "Retirement in {{year}}",
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "saved": "Saved",
+    "loadError": "Could not load the profile"
+  },
+  "onboarding": {
+    "title": "Welcome to finyo",
+    "subtitle": "Set up your profile in three quick steps",
+    "stepIndicator": "Step {{current}} of {{total}}",
+    "steps": {
+      "basics": "Personal",
+      "income": "Income",
+      "preferences": "Appearance"
+    },
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "finish": "Finish",
+    "basics": {
+      "hint": "These details feed into the tax and pension calculations."
+    },
+    "income": {
+      "hint": "Optional — you can adjust the salary later in the budget."
+    },
+    "preferences": {
+      "hint": "You can change language and appearance anytime in the settings."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "profile": "Profile",
+      "preferences": "Appearance",
+      "accounts": "Accounts",
+      "categories": "Categories"
+    },
+    "accounts": {
+      "add": "Add Account",
+      "empty": "No accounts yet.",
+      "initial": "{{amount}} initial · {{currency}}",
+      "confirmDelete": "Delete account \"{{name}}\"? This cannot be undone.",
+      "dialog": {
+        "title": "Add Account",
+        "name": "Name *",
+        "namePlaceholder": "UBS Checking",
+        "type": "Type",
+        "initialBalance": "Initial Balance (CHF)",
+        "color": "Color (hex, optional)"
+      }
+    },
+    "categories": {
+      "add": "Add Category",
+      "expenses": "Expenses",
+      "income": "Income",
+      "emptyExpenses": "No expense categories",
+      "emptyIncome": "No income categories",
+      "confirmDelete": "Delete category \"{{name}}\"?",
+      "dialog": {
+        "title": "Add Category",
+        "name": "Name *",
+        "namePlaceholder": "Groceries",
+        "type": "Type",
+        "expense": "Expense",
+        "income": "Income",
+        "parent": "Parent Category (optional)",
+        "noParent": "No parent (top-level)",
+        "icon": "Icon (emoji)",
+        "color": "Color (hex)"
+      }
+    }
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -725,7 +832,8 @@
     "chf": "CHF",
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
-    "language": "Language"
+    "language": "Language",
+    "toggleMenu": "Toggle menu"
   },
   "auth": {
     "redirecting": "Signing you in …",

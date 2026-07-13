@@ -12,8 +12,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/auth/useAuth';
+import { pillar3Api } from '@/api/pillar3';
+import { salaryApi } from '@/api/salary';
 import { taxApi } from '@/api/tax';
 import type { ChurchAffiliation, TaxCivilStatus, TaxCommune, TaxYearInputs } from '@/api/tax';
+import { formatCHF } from '@/lib/formatters';
 
 const CANTONS = [
   'AG','AI','AR','BE','BL','BS','FR','GE','GL','GR',
@@ -120,11 +123,45 @@ export function CalculatorCard({
     inputs?.netWealth != null ? String(inputs.netWealth) : '',
   );
 
+  // Cross-module prefill: derived, never written into the field state, so
+  // values persisted for the year or typed by the user are never overwritten.
+  // Editing a field marks it touched, which removes the prefill and its hint.
+  const [pillar3aTouched, setPillar3aTouched] = useState(false);
+  const [grossIncomeTouched, setGrossIncomeTouched] = useState(false);
+  const [pickedScenarioId, setPickedScenarioId] = useState('');
+
   const { data: communes } = useQuery({
     queryKey: ['tax', 'communes', canton, String(year)],
     queryFn: () => taxApi.getCommunes(token, canton, year),
     enabled: !!token && !!canton,
   });
+
+  const { data: scenarios } = useQuery({
+    queryKey: ['pillar3-scenarios'],
+    queryFn: () => pillar3Api.getScenarios(token),
+    enabled: !!token,
+  });
+
+  const { data: salary } = useQuery({
+    queryKey: ['salary'],
+    queryFn: () => salaryApi.get(token),
+    enabled: !!token,
+  });
+
+  const scenarioPrefill =
+    !pillar3aTouched && !pillar3a && inputs?.pillar3aContribution == null
+      ? scenarios?.find((scenario) => scenario.isDefault)
+      : undefined;
+  const pillar3aValue = scenarioPrefill
+    ? String(scenarioPrefill.inputs.annualContribution)
+    : pillar3a;
+
+  const salaryPrefill =
+    !grossIncomeTouched && !grossIncome && inputs?.grossEmploymentIncome == null
+    && salary != null && salary.result.grossYearly > 0
+      ? String(salary.result.grossYearly)
+      : null;
+  const grossIncomeValue = salaryPrefill ?? grossIncome;
 
   const selectedCommune = communes?.find((c) => String(c.bfsNumber) === bfsNumber) ?? null;
   const churchMultiplier = resolveChurchMultiplier(selectedCommune, church);
@@ -138,9 +175,9 @@ export function CalculatorCard({
         civilStatus,
         churchAffiliation: church,
         numberOfChildren: Number.parseInt(children) || 0,
-        grossEmploymentIncome: Number.parseFloat(grossIncome) || 0,
+        grossEmploymentIncome: Number.parseFloat(grossIncomeValue) || 0,
         investmentIncome: investmentIncome ? Number.parseFloat(investmentIncome) : null,
-        pillar3aContribution: pillar3a ? Number.parseFloat(pillar3a) : null,
+        pillar3aContribution: pillar3aValue ? Number.parseFloat(pillar3aValue) : null,
         netWealth: netWealth ? Number.parseFloat(netWealth) : null,
       };
       return taxApi.upsertYear(token, year, payload);
@@ -216,7 +253,18 @@ export function CalculatorCard({
           </div>
           <div className="space-y-2">
             <Label>{t('tax.grossIncome')} (CHF) *</Label>
-            <Input type="number" value={grossIncome} onChange={(e) => setGrossIncome(e.target.value)} placeholder="100000" />
+            <Input
+              type="number"
+              value={grossIncomeValue}
+              onChange={(e) => {
+                setGrossIncome(e.target.value);
+                setGrossIncomeTouched(true);
+              }}
+              placeholder="100000"
+            />
+            {salaryPrefill != null && (
+              <p className="text-xs text-muted-foreground">{t('tax.prefill.fromSalary')}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>{t('tax.investmentIncome')} (CHF)</Label>
@@ -229,7 +277,45 @@ export function CalculatorCard({
               </Link>{' '}
               (CHF)
             </Label>
-            <Input type="number" value={pillar3a} onChange={(e) => setPillar3a(e.target.value)} max={7258} />
+            <Input
+              type="number"
+              value={pillar3aValue}
+              onChange={(e) => {
+                setPillar3a(e.target.value);
+                setPillar3aTouched(true);
+              }}
+              max={7258}
+            />
+            {scenarioPrefill && (
+              <p className="text-xs text-muted-foreground">
+                {t('tax.prefill.fromScenario', { name: scenarioPrefill.name })}
+              </p>
+            )}
+            {scenarios && scenarios.length > 0 && (
+              <Select
+                value={pickedScenarioId || undefined}
+                onValueChange={(id) => {
+                  setPickedScenarioId(id);
+                  const scenario = scenarios.find((s) => s.id === id);
+                  if (scenario) {
+                    setPillar3a(String(scenario.inputs.annualContribution));
+                    setPillar3aTouched(true);
+                  }
+                }}
+              >
+                <SelectTrigger aria-label={t('tax.prefill.pickScenario')} className="h-8 text-xs">
+                  <SelectValue placeholder={t('tax.prefill.pickScenario')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {scenarios.map((scenario) => (
+                    <SelectItem key={scenario.id} value={scenario.id}>
+                      {scenario.isDefault ? '★ ' : ''}
+                      {scenario.name} · {formatCHF(scenario.inputs.annualContribution)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-2">
             <Label>{t('tax.netWealth')} (CHF)</Label>
@@ -258,14 +344,14 @@ export function CalculatorCard({
 
         <div className="mt-4 space-y-2">
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => mutate()} disabled={!grossIncome || isPending}>
+            <Button onClick={() => mutate()} disabled={!grossIncomeValue || isPending}>
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculateForYear', { year })}
             </Button>
             {onSaveScenarioRequested && (
               <Button
                 variant="outline"
-                disabled={!grossIncome || isPending}
+                disabled={!grossIncomeValue || isPending}
                 onClick={() =>
                   mutate(undefined, { onSuccess: () => onSaveScenarioRequested() })
                 }

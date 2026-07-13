@@ -5,6 +5,7 @@ import ch.finyo.common.SwissTime;
 import ch.finyo.investment.InstrumentRepository;
 import ch.finyo.investment.PortfolioSnapshotRepository;
 import ch.finyo.investment.PositionRepository;
+import ch.finyo.pillar3.Pillar3ScenarioRepository;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,9 @@ class WealthIT extends BaseIntegrationTest {
     @Autowired
     private PortfolioSnapshotRepository portfolioSnapshotRepository;
 
+    @Autowired
+    private Pillar3ScenarioRepository pillar3ScenarioRepository;
+
     @BeforeEach
     void cleanTables() {
         bucketRepository.deleteAll();
@@ -69,6 +73,7 @@ class WealthIT extends BaseIntegrationTest {
         positionRepository.deleteAll();
         portfolioSnapshotRepository.deleteAll();
         instrumentRepository.deleteAll();
+        pillar3ScenarioRepository.deleteAll();
     }
 
     // -------------------------------------------------------------------------
@@ -96,6 +101,30 @@ class WealthIT extends BaseIntegrationTest {
             body.put("assetClasses", assetClasses);
         }
         return objectMapper.writeValueAsString(body);
+    }
+
+    private String pillar3BucketBody(String name, String manualBalance) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("source", "PILLAR3");
+        if (manualBalance != null) {
+            body.put("manualBalance", manualBalance);
+        }
+        return objectMapper.writeValueAsString(body);
+    }
+
+    /** Saves a default pillar 3a scenario for the primary test user. */
+    private void createDefaultPillar3Scenario(String currentBalance) throws Exception {
+        mockMvc.perform(post("/api/v1/pillar3/scenarios").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Standard",
+                                "isDefault", true,
+                                "currentBalance", currentBalance,
+                                "annualContribution", "7258",
+                                "assumedAnnualReturnPercent", 3.0,
+                                "yearsToRetirement", 25))))
+                .andExpect(status().isCreated());
     }
 
     private UUID createBucket(String body) throws Exception {
@@ -204,6 +233,69 @@ class WealthIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.totalMonthlyRate", is(0)))
                 .andExpect(jsonPath("$.totalForecastYearEnd", is(0)));
         assertThat(netWorthSnapshotRepository.count()).isZero();
+    }
+
+    // -------------------------------------------------------------------------
+    // PILLAR3 buckets
+    // -------------------------------------------------------------------------
+
+    @Test
+    void pillar3_bucket_takes_its_balance_from_the_default_scenario() throws Exception {
+        createDefaultPillar3Scenario("25000");
+
+        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pillar3BucketBody("Säule 3a", null)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name", is("Säule 3a")))
+                .andExpect(jsonPath("$.source", is("PILLAR3")))
+                .andExpect(jsonPath("$.manualBalance").doesNotExist())
+                .andExpect(jsonPath("$.assetClasses.length()", is(0)));
+
+        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets.length()", is(1)))
+                .andExpect(jsonPath("$.buckets[0].source", is("PILLAR3")))
+                .andExpect(jsonPath("$.buckets[0].balance", is(25000.0)))
+                .andExpect(jsonPath("$.total", is(25000.0)));
+
+        // the scenario belongs to the primary user only
+        mockMvc.perform(get("/api/v1/wealth").with(asOtherUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets.length()", is(0)))
+                .andExpect(jsonPath("$.total", is(0)));
+    }
+
+    @Test
+    void pillar3_bucket_without_a_default_scenario_has_zero_balance() throws Exception {
+        createBucket(pillar3BucketBody("Säule 3a", null));
+
+        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets[0].balance", is(0)))
+                .andExpect(jsonPath("$.total", is(0)));
+    }
+
+    @Test
+    void pillar3_bucket_with_a_manual_balance_is_rejected() throws Exception {
+        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pillar3BucketBody("Säule 3a", "100")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title", is("Bad Request")))
+                .andExpect(jsonPath("$.detail", containsString("manualBalance")));
+    }
+
+    @Test
+    void second_pillar3_bucket_is_rejected() throws Exception {
+        createBucket(pillar3BucketBody("Säule 3a", null));
+
+        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pillar3BucketBody("Säule 3a II", null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title", is("Bad Request")))
+                .andExpect(jsonPath("$.detail", containsString("PILLAR3 wealth bucket already exists")));
     }
 
     // -------------------------------------------------------------------------

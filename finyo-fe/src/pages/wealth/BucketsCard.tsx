@@ -15,11 +15,13 @@ import { BucketFormDialog } from './BucketFormDialog';
 function SourceBadge({ source }: Readonly<{ source: WealthSource }>) {
   const { t } = useTranslation();
 
-  return source === 'PORTFOLIO' ? (
-    <Badge variant="secondary">{t('wealth.buckets.sourcePortfolio')}</Badge>
-  ) : (
-    <Badge variant="outline">{t('wealth.buckets.sourceManual')}</Badge>
-  );
+  if (source === 'PORTFOLIO') {
+    return <Badge variant="secondary">{t('wealth.buckets.sourcePortfolio')}</Badge>;
+  }
+  if (source === 'PILLAR3') {
+    return <Badge variant="secondary">{t('wealth.buckets.sourcePillar3')}</Badge>;
+  }
+  return <Badge variant="outline">{t('wealth.buckets.sourceManual')}</Badge>;
 }
 
 function BucketRow({ bucket, index, onEdit, onRemove, removing }: Readonly<{

@@ -20,6 +20,8 @@ import { useAuth } from '@/auth/useAuth';
 import { accountsApi } from '@/api/accounts';
 import { apiRequest } from '@/api/client';
 import { formatCHF } from '@/lib/formatters';
+import { ProfileTab } from './settings/ProfileTab';
+import { PreferencesTab } from './settings/PreferencesTab';
 import type { Account, Category, CreateAccountRequest } from '@/types';
 
 const ACCOUNT_TYPES: Account['type'][] = [
@@ -72,19 +74,27 @@ function AddAccountDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Account</DialogTitle>
+          <DialogTitle>{t('settings.accounts.dialog.title')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Name *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="UBS Checking" />
+            <Label>{t('settings.accounts.dialog.name')}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('settings.accounts.dialog.namePlaceholder')}
+            />
           </div>
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>{t('settings.accounts.dialog.type')}</Label>
             <Select value={type} onValueChange={(v) => setType(v as Account['type'])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {ACCOUNT_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace('_', ' ')}</SelectItem>)}
+                {ACCOUNT_TYPES.map((accountType) => (
+                  <SelectItem key={accountType} value={accountType}>
+                    {t(`accountType.${accountType}`)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -94,12 +104,12 @@ function AddAccountDialog({
               <Input value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="CHF" maxLength={3} />
             </div>
             <div className="space-y-2">
-              <Label>Initial Balance (CHF)</Label>
+              <Label>{t('settings.accounts.dialog.initialBalance')}</Label>
               <Input type="number" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} step={0.01} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Color (hex, optional)</Label>
+            <Label>{t('settings.accounts.dialog.color')}</Label>
             <Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#6366f1" />
           </div>
         </div>
@@ -115,6 +125,7 @@ function AddAccountDialog({
 }
 
 function AccountsTab({ token }: Readonly<{ token: string }>) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
@@ -135,7 +146,11 @@ function AccountsTab({ token }: Readonly<{ token: string }>) {
   if (isLoading) {
     content = ACCOUNT_SKELETON_KEYS.map((key) => <Skeleton key={key} className="h-16 w-full" />);
   } else if (accountList.length === 0) {
-    content = <p className="py-8 text-center text-sm text-muted-foreground">No accounts yet.</p>;
+    content = (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        {t('settings.accounts.empty')}
+      </p>
+    );
   } else {
     content = (
       <div className="space-y-2">
@@ -153,20 +168,23 @@ function AccountsTab({ token }: Readonly<{ token: string }>) {
                   <div>
                     <p className="font-medium text-sm">{account.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatCHF(account.initialBalance)} initial · {account.currency}
+                      {t('settings.accounts.initial', {
+                        amount: formatCHF(account.initialBalance),
+                        currency: account.currency,
+                      })}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">
-                    {account.type.replace('_', ' ')}
+                    {t(`accountType.${account.type}`)}
                   </Badge>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-muted-foreground hover:text-red-500"
                     onClick={() => {
-                      if (globalThis.confirm(`Delete account "${account.name}"? This cannot be undone.`)) {
+                      if (globalThis.confirm(t('settings.accounts.confirmDelete', { name: account.name }))) {
                         deleteAccount(account.id);
                       }
                     }}
@@ -186,7 +204,7 @@ function AccountsTab({ token }: Readonly<{ token: string }>) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Account
+          <Plus className="h-4 w-4 mr-1" /> {t('settings.accounts.add')}
         </Button>
       </div>
 
@@ -247,30 +265,36 @@ function AddCategoryDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Category</DialogTitle>
+          <DialogTitle>{t('settings.categories.dialog.title')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Name *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Groceries" />
+            <Label>{t('settings.categories.dialog.name')}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('settings.categories.dialog.namePlaceholder')}
+            />
           </div>
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>{t('settings.categories.dialog.type')}</Label>
             <Select value={type} onValueChange={(v) => { setType(v as 'EXPENSE' | 'INCOME'); setParentId(''); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="EXPENSE">Expense</SelectItem>
-                <SelectItem value="INCOME">Income</SelectItem>
+                <SelectItem value="EXPENSE">{t('settings.categories.dialog.expense')}</SelectItem>
+                <SelectItem value="INCOME">{t('settings.categories.dialog.income')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {topLevelCats.length > 0 && (
             <div className="space-y-2">
-              <Label>Parent Category (optional)</Label>
+              <Label>{t('settings.categories.dialog.parent')}</Label>
               <Select value={parentId} onValueChange={(v) => setParentId(v === '_none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="No parent (top-level)" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('settings.categories.dialog.noParent')} />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_none">No parent (top-level)</SelectItem>
+                  <SelectItem value="_none">{t('settings.categories.dialog.noParent')}</SelectItem>
                   {topLevelCats.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.icon ? `${c.icon} ` : ''}{c.name}
@@ -282,11 +306,11 @@ function AddCategoryDialog({
           )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Icon (emoji)</Label>
+              <Label>{t('settings.categories.dialog.icon')}</Label>
               <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🛒" />
             </div>
             <div className="space-y-2">
-              <Label>Color (hex)</Label>
+              <Label>{t('settings.categories.dialog.color')}</Label>
               <Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#6366f1" />
             </div>
           </div>
@@ -303,6 +327,8 @@ function AddCategoryDialog({
 }
 
 function CategoryRow({ cat, onDelete }: Readonly<{ cat: Category; onDelete: (id: string) => void }>) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-2">
@@ -317,7 +343,9 @@ function CategoryRow({ cat, onDelete }: Readonly<{ cat: Category; onDelete: (id:
         size="icon"
         className="h-7 w-7 text-muted-foreground hover:text-red-500"
         onClick={() => {
-          if (globalThis.confirm(`Delete category "${cat.name}"?`)) onDelete(cat.id);
+          if (globalThis.confirm(t('settings.categories.confirmDelete', { name: cat.name }))) {
+            onDelete(cat.id);
+          }
         }}
       >
         <Trash2 className="h-3.5 w-3.5" />
@@ -327,6 +355,7 @@ function CategoryRow({ cat, onDelete }: Readonly<{ cat: Category; onDelete: (id:
 }
 
 function CategoriesTab({ token }: Readonly<{ token: string }>) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
@@ -349,7 +378,7 @@ function CategoriesTab({ token }: Readonly<{ token: string }>) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Add Category
+          <Plus className="h-4 w-4 mr-1" /> {t('settings.categories.add')}
         </Button>
       </div>
 
@@ -359,13 +388,15 @@ function CategoriesTab({ token }: Readonly<{ token: string }>) {
         <div className="space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-sm font-medium">Expenses</h3>
+              <h3 className="text-sm font-medium">{t('settings.categories.expenses')}</h3>
               <Badge variant="secondary">{expenses.length}</Badge>
             </div>
             <Card>
               <CardContent className="px-4 py-1 divide-y">
                 {expenses.length === 0 ? (
-                  <p className="py-3 text-sm text-muted-foreground text-center">No expense categories</p>
+                  <p className="py-3 text-sm text-muted-foreground text-center">
+                    {t('settings.categories.emptyExpenses')}
+                  </p>
                 ) : (
                   expenses.map((c) => <CategoryRow key={c.id} cat={c} onDelete={deleteCategory} />)
                 )}
@@ -377,13 +408,15 @@ function CategoriesTab({ token }: Readonly<{ token: string }>) {
 
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-sm font-medium">Income</h3>
+              <h3 className="text-sm font-medium">{t('settings.categories.income')}</h3>
               <Badge variant="secondary">{incomes.length}</Badge>
             </div>
             <Card>
               <CardContent className="px-4 py-1 divide-y">
                 {incomes.length === 0 ? (
-                  <p className="py-3 text-sm text-muted-foreground text-center">No income categories</p>
+                  <p className="py-3 text-sm text-muted-foreground text-center">
+                    {t('settings.categories.emptyIncome')}
+                  </p>
                 ) : (
                   incomes.map((c) => <CategoryRow key={c.id} cat={c} onDelete={deleteCategory} />)
                 )}
@@ -406,17 +439,26 @@ function CategoriesTab({ token }: Readonly<{ token: string }>) {
 // --- Main page ---
 
 export function Settings() {
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <Tabs defaultValue="accounts">
+      <h1 className="text-2xl font-semibold">{t('settings.title')}</h1>
+      <Tabs defaultValue="profile">
         <TabsList>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="profile">{t('settings.tabs.profile')}</TabsTrigger>
+          <TabsTrigger value="preferences">{t('settings.tabs.preferences')}</TabsTrigger>
+          <TabsTrigger value="accounts">{t('settings.tabs.accounts')}</TabsTrigger>
+          <TabsTrigger value="categories">{t('settings.tabs.categories')}</TabsTrigger>
         </TabsList>
+        <TabsContent value="profile" className="mt-4">
+          <ProfileTab />
+        </TabsContent>
+        <TabsContent value="preferences" className="mt-4">
+          <PreferencesTab />
+        </TabsContent>
         <TabsContent value="accounts" className="mt-4">
           <AccountsTab token={token} />
         </TabsContent>

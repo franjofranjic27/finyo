@@ -1,6 +1,7 @@
 package ch.finyo.investment;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record PortfolioPositionResponse(
@@ -15,6 +16,7 @@ public record PortfolioPositionResponse(
         String valor,
         BigDecimal quantity,
         BigDecimal purchasePrice,
+        LocalDate purchaseDate,
         BigDecimal currentPrice,
         PriceSource priceSource,
         BigDecimal value,

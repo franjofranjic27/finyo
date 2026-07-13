@@ -5,8 +5,9 @@ import { Route, Routes } from 'react-router-dom';
 import { PositionsTable } from './PositionsTable';
 import { portfolioApi } from '@/api/portfolio';
 import type { PortfolioPosition } from '@/api/portfolio';
+import { positionDetailApi } from '@/api/positionDetail';
 import { renderWithProviders } from '@/test/test-utils';
-import { portfolioPosition } from '@/test/fixtures/portfolio';
+import { portfolioPosition, positionDetail } from '@/test/fixtures/portfolio';
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -28,6 +29,10 @@ vi.mock('@/api/portfolio', async (importOriginal) => {
     portfolioApi: { deletePosition: vi.fn() },
   };
 });
+
+vi.mock('@/api/positionDetail', () => ({
+  positionDetailApi: { updatePosition: vi.fn() },
+}));
 
 // Deliberately unordered input: grouping must impose ETF → STOCK order.
 const positions = [
@@ -79,6 +84,10 @@ function renderTable(items: PortfolioPosition[] = positions) {
 describe('PositionsTable', () => {
   beforeEach(() => {
     vi.mocked(portfolioApi.deletePosition).mockResolvedValue(undefined);
+    vi.mocked(positionDetailApi.updatePosition).mockReset();
+    vi.mocked(positionDetailApi.updatePosition).mockResolvedValue(
+      positionDetail({ positionId: 'p2' }),
+    );
   });
 
   it('groups positions under asset-class subheaders in display order', () => {
@@ -147,6 +156,35 @@ describe('PositionsTable', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['portfolio'] }),
     );
     // The ✕ click must not bubble into the row navigation.
+    expect(screen.queryByText('detail-page')).not.toBeInTheDocument();
+  });
+
+  it('opens the edit dialog from the row action and PATCHes the holding', async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderTable();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    // First edit button belongs to the ETF group (iShares, p2).
+    await user.click(screen.getAllByRole('button', { name: 'Edit position' })[0]);
+
+    expect(await screen.findByRole('heading', { name: 'Edit position' })).toBeInTheDocument();
+    // prefilled from the table row
+    expect(screen.getByLabelText('Quantity')).toHaveValue(10);
+    expect(screen.getByLabelText('Avg. Purchase Price')).toHaveValue(90);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(positionDetailApi.updatePosition).toHaveBeenCalledWith('test-token', 'p2', {
+        quantity: 10,
+        purchasePrice: 90,
+        purchaseDate: null,
+      }),
+    );
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['position', 'p2'] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['portfolio'] });
+    // The pencil click must not bubble into the row navigation.
     expect(screen.queryByText('detail-page')).not.toBeInTheDocument();
   });
 

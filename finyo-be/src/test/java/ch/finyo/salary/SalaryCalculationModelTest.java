@@ -15,6 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   2. Swiss 5-centime rounding, including the exact-half case (x.x25 → .x5).
  *   3. 13th salary: percentage lines on 13 months, fixed lines still ×12.
  *   4. Zero gross: all lines zero, totalDeductionsPct 0.
+ *   5. YEARLY input mode: the stored yearly gross is authoritative (redisplayed
+ *      exactly), the monthly value is derived; MONTHLY behavior is unchanged.
  */
 class SalaryCalculationModelTest {
 
@@ -23,7 +25,9 @@ class SalaryCalculationModelTest {
                                   String pensionFixed, String otherFixed) {
         return SalaryProfile.builder()
                 .userId("user-salary-model")
+                .inputMode(SalaryInputMode.MONTHLY)
                 .grossMonthly(new BigDecimal(grossMonthly))
+                .grossYearly(BigDecimal.ZERO)
                 .thirteenthSalary(thirteenthSalary)
                 .ahvPct(new BigDecimal(ahvPct))
                 .alvPct(new BigDecimal(alvPct))
@@ -36,6 +40,24 @@ class SalaryCalculationModelTest {
 
     private SalaryProfile referenceProfile(boolean thirteenthSalary) {
         return profile("5787", thirteenthSalary, "5.3", "1.1", "0.455", "0.17", "85.35", "11");
+    }
+
+    private SalaryProfile yearlyProfile(String grossYearly, boolean thirteenthSalary) {
+        return SalaryProfile.builder()
+                .userId("user-salary-model")
+                .inputMode(SalaryInputMode.YEARLY)
+                // stored grossMonthly is a derived convenience value; the model
+                // must recompute the monthly view from the authoritative yearly gross
+                .grossMonthly(BigDecimal.ZERO)
+                .grossYearly(new BigDecimal(grossYearly))
+                .thirteenthSalary(thirteenthSalary)
+                .ahvPct(new BigDecimal("5.3"))
+                .alvPct(new BigDecimal("1.1"))
+                .nbuPct(new BigDecimal("0.455"))
+                .ktgPct(new BigDecimal("0.17"))
+                .pensionFixed(new BigDecimal("85.35"))
+                .otherFixed(new BigDecimal("11"))
+                .build();
     }
 
     private SalaryDeduction line(SalaryResult result, SalaryDeductionType type) {
@@ -141,5 +163,42 @@ class SalaryCalculationModelTest {
         assertThat(result.netMonthly()).isEqualByComparingTo("0");
         assertThat(result.netYearly()).isEqualByComparingTo("0");
         assertThat(result.totalDeductionsPct()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void yearly_mode_with_13th_salary_uses_the_yearly_gross_as_total_and_derives_the_monthly_view() {
+        SalaryResult result = SalaryCalculationModel.calculate(yearlyProfile("100000", true));
+
+        // the entered yearly gross is the total annual amount incl. the 13th salary
+        assertThat(result.grossYearly()).isEqualByComparingTo("100000.00");
+        // 100000 / 13 = 7692.307... -> 7692.31 (HALF_UP)
+        assertThat(result.grossMonthly()).isEqualByComparingTo("7692.31");
+
+        // percentage lines apply to the full yearly gross; the monthly line is
+        // computed from the derived monthly gross (7692.31 x 5.3% = 407.69 -> 407.70)
+        assertLine(result, SalaryDeductionType.AHV, "407.70", "5300.00");
+        // fixed contributions stay 12x regardless of the 13th salary
+        assertLine(result, SalaryDeductionType.PENSION, "85.35", "1024.20");
+        assertLine(result, SalaryDeductionType.OTHER, "11.00", "132.00");
+    }
+
+    @Test
+    void yearly_mode_without_13th_salary_derives_the_monthly_gross_from_12_months() {
+        SalaryResult result = SalaryCalculationModel.calculate(yearlyProfile("90000", false));
+
+        assertThat(result.grossYearly()).isEqualByComparingTo("90000.00");
+        assertThat(result.grossMonthly()).isEqualByComparingTo("7500.00");
+
+        assertLine(result, SalaryDeductionType.AHV, "397.50", "4770.00");
+        assertLine(result, SalaryDeductionType.ALV, "82.50", "990.00");
+    }
+
+    @Test
+    void monthly_mode_ignores_the_stored_yearly_gross_and_keeps_the_original_behavior() {
+        // the helper stores grossYearly = 0; MONTHLY must still compute 5787 x 12
+        SalaryResult result = SalaryCalculationModel.calculate(referenceProfile(false));
+
+        assertThat(result.grossYearly()).isEqualByComparingTo("69444.00");
+        assertThat(result.netMonthly()).isEqualByComparingTo("5284.10");
     }
 }

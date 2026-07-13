@@ -13,7 +13,8 @@ import java.util.List;
 /**
  * Request to create or update a wealth bucket. Source-dependent presence rules
  * (manualBalance required iff MANUAL, assetClasses required non-empty iff
- * PORTFOLIO) are validated in the service to produce precise error messages.
+ * PORTFOLIO, both forbidden for PILLAR3) are validated in the service to
+ * produce precise error messages.
  */
 public record WealthBucketRequest(
         @NotBlank @Size(max = 100) String name,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { positionDetailApi } from './positionDetail';
-import type { UpdateInstrumentRequest } from './positionDetail';
+import type { UpdateInstrumentRequest, UpdatePositionRequest } from './positionDetail';
 import { apiRequest } from './client';
 import { positionDetail } from '@/test/fixtures/portfolio';
 
@@ -37,6 +37,21 @@ describe('positionDetailApi', () => {
     positionDetailApi.updateInstrument(TOKEN, 'p1', update);
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/positions/p1/instrument',
+      { method: 'PATCH', body: JSON.stringify(update) },
+      TOKEN,
+    );
+  });
+
+  it('updatePosition PATCHes the serialised holding fields', () => {
+    const update: UpdatePositionRequest = {
+      quantity: 5,
+      purchasePrice: 90,
+      purchaseDate: null,
+      currentPrice: 120,
+    };
+    positionDetailApi.updatePosition(TOKEN, 'p1', update);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/positions/p1',
       { method: 'PATCH', body: JSON.stringify(update) },
       TOKEN,
     );

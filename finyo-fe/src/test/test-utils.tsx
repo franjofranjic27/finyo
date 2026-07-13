@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { render, type RenderResult } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@/hooks/useTheme';
 
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -21,7 +22,7 @@ interface ProviderRenderOptions {
 }
 
 /**
- * Renders a component inside the app providers: react-query + MemoryRouter.
+ * Renders a component inside the app providers: react-query + theme + MemoryRouter.
  * i18n is a global singleton and is initialised in the test setup file.
  * Auth is intentionally NOT provided here — mock `@/auth/useAuth` locally.
  */
@@ -39,7 +40,9 @@ export function renderWithProviders(
 
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[route]}>{tree}</MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={[route]}>{tree}</MemoryRouter>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 
