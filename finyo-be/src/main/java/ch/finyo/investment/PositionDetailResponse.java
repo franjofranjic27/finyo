@@ -1,6 +1,7 @@
 package ch.finyo.investment;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -19,6 +20,7 @@ public record PositionDetailResponse(
         String currency,
         BigDecimal quantity,
         BigDecimal avgPurchasePrice,
+        LocalDate purchaseDate,
         BigDecimal currentPrice,
         PriceSource priceSource,
         OffsetDateTime priceUpdatedAt,

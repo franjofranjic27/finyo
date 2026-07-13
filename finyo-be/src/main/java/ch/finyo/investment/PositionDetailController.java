@@ -46,6 +46,21 @@ public class PositionDetailController {
         return ResponseEntity.ok(positionDetailService.getDetail(positionId, userId));
     }
 
+    @PatchMapping
+    @Operation(summary = "Update a holding",
+            description = "Partial update of the position itself: quantity, purchasePrice and currentPrice "
+                    + "are applied only when present; purchaseDate is always applied (null = clear). "
+                    + "An empty body is rejected.")
+    @ApiResponse(responseCode = "200", description = "Position updated, fresh position detail returned")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    @ApiResponse(responseCode = "404", description = "Position not found")
+    public ResponseEntity<PositionDetailResponse> updatePosition(@PathVariable UUID positionId,
+                                                                 @Valid @RequestBody PositionPatchRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("PATCH /api/v1/positions/{} user={}", positionId, userId);
+        return ResponseEntity.ok(positionDetailService.updatePosition(positionId, request, userId));
+    }
+
     @PatchMapping("/instrument")
     @Operation(summary = "Update the instrument behind a position",
             description = "Partial update: only the non-null fields of the request body are applied.")
