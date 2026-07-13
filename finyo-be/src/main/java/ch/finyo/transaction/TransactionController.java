@@ -187,11 +187,13 @@ public class TransactionController {
 
     @PostMapping("/import/commit")
     @Operation(summary = "Persist previously previewed statement rows",
-            description = "Duplicates are re-checked against the database and skipped when 'skipDuplicates' is set.")
+            description = "Duplicates are re-checked against the database. Rows whose bank reference "
+                    + "(external_ref) already exists are always skipped — they are unique per user by "
+                    + "design and could not be inserted anyway. 'skipDuplicates' only controls the "
+                    + "date/amount/description heuristic used for rows without a bank reference.")
     @ApiResponse(responseCode = "200", description = "Import completed")
     @ApiResponse(responseCode = "400", description = "Validation failed")
     @ApiResponse(responseCode = "404", description = "Account or Category not found")
-    @ApiResponse(responseCode = "409", description = "A row conflicts with an existing bank reference")
     public ResponseEntity<ImportResultResponse> importCommit(@Valid @RequestBody ImportCommitRequest request) {
         String userId = userContextProvider.getUserId();
         log.info("POST /api/v1/transactions/import/commit user={} accountId={} rows={}",

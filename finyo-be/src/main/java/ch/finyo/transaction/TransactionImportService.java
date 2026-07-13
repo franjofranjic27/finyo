@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -20,12 +21,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Two-step statement import: {@link #preview} parses a file (CSV, Excel or
@@ -38,8 +41,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransactionImportService {
 
-    /** Preview descriptions are truncated to this length so a commit round-trip always validates. */
-    private static final int MAX_DESCRIPTION_LENGTH = 500;
     private static final int DETECTION_HEAD_BYTES = 32;
     private static final String DEFAULT_CURRENCY = "CHF";
 
@@ -49,6 +50,12 @@ public class TransactionImportService {
     private final CategoryRuleService categoryRuleService;
     private final CsvImportService csvImportService;
     private final CamtParser camtParser;
+
+    /** A statement row as parsed from the file, before duplicate detection and category matching. */
+    private record ParsedRow(LocalDate date, BigDecimal amount, @Nullable String currency,
+                             @Nullable String description, @Nullable String counterparty,
+                             @Nullable String externalRef) implements DuplicateCandidate {
+    }
 
     @Transactional(readOnly = true)
     public ImportPreviewResponse preview(MultipartFile file, UUID accountId, ImportRequest csvParams,
@@ -68,12 +75,11 @@ public class TransactionImportService {
 
     private ImportPreviewResponse previewCamt(MultipartFile file, CategoryRuleMatcher matcher, String userId)
             throws IOException {
-        List<ImportPreviewRow> rows = new ArrayList<>();
-        for (CamtEntry entry : camtParser.parse(file.getBytes())) {
-            rows.add(toPreviewRow(rows.size() + 1, entry.date(), entry.amount(), entry.currency(),
-                    entry.description(), entry.counterparty(), entry.externalRef(), matcher, userId));
-        }
-        return buildPreviewResponse(ImportFormat.CAMT053, rows, 0, List.of());
+        List<ParsedRow> rows = camtParser.parse(file.getBytes()).stream()
+                .map(entry -> new ParsedRow(entry.date(), entry.amount(), entry.currency(),
+                        truncateDescription(entry.description()), entry.counterparty(), entry.externalRef()))
+                .toList();
+        return buildPreviewResponse(ImportFormat.CAMT053, rows, 0, List.of(), matcher, userId);
     }
 
     private ImportPreviewResponse previewTabular(MultipartFile file, ImportFormat format, ImportRequest csvParams,
@@ -84,7 +90,7 @@ public class TransactionImportService {
                 ? csvImportService.readExcelRows(file, mapping)
                 : csvImportService.readCsvRows(file, mapping);
 
-        List<ImportPreviewRow> rows = new ArrayList<>();
+        List<ParsedRow> rows = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         int failed = 0;
         for (int i = 0; i < rawRows.size(); i++) {
@@ -95,35 +101,36 @@ public class TransactionImportService {
                     continue;
                 }
                 var parsed = maybeParsed.get();
-                rows.add(toPreviewRow(rows.size() + 1, parsed.date(), parsed.amount(), null,
-                        parsed.description(), null, null, matcher, userId));
+                rows.add(new ParsedRow(parsed.date(), parsed.amount(), null,
+                        truncateDescription(parsed.description()), null, null));
             } catch (Exception e) {
                 failed++;
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
             }
         }
-        return buildPreviewResponse(format, rows, failed, errors);
+        return buildPreviewResponse(format, rows, failed, errors, matcher, userId);
     }
 
-    private ImportPreviewRow toPreviewRow(int index, LocalDate date, BigDecimal amount, @Nullable String currency,
-                                          @Nullable String description, @Nullable String counterparty,
-                                          @Nullable String externalRef, CategoryRuleMatcher matcher, String userId) {
-        String truncatedDescription = truncate(description);
-        boolean duplicate = isDuplicate(userId, date, amount, truncatedDescription, externalRef);
-        Category suggested = matcher.match(matchText(truncatedDescription, counterparty)).orElse(null);
-        return new ImportPreviewRow(
-                index, date, amount, currency, truncatedDescription, counterparty, externalRef, duplicate,
-                suggested != null ? suggested.getId() : null,
-                suggested != null ? suggested.getName() : null);
-    }
+    private ImportPreviewResponse buildPreviewResponse(ImportFormat format, List<ParsedRow> parsedRows, int failed,
+                                                       List<String> errors, CategoryRuleMatcher matcher,
+                                                       String userId) {
+        DuplicateIndex duplicates = loadDuplicateIndex(userId, parsedRows);
 
-    private ImportPreviewResponse buildPreviewResponse(ImportFormat format, List<ImportPreviewRow> rows,
-                                                       int failed, List<String> errors) {
-        int duplicates = (int) rows.stream().filter(ImportPreviewRow::duplicate).count();
+        List<ImportPreviewRow> rows = new ArrayList<>(parsedRows.size());
+        for (ParsedRow row : parsedRows) {
+            Category suggested = matcher.match(matchText(row.description(), row.counterparty())).orElse(null);
+            rows.add(new ImportPreviewRow(
+                    rows.size() + 1, row.date(), row.amount(), row.currency(), row.description(),
+                    row.counterparty(), row.externalRef(), duplicates.contains(row),
+                    suggested != null ? suggested.getId() : null,
+                    suggested != null ? suggested.getName() : null));
+        }
+
+        int duplicateCount = (int) rows.stream().filter(ImportPreviewRow::duplicate).count();
         log.info("Statement import preview: format={} rows={} duplicates={} failed={}",
-                format, rows.size(), duplicates, failed);
+                format, rows.size(), duplicateCount, failed);
         return new ImportPreviewResponse(
-                format, rows.size() + failed, rows.size() - duplicates, duplicates, failed, rows, errors);
+                format, rows.size() + failed, rows.size() - duplicateCount, duplicateCount, failed, rows, errors);
     }
 
     @Transactional
@@ -133,28 +140,22 @@ public class TransactionImportService {
         TransactionSource source = request.format() == ImportFormat.CAMT053
                 ? TransactionSource.CAMT_IMPORT
                 : TransactionSource.CSV_IMPORT;
+        DuplicateIndex duplicates = loadDuplicateIndex(userId, request.rows());
 
         int skipped = 0;
-        // guards against repeated references within one batch (e.g. a
-        // Sammelbuchung whose sub-transactions all fall back to the entry
-        // reference) — the partial unique index would reject the insert
         Set<String> referencesInBatch = new HashSet<>();
         List<Transaction> toSave = new ArrayList<>();
 
         for (ImportCommitRow row : request.rows()) {
-            boolean duplicate = isDuplicate(userId, row.date(), row.amount(), row.description(), row.externalRef())
-                    || (row.externalRef() != null && referencesInBatch.contains(row.externalRef()));
-            if (duplicate && request.skipDuplicates()) {
+            if (isAlreadyReferenced(row, duplicates, referencesInBatch)
+                    || (request.skipDuplicates() && duplicates.contains(row))) {
                 skipped++;
                 continue;
-            }
-            if (row.externalRef() != null) {
-                referencesInBatch.add(row.externalRef());
             }
             toSave.add(Transaction.builder()
                     .userId(userId)
                     .amount(row.amount())
-                    .currency(row.currency() != null && !row.currency().isBlank() ? row.currency() : DEFAULT_CURRENCY)
+                    .currency(StringUtils.hasText(row.currency()) ? row.currency() : DEFAULT_CURRENCY)
                     .date(row.date())
                     .description(row.description())
                     .category(row.categoryId() != null ? categoriesById.get(row.categoryId()) : null)
@@ -169,6 +170,69 @@ public class TransactionImportService {
                 request.format(), toSave.size(), skipped, userId);
         return new ImportResultResponse(request.rows().size(), toSave.size(), skipped, 0, List.of());
     }
+
+    /**
+     * Rows whose bank reference is already stored — or repeats earlier in the same batch — can never be
+     * inserted: the partial unique index on (user_id, external_ref) would reject them and roll the whole
+     * commit back. They are therefore skipped even when the user opted out of duplicate skipping.
+     */
+    private boolean isAlreadyReferenced(ImportCommitRow row, DuplicateIndex duplicates,
+                                        Set<String> referencesInBatch) {
+        String externalRef = row.externalRef();
+        if (!StringUtils.hasText(externalRef)) {
+            return false;
+        }
+        return duplicates.containsReference(externalRef) || !referencesInBatch.add(externalRef);
+    }
+
+    // -------------------------------------------------------------------------
+    // Duplicate detection
+    // -------------------------------------------------------------------------
+
+    /**
+     * Duplicate lookup for a whole import: rows with a bank reference are matched against the
+     * references already stored, rows without one against the (date, amount, description)
+     * fingerprints of the batch's date range. Two queries per import instead of one per row.
+     */
+    private record DuplicateIndex(Set<String> existingReferences, Set<TransactionFingerprint> existingFingerprints) {
+
+        boolean contains(DuplicateCandidate row) {
+            String externalRef = row.externalRef();
+            return StringUtils.hasText(externalRef)
+                    ? containsReference(externalRef)
+                    : existingFingerprints.contains(TransactionFingerprint.of(row));
+        }
+
+        boolean containsReference(String externalRef) {
+            return existingReferences.contains(externalRef);
+        }
+    }
+
+    private DuplicateIndex loadDuplicateIndex(String userId, List<? extends DuplicateCandidate> rows) {
+        Set<String> references = rows.stream()
+                .map(DuplicateCandidate::externalRef)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+        Set<String> existingReferences = references.isEmpty()
+                ? Set.of()
+                : Set.copyOf(transactionRepository.findExistingExternalRefs(userId, references));
+
+        List<LocalDate> datesWithoutReference = rows.stream()
+                .filter(row -> !StringUtils.hasText(row.externalRef()))
+                .map(DuplicateCandidate::date)
+                .toList();
+        if (datesWithoutReference.isEmpty()) {
+            return new DuplicateIndex(existingReferences, Set.of());
+        }
+        LocalDate from = datesWithoutReference.stream().min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate to = datesWithoutReference.stream().max(Comparator.naturalOrder()).orElseThrow();
+        return new DuplicateIndex(existingReferences,
+                Set.copyOf(transactionRepository.findFingerprintsByUserIdAndDateBetween(userId, from, to)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
     private Account requireOwnedAccount(UUID accountId, String userId) {
         return accountRepository.findByIdAndUserId(accountId, userId)
@@ -189,19 +253,11 @@ public class TransactionImportService {
         return categoriesById;
     }
 
-    private boolean isDuplicate(String userId, LocalDate date, BigDecimal amount,
-                                @Nullable String description, @Nullable String externalRef) {
-        if (externalRef != null && !externalRef.isBlank()) {
-            return transactionRepository.existsByUserIdAndExternalRef(userId, externalRef);
-        }
-        return transactionRepository.existsByUserIdAndDateAndAmountAndDescription(userId, date, amount, description);
-    }
-
-    private static @Nullable String truncate(@Nullable String description) {
-        if (description == null || description.length() <= MAX_DESCRIPTION_LENGTH) {
+    private static @Nullable String truncateDescription(@Nullable String description) {
+        if (description == null || description.length() <= ImportLimits.MAX_DESCRIPTION_LENGTH) {
             return description;
         }
-        return description.substring(0, MAX_DESCRIPTION_LENGTH);
+        return description.substring(0, ImportLimits.MAX_DESCRIPTION_LENGTH);
     }
 
     /** Rules match against description and counterparty combined. */

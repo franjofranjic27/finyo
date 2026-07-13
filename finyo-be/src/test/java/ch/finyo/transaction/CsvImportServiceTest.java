@@ -3,8 +3,12 @@ package ch.finyo.transaction;
 import ch.finyo.account.Account;
 import ch.finyo.account.AccountRepository;
 import ch.finyo.account.AccountType;
+import ch.finyo.category.Category;
+import ch.finyo.category.CategoryRule;
 import ch.finyo.category.CategoryRuleMatcher;
 import ch.finyo.category.CategoryRuleService;
+import ch.finyo.category.CategoryType;
+import ch.finyo.common.DocumentProcessingException;
 import ch.finyo.common.ResourceNotFoundException;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CreationHelper;
@@ -328,6 +332,58 @@ class CsvImportServiceTest {
 
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.errors()).hasSize(1);
+    }
+
+    @Test
+    void importCsv_assigns_the_category_matched_by_the_users_keyword_rules() throws IOException {
+        givenAccountExists();
+        Category groceries = Category.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .name("Groceries")
+                .type(CategoryType.EXPENSE)
+                .build();
+        given(categoryRuleService.loadMatcher(USER_ID)).willReturn(CategoryRuleMatcher.of(List.of(
+                CategoryRule.builder()
+                        .id(UUID.randomUUID())
+                        .userId(USER_ID)
+                        .keyword("migros")
+                        .category(groceries)
+                        .build())));
+        MockMultipartFile file = csvFile("15.03.2025,-42.50,MIGROS Zuerich\n16.03.2025,-10.00,Unknown shop\n");
+
+        ImportResultResponse result = csvImportService.importCsv(file, customRequest(false, false), USER_ID);
+
+        assertThat(result.imported()).isEqualTo(2);
+        then(transactionRepository).should().saveAll(savedTransactions.capture());
+        List<Transaction> saved = savedTransactions.getValue();
+        assertThat(saved.get(0).getCategory()).isEqualTo(groceries);
+        assertThat(saved.get(1).getCategory()).isNull();
+    }
+
+    @Test
+    void importCsv_rejects_files_beyond_the_row_cap() {
+        givenAccountExists();
+        MockMultipartFile file = csvFile("15.03.2025,-1.00,row\n".repeat(10_001));
+        ImportRequest request = customRequest(false, false);
+
+        assertThatThrownBy(() -> csvImportService.importCsv(file, request, USER_ID))
+                .isInstanceOf(DocumentProcessingException.class)
+                .hasMessageContaining("maximum");
+        then(transactionRepository).should(never()).saveAll(any());
+    }
+
+    @Test
+    void importExcel_of_a_file_that_is_not_a_workbook_is_rejected_without_leaking_parser_internals() {
+        givenAccountExists();
+        MockMultipartFile file = new MockMultipartFile("file", "statement.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "<?xml version=\"1.0\"?><Document/>".getBytes(StandardCharsets.UTF_8));
+        ImportRequest request = customRequest(true, false);
+
+        assertThatThrownBy(() -> csvImportService.importExcel(file, request, USER_ID))
+                .isInstanceOf(DocumentProcessingException.class)
+                .hasMessage("The file could not be read as an Excel workbook (.xlsx)");
     }
 
     @Test

@@ -76,9 +76,9 @@ export function importCommitResult(
   overrides: Partial<ImportCommitResult> = {},
 ): ImportCommitResult {
   return {
-    total: 2,
+    totalRows: 2,
     imported: 2,
-    skipped: 0,
+    skippedDuplicates: 0,
     failed: 0,
     errors: [],
     ...overrides,

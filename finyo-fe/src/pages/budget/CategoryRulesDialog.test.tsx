@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CategoryRulesDialog } from './CategoryRulesDialog';
+import { ApiError } from '@/api/client';
 import { categoriesApi } from '@/api/categories';
 import { categoryRulesApi } from '@/api/categoryRules';
 import type { CategoryRule } from '@/api/categoryRules';
@@ -115,20 +116,38 @@ describe('CategoryRulesDialog', () => {
     expect(categoryRulesApi.delete).not.toHaveBeenCalled();
   });
 
-  it('shows the duplicate-keyword message on a 409', async () => {
-    vi.mocked(categoryRulesApi.create).mockRejectedValue(new Error('Request failed: 409'));
-    const user = userEvent.setup();
-    renderWithProviders(<CategoryRulesDialog onClose={vi.fn()} />);
-    await screen.findByText('MIGROS');
-
+  async function submitDuplicateKeyword(user: ReturnType<typeof userEvent.setup>) {
     await user.type(screen.getByLabelText('Keyword'), 'MIGROS');
     await user.click(screen.getByRole('combobox', { name: 'Category' }));
     await user.click(await screen.findByRole('option', { name: 'Lebensmittel' }));
     await user.click(screen.getByRole('button', { name: 'Add' }));
+  }
+
+  it('shows the duplicate-keyword message on a 409', async () => {
+    // exactly what apiRequest throws: a typed error, not a message containing "409"
+    vi.mocked(categoryRulesApi.create).mockRejectedValue(
+      new ApiError('A rule with this keyword already exists', 409),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<CategoryRulesDialog onClose={vi.fn()} />);
+    await screen.findByText('MIGROS');
+
+    await submitDuplicateKeyword(user);
 
     expect(
       await screen.findByText('A rule for this keyword already exists'),
     ).toBeInTheDocument();
+  });
+
+  it('shows the backend detail for any other error', async () => {
+    vi.mocked(categoryRulesApi.create).mockRejectedValue(new ApiError('Category not found', 404));
+    const user = userEvent.setup();
+    renderWithProviders(<CategoryRulesDialog onClose={vi.fn()} />);
+    await screen.findByText('MIGROS');
+
+    await submitDuplicateKeyword(user);
+
+    expect(await screen.findByText('Category not found')).toBeInTheDocument();
   });
 
   it('edits a rule via the inline form', async () => {

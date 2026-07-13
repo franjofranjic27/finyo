@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
 
 // The multipart preview upload bypasses apiRequest on purpose: the shared
 // client hardcodes Content-Type application/json, while FormData needs the
@@ -100,23 +100,13 @@ export interface ImportCommitRequest {
   rows: ImportCommitRow[];
 }
 
+/** Mirrors the backend ImportResultResponse — field names are the backend's. */
 export interface ImportCommitResult {
-  total: number;
+  totalRows: number;
   imported: number;
-  skipped: number;
+  skippedDuplicates: number;
   failed: number;
   errors: string[];
-}
-
-/** RFC-7807 ProblemDetail error from the statement-import endpoints. */
-export class TransactionImportError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'TransactionImportError';
-    this.status = status;
-  }
 }
 
 function listQuery({ from, to, page = 0, size = 50 }: TransactionListParams): string {
@@ -150,6 +140,8 @@ export const transactionsApi = {
 /**
  * Uploads a bank statement for a dry-run parse. Nothing is persisted —
  * the caller confirms the previewed rows via `transactionsApi.commitImport`.
+ *
+ * @throws ApiError on any non-2xx response (413 too large, 422 unreadable file, …)
  */
 export async function previewImport(
   token: string,
@@ -172,7 +164,7 @@ export async function previewImport(
 
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new TransactionImportError(
+    throw new ApiError(
       problem?.detail?.trim() ? problem.detail : `Request failed: ${response.status}`,
       response.status,
     );

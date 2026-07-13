@@ -248,8 +248,12 @@ function MonthCategoryBreakdown({ items }: Readonly<{ items: RangeCategoryBreakd
                   className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground"
                   style={item.categoryColor ? { backgroundColor: item.categoryColor } : undefined}
                 />
+                {/* the backend labels the null-category group "Uncategorized" in English —
+                    key off the id so the label follows the UI language */}
                 <span className="min-w-0 truncate">
-                  {item.categoryName ?? t('budget.month.uncategorized')}
+                  {item.categoryId === null
+                    ? t('budget.month.uncategorized')
+                    : item.categoryName}
                 </span>
                 <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
                   {formatPercent(item.percentage)}

@@ -5,6 +5,7 @@ import ch.finyo.account.AccountRepository;
 import ch.finyo.category.Category;
 import ch.finyo.category.CategoryRuleMatcher;
 import ch.finyo.category.CategoryRuleService;
+import ch.finyo.common.DocumentProcessingException;
 import ch.finyo.common.ResourceNotFoundException;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -59,20 +61,43 @@ public class CsvImportService {
         return processRows(rows, mapping, account, userId, request.skipDuplicates());
     }
 
-    /** Reads the raw CSV cell matrix (header stripped when configured). Shared with the preview flow. */
+    /**
+     * Reads the raw CSV cell matrix (header stripped when configured). Shared with the preview flow.
+     *
+     * @throws DocumentProcessingException when the bytes are not readable as CSV (e.g. a forced
+     *         format override) or exceed {@link ImportLimits#MAX_ROWS} — a client error, not a 500
+     */
     List<String[]> readCsvRows(MultipartFile file, CsvColumnMapping mapping) throws IOException {
         CsvParserSettings settings = new CsvParserSettings();
         settings.setHeaderExtractionEnabled(mapping.hasHeader());
         settings.setDelimiterDetectionEnabled(true, ',', ';');
 
-        CsvParser parser = new CsvParser(settings);
-        return parser.parseAll(file.getInputStream(), "UTF-8");
+        try (InputStream in = file.getInputStream()) {
+            return capped(new CsvParser(settings).parseAll(in, "UTF-8"));
+        } catch (DocumentProcessingException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // parser internals (line/column pointers, buffer dumps) must not reach the client
+            log.warn("CSV parsing failed: {}", e.getClass().getSimpleName());
+            throw new DocumentProcessingException("The file could not be read as a CSV file");
+        }
     }
 
-    /** Reads the raw cell matrix of the first sheet. Shared with the preview flow. */
+    /**
+     * Reads the raw cell matrix of the first sheet. Shared with the preview flow.
+     *
+     * @throws DocumentProcessingException when the bytes are not an OOXML workbook (e.g. a forced
+     *         format override) or exceed {@link ImportLimits#MAX_ROWS} — a client error, not a 500
+     */
     List<String[]> readExcelRows(MultipartFile file, CsvColumnMapping mapping) throws IOException {
+        try (InputStream in = file.getInputStream()) {
+            return readSheet(in, mapping);
+        }
+    }
+
+    private List<String[]> readSheet(InputStream in, CsvColumnMapping mapping) {
         List<String[]> rows = new ArrayList<>();
-        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+        try (Workbook workbook = new XSSFWorkbook(in)) {
             Sheet sheet = workbook.getSheetAt(0);
             int startRow = mapping.hasHeader() ? 1 : 0;
             for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
@@ -85,6 +110,16 @@ public class CsvImportService {
                 }
                 rows.add(rowData);
             }
+        } catch (IOException | RuntimeException e) {
+            log.warn("Excel parsing failed: {}", e.getClass().getSimpleName());
+            throw new DocumentProcessingException("The file could not be read as an Excel workbook (.xlsx)");
+        }
+        return capped(rows);
+    }
+
+    private static List<String[]> capped(List<String[]> rows) {
+        if (rows.size() > ImportLimits.MAX_ROWS) {
+            throw new DocumentProcessingException(ImportLimits.TOO_MANY_ROWS_MESSAGE);
         }
         return rows;
     }
@@ -160,9 +195,9 @@ public class CsvImportService {
 
     /**
      * Parses one raw statement row without saving anything. Returns empty when
-     * the date or amount cell is blank (silently skipped, matching the legacy
-     * behavior) and throws for structurally broken rows (missing columns,
-     * unparseable date or amount). Shared with the preview flow.
+     * the date or amount cell is blank — the caller counts such a row as FAILED
+     * but without an error entry — and throws for structurally broken rows
+     * (missing columns, unparseable date or amount). Shared with the preview flow.
      */
     Optional<ParsedRow> parseRow(String[] row, CsvColumnMapping mapping, DateTimeFormatter formatter) {
         if (row.length <= Math.max(mapping.dateColumn(), mapping.amountColumn())) {

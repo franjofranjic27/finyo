@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/auth/useAuth';
 import { accountsApi } from '@/api/accounts';
-import { previewImport, transactionsApi, TransactionImportError } from '@/api/transactions';
+import { ApiError } from '@/api/client';
+import { previewImport, transactionsApi } from '@/api/transactions';
 import type {
   CsvPreset, ImportCommitResult, ImportFormat, ImportPreview, ImportPreviewRow,
 } from '@/api/transactions';
@@ -45,7 +46,7 @@ function isAcceptedFile(file: File): boolean {
 }
 
 function previewErrorMessage(error: Error, t: (key: string) => string): string {
-  if (error instanceof TransactionImportError) {
+  if (error instanceof ApiError) {
     if (error.status === 413) return t('budget.import.errors.tooLarge');
     if (error.status === 422) {
       return error.message.startsWith('Request failed')
@@ -54,6 +55,14 @@ function previewErrorMessage(error: Error, t: (key: string) => string): string {
     }
   }
   return error.message;
+}
+
+/**
+ * Duplicates carrying a bank reference are unique per user by design — the
+ * backend always skips them, so they cannot be opted into.
+ */
+function isLocked(row: ImportPreviewRow): boolean {
+  return row.duplicate && !!row.externalRef;
 }
 
 interface StatementImportDialogProps {
@@ -109,8 +118,10 @@ export function StatementImportDialog({
       return transactionsApi.commitImport(token, {
         accountId,
         format: data.format,
-        // The selection is authoritative; only re-skip duplicates server-side
-        // when the user did not explicitly opt into any of them.
+        // The flag only governs the date/amount/description heuristic: checking a
+        // flagged row means "import it anyway". Rows with a bank reference cannot be
+        // checked (see isLocked) and are skipped server-side in any case, so this
+        // never runs the batch into the unique-reference conflict.
         skipDuplicates: !rows.some((row) => row.duplicate),
         rows: rows.map((row) => ({
           date: row.date,
@@ -150,15 +161,21 @@ export function StatementImportDialog({
     }
   };
 
+  const rejectFile = (message: string) => {
+    // drop the rejected file so a later account or preset change cannot re-preview it
+    setFile(null);
+    setClientError(message);
+  };
+
   const handleFile = (selected: File) => {
     setClientError(null);
     preview.reset();
     if (!isAcceptedFile(selected)) {
-      setClientError(t('budget.import.errors.invalidFile'));
+      rejectFile(t('budget.import.errors.invalidFile'));
       return;
     }
     if (selected.size > MAX_FILE_BYTES) {
-      setClientError(t('budget.import.errors.tooLarge'));
+      rejectFile(t('budget.import.errors.tooLarge'));
       return;
     }
     setFile(selected);
@@ -246,7 +263,9 @@ export function StatementImportDialog({
               </p>
             )}
 
-            {preview.data && file ? (
+            {/* while a re-preview (account or preset change) is in flight the previous
+                table would be stale — show the analysing state instead */}
+            {preview.data && file && !preview.isPending ? (
               <ImportPreviewPanel
                 file={file}
                 preview={preview.data}
@@ -332,10 +351,13 @@ function Dropzone({ isProcessing, onDrop, onBrowse }: Readonly<DropzoneProps>) {
   );
 }
 
-function DuplicatePill() {
+function DuplicatePill({ locked }: Readonly<{ locked: boolean }>) {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-500">
+    <span
+      title={locked ? t('budget.import.duplicateLocked') : undefined}
+      className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-500"
+    >
       {t('budget.import.duplicate')}
     </span>
   );
@@ -456,6 +478,7 @@ interface PreviewRowProps {
 
 function PreviewRow({ row, checked, language, onToggle }: Readonly<PreviewRowProps>) {
   const { t } = useTranslation();
+  const locked = isLocked(row);
 
   return (
     <TableRow className={checked ? '' : 'text-muted-foreground'}>
@@ -463,6 +486,8 @@ function PreviewRow({ row, checked, language, onToggle }: Readonly<PreviewRowPro
         <Checkbox
           aria-label={`${t('budget.import.selectRow')}: ${row.description}`}
           checked={checked}
+          disabled={locked}
+          title={locked ? t('budget.import.duplicateLocked') : undefined}
           onCheckedChange={(value) => onToggle(value === true)}
         />
       </TableCell>
@@ -478,7 +503,7 @@ function PreviewRow({ row, checked, language, onToggle }: Readonly<PreviewRowPro
           '—'
         )}
       </TableCell>
-      <TableCell>{row.duplicate && <DuplicatePill />}</TableCell>
+      <TableCell>{row.duplicate && <DuplicatePill locked={locked} />}</TableCell>
     </TableRow>
   );
 }
@@ -494,7 +519,7 @@ function ImportResult({
       <p className="text-sm">
         {t('budget.import.resultSummary', {
           imported: result.imported,
-          skipped: result.skipped,
+          skipped: result.skippedDuplicates,
           failed: result.failed,
         })}
       </p>

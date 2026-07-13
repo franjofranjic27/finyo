@@ -3,10 +3,11 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StatementImportDialog } from './StatementImportDialog';
 import { accountsApi } from '@/api/accounts';
-import { previewImport, transactionsApi, TransactionImportError } from '@/api/transactions';
+import { ApiError } from '@/api/client';
+import { previewImport, transactionsApi } from '@/api/transactions';
 import { renderWithProviders } from '@/test/test-utils';
 import { bankAccount } from '@/test/fixtures/accounts';
-import { importCommitResult, importPreview } from '@/test/fixtures/transactions';
+import { importCommitResult, importPreview, importPreviewRow } from '@/test/fixtures/transactions';
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -29,7 +30,6 @@ vi.mock('@/api/accounts', async (importOriginal) => {
   };
 });
 
-// Keep TransactionImportError real so instanceof checks in the dialog work.
 vi.mock('@/api/transactions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/transactions')>();
   return {
@@ -52,6 +52,8 @@ async function selectAccountAndUpload(user: ReturnType<typeof userEvent.setup>) 
 
 describe('StatementImportDialog', () => {
   beforeEach(() => {
+    vi.mocked(previewImport).mockReset();
+    vi.mocked(transactionsApi.commitImport).mockReset();
     vi.mocked(accountsApi.getAll).mockResolvedValue([bankAccount({ id: 'a1' })]);
   });
 
@@ -78,7 +80,7 @@ describe('StatementImportDialog', () => {
   it('commits only the checked rows and shows the result summary', async () => {
     vi.mocked(previewImport).mockResolvedValue(importPreview());
     vi.mocked(transactionsApi.commitImport).mockResolvedValue(
-      importCommitResult({ total: 1, imported: 1 }),
+      importCommitResult({ totalRows: 1, imported: 1 }),
     );
     const user = userEvent.setup();
     const { queryClient } = renderWithProviders(
@@ -115,6 +117,64 @@ describe('StatementImportDialog', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['analytics'] });
   });
 
+  it('renders the skipped count from the backend result fields', async () => {
+    vi.mocked(previewImport).mockResolvedValue(importPreview());
+    vi.mocked(transactionsApi.commitImport).mockResolvedValue(
+      importCommitResult({ totalRows: 3, imported: 1, skippedDuplicates: 2 }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<StatementImportDialog open onOpenChange={vi.fn()} />);
+
+    await selectAccountAndUpload(user);
+    await screen.findByText('MIGROS ZUERICH');
+    await user.click(screen.getByRole('button', { name: 'Import 2 transactions' }));
+
+    expect(await screen.findByText('1 imported, 2 skipped, 0 failed')).toBeInTheDocument();
+  });
+
+  it('locks duplicates that carry a bank reference and lets heuristic duplicates be imported anyway', async () => {
+    vi.mocked(previewImport).mockResolvedValue(
+      importPreview({
+        rows: [
+          importPreviewRow({
+            index: 0,
+            description: 'COOP PRONTO',
+            duplicate: true,
+          }),
+          importPreviewRow({
+            index: 1,
+            description: 'SBB EASYRIDE',
+            duplicate: true,
+            externalRef: 'ref-1',
+          }),
+        ],
+      }),
+    );
+    vi.mocked(transactionsApi.commitImport).mockResolvedValue(importCommitResult());
+    const user = userEvent.setup();
+    renderWithProviders(<StatementImportDialog open onOpenChange={vi.fn()} />);
+
+    await selectAccountAndUpload(user);
+    await screen.findByText('COOP PRONTO');
+
+    // a duplicate with a bank reference can never be re-imported — the unique index rejects it
+    expect(screen.getByRole('checkbox', { name: 'Import row: SBB EASYRIDE' })).toBeDisabled();
+
+    // the heuristic duplicate can be opted into, and the server-side re-check is then relaxed
+    await user.click(screen.getByRole('checkbox', { name: 'Import row: COOP PRONTO' }));
+    await user.click(screen.getByRole('button', { name: 'Import 1 transactions' }));
+
+    await waitFor(() =>
+      expect(transactionsApi.commitImport).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({
+          skipDuplicates: false,
+          rows: [expect.objectContaining({ description: 'COOP PRONTO', externalRef: null })],
+        }),
+      ),
+    );
+  });
+
   it('renders the suggested category as a badge and — when missing', async () => {
     vi.mocked(previewImport).mockResolvedValue(importPreview());
     const user = userEvent.setup();
@@ -127,9 +187,7 @@ describe('StatementImportDialog', () => {
   });
 
   it('shows a readable message when the preview fails with 422', async () => {
-    vi.mocked(previewImport).mockRejectedValue(
-      new TransactionImportError('Unreadable statement file', 422),
-    );
+    vi.mocked(previewImport).mockRejectedValue(new ApiError('Unreadable statement file', 422));
     const user = userEvent.setup();
     renderWithProviders(<StatementImportDialog open onOpenChange={vi.fn()} />);
 
@@ -139,15 +197,28 @@ describe('StatementImportDialog', () => {
   });
 
   it('maps a 413 to the too-large message', async () => {
-    vi.mocked(previewImport).mockRejectedValue(
-      new TransactionImportError('Request failed: 413', 413),
-    );
+    vi.mocked(previewImport).mockRejectedValue(new ApiError('Request failed: 413', 413));
     const user = userEvent.setup();
     renderWithProviders(<StatementImportDialog open onOpenChange={vi.fn()} />);
 
     await selectAccountAndUpload(user);
 
     expect(await screen.findByText('The file is larger than 10 MB')).toBeInTheDocument();
+  });
+
+  it('drops a rejected file so a later account change does not preview it', async () => {
+    const oversized = new File(['x'], 'statement.csv', { type: 'text/csv' });
+    Object.defineProperty(oversized, 'size', { value: 11 * 1024 * 1024 });
+    const user = userEvent.setup();
+    renderWithProviders(<StatementImportDialog open onOpenChange={vi.fn()} />);
+
+    await user.upload(screen.getByLabelText('Choose file'), oversized);
+    expect(await screen.findByText('The file is larger than 10 MB')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('combobox', { name: 'Account' }));
+    await user.click(await screen.findByRole('option', { name: 'Privatkonto' }));
+
+    expect(previewImport).not.toHaveBeenCalled();
   });
 
   it('hints at missing accounts', async () => {

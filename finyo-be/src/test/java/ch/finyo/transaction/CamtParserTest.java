@@ -3,6 +3,7 @@ package ch.finyo.transaction;
 import ch.finyo.common.DocumentProcessingException;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.Month;
@@ -155,7 +156,7 @@ class CamtParserTest {
     }
 
     @Test
-    void entry_level_acct_svcr_ref_is_used_when_the_transaction_has_none() {
+    void the_transaction_end_to_end_id_wins_over_the_entry_level_reference() {
         List<CamtEntry> entries = parser.parse(camt04("""
                 <Ntry>
                   <Amt Ccy="CHF">10.00</Amt>
@@ -172,7 +173,48 @@ class CamtParserTest {
                 """));
 
         assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).externalRef()).isEqualTo("E2E-2");
+    }
+
+    @Test
+    void entry_level_acct_svcr_ref_is_the_last_resort_for_a_single_transaction_entry() {
+        List<CamtEntry> entries = parser.parse(camt04("""
+                <Ntry>
+                  <Amt Ccy="CHF">10.00</Amt>
+                  <CdtDbtInd>DBIT</CdtDbtInd>
+                  <Sts>BOOK</Sts>
+                  <BookgDt><Dt>2025-05-05</Dt></BookgDt>
+                  <AcctSvcrRef>ENTRY-REF-2</AcctSvcrRef>
+                  <NtryDtls>
+                    <TxDtls>
+                      <RmtInf><Ustrd>Ohne Referenzen</Ustrd></RmtInf>
+                    </TxDtls>
+                  </NtryDtls>
+                </Ntry>
+                """));
+
+        assertThat(entries).hasSize(1);
         assertThat(entries.get(0).externalRef()).isEqualTo("ENTRY-REF-2");
+    }
+
+    @Test
+    void references_longer_than_the_column_width_are_truncated() {
+        String longRef = "R".repeat(300);
+        List<CamtEntry> entries = parser.parse(camt04("""
+                <Ntry>
+                  <Amt Ccy="CHF">10.00</Amt>
+                  <CdtDbtInd>DBIT</CdtDbtInd>
+                  <Sts>BOOK</Sts>
+                  <BookgDt><Dt>2025-05-05</Dt></BookgDt>
+                  <NtryDtls>
+                    <TxDtls><Refs><AcctSvcrRef>%s</AcctSvcrRef></Refs></TxDtls>
+                  </NtryDtls>
+                </Ntry>
+                """.formatted(longRef)));
+
+        // an untruncated reference would preview fine and then fail the whole commit (@Size(max=255))
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).externalRef()).hasSize(255).isEqualTo("R".repeat(255));
     }
 
     @Test
@@ -227,8 +269,8 @@ class CamtParserTest {
     @Test
     void batch_entry_expands_into_one_row_per_transaction_with_individual_amounts() {
         // Sammelbuchung: entry total 100, two sub-transactions with own amounts
-        // (one direct Amt, one AmtDtls/TxAmt shape) and one without an amount
-        // that falls back to the signed entry amount.
+        // (one direct Amt, one AmtDtls/TxAmt in the entry currency) and one
+        // without an amount that falls back to the signed entry amount.
         List<CamtEntry> entries = parser.parse(camt04("""
                 <Ntry>
                   <Amt Ccy="CHF">100.00</Amt>
@@ -245,7 +287,7 @@ class CamtParserTest {
                     </TxDtls>
                     <TxDtls>
                       <Refs><AcctSvcrRef>BATCH-TX-2</AcctSvcrRef></Refs>
-                      <AmtDtls><TxAmt><Amt Ccy="EUR">30.00</Amt></TxAmt></AmtDtls>
+                      <AmtDtls><TxAmt><Amt Ccy="CHF">30.00</Amt></TxAmt></AmtDtls>
                       <RmtInf><Ustrd>Teilzahlung zwei</Ustrd></RmtInf>
                     </TxDtls>
                     <TxDtls>
@@ -260,9 +302,77 @@ class CamtParserTest {
         assertThat(entries.get(0).description()).isEqualTo("Teilzahlung eins");
         assertThat(entries.get(0).externalRef()).isEqualTo("BATCH-TX-1");
         assertThat(entries.get(1).amount()).isEqualByComparingTo("-30.00");
-        assertThat(entries.get(1).currency()).isEqualTo("EUR");
+        assertThat(entries.get(1).currency()).isEqualTo("CHF");
         assertThat(entries.get(2).amount()).isEqualByComparingTo("-100.00");
         assertThat(entries.get(2).externalRef()).isEqualTo("BATCH-TX-3");
+    }
+
+    @Test
+    void batch_sub_transactions_keep_their_own_end_to_end_ids_and_never_share_the_entry_reference() {
+        // The entry-level AcctSvcrRef is shared by the whole Sammelbuchung. Handing it to every
+        // sub-transaction made them collide on (user, external_ref) and the commit silently dropped
+        // all but the first — so sub-transactions use their own refs, or none at all.
+        List<CamtEntry> entries = parser.parse(camt04("""
+                <Ntry>
+                  <Amt Ccy="CHF">75.00</Amt>
+                  <CdtDbtInd>DBIT</CdtDbtInd>
+                  <Sts>BOOK</Sts>
+                  <BookgDt><Dt>2025-06-02</Dt></BookgDt>
+                  <AcctSvcrRef>SHARED-ENTRY-REF</AcctSvcrRef>
+                  <NtryDtls>
+                    <Btch><NbOfTxs>3</NbOfTxs></Btch>
+                    <TxDtls>
+                      <Refs><EndToEndId>E2E-BATCH-1</EndToEndId></Refs>
+                      <Amt Ccy="CHF">25.00</Amt>
+                      <RmtInf><Ustrd>Lastschrift eins</Ustrd></RmtInf>
+                    </TxDtls>
+                    <TxDtls>
+                      <Refs><EndToEndId>E2E-BATCH-2</EndToEndId></Refs>
+                      <Amt Ccy="CHF">30.00</Amt>
+                      <RmtInf><Ustrd>Lastschrift zwei</Ustrd></RmtInf>
+                    </TxDtls>
+                    <TxDtls>
+                      <Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs>
+                      <Amt Ccy="CHF">20.00</Amt>
+                      <RmtInf><Ustrd>Lastschrift drei</Ustrd></RmtInf>
+                    </TxDtls>
+                  </NtryDtls>
+                </Ntry>
+                """));
+
+        assertThat(entries).hasSize(3);
+        assertThat(entries).extracting(CamtEntry::externalRef)
+                .containsExactly("E2E-BATCH-1", "E2E-BATCH-2", null);
+        assertThat(entries).extracting(CamtEntry::description)
+                .containsExactly("Lastschrift eins", "Lastschrift zwei", "Lastschrift drei");
+        assertThat(entries).extracting(CamtEntry::amount)
+                .usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("-25.00"), new BigDecimal("-30.00"), new BigDecimal("-20.00"));
+    }
+
+    @Test
+    void foreign_currency_tx_amount_is_ignored_in_favour_of_the_entry_amount() {
+        // AmtDtls/TxAmt is the amount in the ORIGINAL currency: EUR 30.00 booked as -30.00 into a
+        // CHF account would skew every sum, since nothing converts currencies downstream.
+        List<CamtEntry> entries = parser.parse(camt04("""
+                <Ntry>
+                  <Amt Ccy="CHF">32.45</Amt>
+                  <CdtDbtInd>DBIT</CdtDbtInd>
+                  <Sts>BOOK</Sts>
+                  <BookgDt><Dt>2025-06-03</Dt></BookgDt>
+                  <NtryDtls>
+                    <TxDtls>
+                      <Refs><AcctSvcrRef>FX-TX-1</AcctSvcrRef></Refs>
+                      <AmtDtls><TxAmt><Amt Ccy="EUR">30.00</Amt></TxAmt></AmtDtls>
+                      <RmtInf><Ustrd>Onlineshop EU</Ustrd></RmtInf>
+                    </TxDtls>
+                  </NtryDtls>
+                </Ntry>
+                """));
+
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).amount()).isEqualByComparingTo("-32.45");
+        assertThat(entries.get(0).currency()).isEqualTo("CHF");
     }
 
     // =========================================================================

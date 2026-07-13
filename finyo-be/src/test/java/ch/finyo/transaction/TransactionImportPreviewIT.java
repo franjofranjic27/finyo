@@ -199,6 +199,21 @@ class TransactionImportPreviewIT extends BaseIntegrationTest {
     }
 
     @Test
+    void preview_with_a_format_override_that_does_not_match_the_file_returns_422() throws Exception {
+        // 'format' is client-supplied: forcing EXCEL onto XML bytes must be a client error,
+        // not a POI stack trace behind a 500
+        mockMvc.perform(multipart("/api/v1/transactions/import/preview")
+                        .file(camtFile(CAMT_XML))
+                        .param("accountId", account.getId().toString())
+                        .param("format", "EXCEL")
+                        .with(asUser()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail", is("The file could not be read as an Excel workbook (.xlsx)")));
+
+        assertThat(transactionRepository.count()).isZero();
+    }
+
+    @Test
     void preview_of_a_malformed_xml_file_returns_422() throws Exception {
         mockMvc.perform(multipart("/api/v1/transactions/import/preview")
                         .file(camtFile("<html><body>not a statement</body></html>"))

@@ -27,26 +27,31 @@ import java.util.List;
  *   <li>Date: {@code BookgDt} (date part of {@code Dt}/{@code DtTm}),
  *       falling back to {@code ValDt}.</li>
  *   <li>Sammelbuchungen: one {@link CamtEntry} per {@code TxDtls}, using the
- *       per-transaction amount ({@code Amt} or {@code AmtDtls/TxAmt/Amt})
- *       when present, else the entry amount. Limitation: the entry-level
- *       debit/credit sign is applied to every sub-transaction — mixed-sign
- *       batches are not decomposed.</li>
+ *       per-transaction amount ({@code Amt}, or {@code AmtDtls/TxAmt/Amt} when
+ *       that is booked in the entry currency) when present, else the entry
+ *       amount. Limitation: the entry-level debit/credit sign is applied to
+ *       every sub-transaction — mixed-sign batches are not decomposed.</li>
  *   <li>External reference precedence: {@code TxDtls/Refs/AcctSvcrRef} &gt;
- *       entry-level {@code AcctSvcrRef} &gt; {@code EndToEndId} (the literal
- *       {@code NOTPROVIDED} is ignored); may be null.</li>
+ *       {@code TxDtls/Refs/EndToEndId} (the literal {@code NOTPROVIDED} is
+ *       ignored). The entry-level {@code AcctSvcrRef} is a last resort for
+ *       single-transaction entries only: it is shared by all sub-transactions
+ *       of a batch and would make them collide on the unique (user,
+ *       external_ref) index. Sub-transactions without an own reference get a
+ *       null reference and fall back to the date/amount/description duplicate
+ *       heuristic.</li>
  * </ul>
  *
  * <p>Security hardening: DTDs and external entities are disabled and any DTD
  * event aborts parsing (XXE / billion laughs). Documents are capped at
- * {@value #MAX_ENTRIES} entries and element text is truncated at
- * {@value #MAX_TEXT_LENGTH} characters. File contents are never logged —
- * counts only.
+ * {@link ImportLimits#MAX_ROWS} entries, element text is truncated at
+ * {@value #MAX_TEXT_LENGTH} characters and references at
+ * {@link ImportLimits#MAX_EXTERNAL_REF_LENGTH}. File contents are never
+ * logged — counts only.
  */
 @Slf4j
 @Component
 public class CamtParser {
 
-    private static final int MAX_ENTRIES = 10_000;
     private static final int MAX_TEXT_LENGTH = 4_096;
     private static final String NOT_PROVIDED = "NOTPROVIDED";
     private static final String STATUS_BOOKED = "BOOK";
@@ -96,9 +101,8 @@ public class CamtParser {
                 } else if ("Ntry".equals(name)) {
                     entryElementCount++;
                     parseEntry(reader, entries);
-                    if (entryElementCount > MAX_ENTRIES || entries.size() > MAX_ENTRIES) {
-                        throw new DocumentProcessingException(
-                                "The camt.053 document exceeds the maximum of " + MAX_ENTRIES + " entries");
+                    if (entryElementCount > ImportLimits.MAX_ROWS || entries.size() > ImportLimits.MAX_ROWS) {
+                        throw new DocumentProcessingException(ImportLimits.TOO_MANY_ROWS_MESSAGE);
                     }
                 }
             }
@@ -123,7 +127,13 @@ public class CamtParser {
     // Entry parsing
     // -------------------------------------------------------------------------
 
-    private record TxDetail(@Nullable BigDecimal amount, @Nullable String currency,
+    /**
+     * @param amount   {@code TxDtls/Amt} — booked in the account currency.
+     * @param txAmount {@code TxDtls/AmtDtls/TxAmt/Amt} — the amount in the
+     *                 ORIGINAL currency of the payment, which is only usable
+     *                 when it happens to be the entry currency.
+     */
+    private record TxDetail(@Nullable AmountValue amount, @Nullable AmountValue txAmount,
                             @Nullable String acctSvcrRef, @Nullable String endToEndId,
                             @Nullable String description, @Nullable String creditorName,
                             @Nullable String debtorName) {
@@ -184,19 +194,48 @@ public class CamtParser {
         BigDecimal entryAmount = negative ? amount.negate() : amount;
 
         if (details.isEmpty()) {
-            out.add(new CamtEntry(date, entryAmount, currency, additionalInfo, null, entryRef));
+            out.add(new CamtEntry(date, entryAmount, currency, additionalInfo, null, truncateRef(entryRef)));
             return;
         }
+        boolean batch = details.size() > 1;
         for (TxDetail detail : details) {
-            BigDecimal detailAmount = detail.amount() != null
-                    ? (negative ? detail.amount().negate() : detail.amount())
+            AmountValue usable = usableAmount(detail, currency);
+            BigDecimal detailAmount = usable != null
+                    ? (negative ? usable.amount().negate() : usable.amount())
                     : entryAmount;
-            String detailCurrency = detail.currency() != null ? detail.currency() : currency;
+            String detailCurrency = usable != null && usable.currency() != null ? usable.currency() : currency;
             String description = firstNonBlank(detail.description(), additionalInfo);
             String counterparty = negative ? detail.creditorName() : detail.debtorName();
-            String externalRef = firstNonBlank(detail.acctSvcrRef(), entryRef, detail.endToEndId());
-            out.add(new CamtEntry(date, detailAmount, detailCurrency, description, counterparty, externalRef));
+            // the entry reference is shared by all sub-transactions of a batch —
+            // using it there would collapse them into one duplicate group
+            String externalRef = batch
+                    ? firstNonBlank(detail.acctSvcrRef(), detail.endToEndId())
+                    : firstNonBlank(detail.acctSvcrRef(), detail.endToEndId(), entryRef);
+            out.add(new CamtEntry(date, detailAmount, detailCurrency, description, counterparty,
+                    truncateRef(externalRef)));
         }
+    }
+
+    /**
+     * The per-transaction {@code Amt} is booked in the account currency and is always usable.
+     * {@code AmtDtls/TxAmt} however holds the amount in the payment's original currency — importing
+     * e.g. EUR 30.00 into a CHF account would skew every sum downstream (no FX conversion happens
+     * anywhere), so it is only accepted when it matches the entry currency. Otherwise the caller
+     * falls back to the entry amount.
+     */
+    private static @Nullable AmountValue usableAmount(TxDetail detail, @Nullable String entryCurrency) {
+        if (detail.amount() != null) {
+            return detail.amount();
+        }
+        AmountValue txAmount = detail.txAmount();
+        if (txAmount != null && matchesEntryCurrency(txAmount.currency(), entryCurrency)) {
+            return txAmount;
+        }
+        return null;
+    }
+
+    private static boolean matchesEntryCurrency(@Nullable String currency, @Nullable String entryCurrency) {
+        return currency == null || entryCurrency == null || currency.equalsIgnoreCase(entryCurrency);
     }
 
     /** Reader is positioned at {@code NtryDtls}; collects every {@code TxDtls} child. */
@@ -218,8 +257,8 @@ public class CamtParser {
     }
 
     private TxDetail parseTxDetails(XMLStreamReader reader) throws XMLStreamException {
-        BigDecimal amount = null;
-        String currency = null;
+        AmountValue amount = null;
+        AmountValue txAmount = null;
         String acctSvcrRef = null;
         String endToEndId = null;
         List<String> remittanceLines = new ArrayList<>();
@@ -241,14 +280,13 @@ public class CamtParser {
                     endToEndId = refs.endToEndId();
                 }
                 case "Amt" -> {
-                    currency = reader.getAttributeValue(null, "Ccy");
-                    amount = new BigDecimal(readElementText(reader));
+                    String currency = reader.getAttributeValue(null, "Ccy");
+                    amount = new AmountValue(new BigDecimal(readElementText(reader)), currency);
                 }
                 case "AmtDtls" -> {
-                    AmountValue txAmount = parseAmountDetails(reader);
-                    if (amount == null && txAmount != null) {
-                        amount = txAmount.amount();
-                        currency = txAmount.currency();
+                    AmountValue parsed = parseAmountDetails(reader);
+                    if (txAmount == null) {
+                        txAmount = parsed;
                     }
                 }
                 case "RmtInf" -> collectRemittanceLines(reader, remittanceLines);
@@ -262,7 +300,7 @@ public class CamtParser {
         }
 
         String description = remittanceLines.isEmpty() ? null : String.join(" ", remittanceLines);
-        return new TxDetail(amount, currency, acctSvcrRef, endToEndId, description, creditorName, debtorName);
+        return new TxDetail(amount, txAmount, acctSvcrRef, endToEndId, description, creditorName, debtorName);
     }
 
     private record RefValues(@Nullable String acctSvcrRef, @Nullable String endToEndId) {}
@@ -452,6 +490,14 @@ public class CamtParser {
             return null;
         }
         return LocalDate.parse(text.substring(0, 10));
+    }
+
+    /** Keeps references within the {@code external_ref} column width so a previewed row can be committed. */
+    private static @Nullable String truncateRef(@Nullable String reference) {
+        if (reference == null || reference.length() <= ImportLimits.MAX_EXTERNAL_REF_LENGTH) {
+            return reference;
+        }
+        return reference.substring(0, ImportLimits.MAX_EXTERNAL_REF_LENGTH);
     }
 
     private static @Nullable String firstNonBlank(@Nullable String... values) {

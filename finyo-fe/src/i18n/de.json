@@ -530,14 +530,12 @@
       "editTitle": "Monatsbudget bearbeiten"
     },
     "month": {
-      "title": "Monatsansicht",
       "loadError": "Monatsansicht konnte nicht geladen werden",
       "income": "Einnahmen",
       "expenses": "Ausgaben",
       "balance": "Saldo",
       "planVsActual": "Plan vs. Ist",
       "plan": "Plan",
-      "actual": "Ist",
       "plannedIncome": "Nettoeinkommen",
       "available": "Variable Ausgaben",
       "availableHint": "Ausgaben ohne Fixkosten, verglichen mit dem verfügbaren Betrag",
@@ -578,7 +576,7 @@
       "colStatus": "Status",
       "selectRow": "Zeile importieren",
       "duplicate": "Duplikat",
-      "new": "Neu",
+      "duplicateLocked": "Bereits importiert (Bankreferenz) — kein erneuter Import möglich",
       "parseErrors": "{{count}} Zeilen konnten nicht gelesen werden",
       "importCount": "{{count}} Transaktionen importieren",
       "resultSummary": "{{imported}} importiert, {{skipped}} übersprungen, {{failed}} fehlgeschlagen",

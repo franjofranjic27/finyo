@@ -9,6 +9,7 @@ import ch.finyo.category.CategoryRule;
 import ch.finyo.category.CategoryRuleMatcher;
 import ch.finyo.category.CategoryRuleService;
 import ch.finyo.category.CategoryType;
+import ch.finyo.common.DocumentProcessingException;
 import ch.finyo.common.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.time.Month;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,13 +36,15 @@ import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.times;
 import static org.mockito.Mockito.lenient;
 
 /**
  * Unit tests for the two-step statement import (no Spring context, no
  * database): format detection, duplicate flagging via external reference and
  * via the date/amount/description heuristic, rule-based category suggestions,
- * commit skip counting and tenant isolation for accounts and categories.
+ * commit skip counting, resource limits and tenant isolation for accounts and
+ * categories.
  *
  * Uses a real CsvImportService and a real CamtParser (both pure) so preview
  * covers actual parsing instead of stubbed row values.
@@ -176,7 +180,8 @@ class TransactionImportServiceTest {
     @Test
     void preview_detects_camt_and_flags_duplicates_via_the_external_reference() throws IOException {
         givenAccountExists();
-        given(transactionRepository.existsByUserIdAndExternalRef(USER_ID, "SYNTH-REF-1")).willReturn(true);
+        given(transactionRepository.findExistingExternalRefs(USER_ID, Set.of("SYNTH-REF-1")))
+                .willReturn(List.of("SYNTH-REF-1"));
         MockMultipartFile camtFile = file("statement.xml", "application/xml", CAMT_XML);
 
         ImportPreviewResponse response = importService.preview(camtFile, ACCOUNT_ID, csvParams(), null, USER_ID);
@@ -190,20 +195,20 @@ class TransactionImportServiceTest {
         assertThat(row.amount()).isEqualByComparingTo("-42.50");
         assertThat(row.counterparty()).isEqualTo("Migros Testfiliale");
         assertThat(row.externalRef()).isEqualTo("SYNTH-REF-1");
+        // rows with a reference never need the heuristic query
         then(transactionRepository).should(never())
-                .existsByUserIdAndDateAndAmountAndDescription(any(), any(), any(), any());
+                .findFingerprintsByUserIdAndDateBetween(any(), any(), any());
         then(transactionRepository).should(never()).saveAll(any());
     }
 
     @Test
     void preview_flags_csv_duplicates_via_the_date_amount_description_heuristic() throws IOException {
         givenAccountExists();
-        given(transactionRepository.existsByUserIdAndDateAndAmountAndDescription(
-                USER_ID, LocalDate.of(2025, Month.MARCH, 15), new BigDecimal("-42.50"), "Coffee"))
-                .willReturn(true);
-        given(transactionRepository.existsByUserIdAndDateAndAmountAndDescription(
-                USER_ID, LocalDate.of(2025, Month.MARCH, 16), new BigDecimal("-10.00"), "Tea"))
-                .willReturn(false);
+        // one range query for the whole batch instead of one query per row
+        given(transactionRepository.findFingerprintsByUserIdAndDateBetween(
+                USER_ID, LocalDate.of(2025, Month.MARCH, 15), LocalDate.of(2025, Month.MARCH, 16)))
+                .willReturn(List.of(new TransactionFingerprint(
+                        LocalDate.of(2025, Month.MARCH, 15), new BigDecimal("-42.5000"), "Coffee")));
         MockMultipartFile csvFile = file("import.csv", "text/csv",
                 "15.03.2025,-42.50,Coffee\n16.03.2025,-10.00,Tea\n");
 
@@ -216,6 +221,33 @@ class TransactionImportServiceTest {
         assertThat(response.rows().get(0).duplicate()).isTrue();
         assertThat(response.rows().get(1).duplicate()).isFalse();
         assertThat(response.rows().get(1).externalRef()).isNull();
+        then(transactionRepository).should(times(1))
+                .findFingerprintsByUserIdAndDateBetween(any(), any(), any());
+        then(transactionRepository).should(never()).findExistingExternalRefs(any(), any());
+    }
+
+    @Test
+    void preview_rejects_tabular_files_beyond_the_row_cap() {
+        givenAccountExists();
+        String tooManyRows = "15.03.2025,-1.00,row\n".repeat(10_001);
+        MockMultipartFile csvFile = file("import.csv", "text/csv", tooManyRows);
+        ImportRequest params = csvParams();
+
+        assertThatThrownBy(() -> importService.preview(csvFile, ACCOUNT_ID, params, null, USER_ID))
+                .isInstanceOf(DocumentProcessingException.class)
+                .hasMessageContaining("maximum");
+    }
+
+    @Test
+    void preview_wraps_a_wrong_format_override_into_a_processing_error() {
+        givenAccountExists();
+        // client-supplied override: forcing EXCEL onto XML bytes must not surface as a 500
+        MockMultipartFile camtFile = file("statement.xml", "application/xml", CAMT_XML);
+        ImportRequest params = csvParams();
+
+        assertThatThrownBy(() -> importService.preview(camtFile, ACCOUNT_ID, params, ImportFormat.EXCEL, USER_ID))
+                .isInstanceOf(DocumentProcessingException.class)
+                .hasMessageContaining("Excel workbook");
     }
 
     @Test
@@ -287,7 +319,8 @@ class TransactionImportServiceTest {
         givenAccountExists();
         Category groceries = buildCategory("Groceries");
         given(categoryRepository.findByIdAndUserId(groceries.getId(), USER_ID)).willReturn(Optional.of(groceries));
-        given(transactionRepository.existsByUserIdAndExternalRef(USER_ID, "SYNTH-REF-9")).willReturn(false);
+        given(transactionRepository.findExistingExternalRefs(USER_ID, Set.of("SYNTH-REF-9")))
+                .willReturn(List.of());
 
         ImportResultResponse result = importService.commit(new ImportCommitRequest(
                 ACCOUNT_ID, ImportFormat.CAMT053, true,
@@ -305,10 +338,33 @@ class TransactionImportServiceTest {
     }
 
     @Test
-    void commit_skips_duplicates_by_reference_and_within_the_batch_when_enabled() {
+    void commit_imports_every_batch_sub_transaction_without_a_reference() {
+        // Sammelbuchung: the parser leaves sub-transactions without an own reference at null, so
+        // they must each be persisted — they used to collapse into one "in-batch duplicate".
         givenAccountExists();
-        given(transactionRepository.existsByUserIdAndExternalRef(USER_ID, "EXISTING-REF")).willReturn(true);
-        given(transactionRepository.existsByUserIdAndExternalRef(USER_ID, "NEW-REF")).willReturn(false);
+        given(transactionRepository.findFingerprintsByUserIdAndDateBetween(
+                USER_ID, LocalDate.of(2025, Month.JUNE, 1), LocalDate.of(2025, Month.JUNE, 1)))
+                .willReturn(List.of());
+
+        ImportResultResponse result = importService.commit(new ImportCommitRequest(
+                ACCOUNT_ID, ImportFormat.CAMT053, true,
+                List.of(
+                        commitRow("2025-06-01", "-25.00", "Lastschrift eins", null, null),
+                        commitRow("2025-06-01", "-30.00", "Lastschrift zwei", null, null))), USER_ID);
+
+        assertThat(result.imported()).isEqualTo(2);
+        assertThat(result.skippedDuplicates()).isZero();
+        then(transactionRepository).should().saveAll(savedTransactions.capture());
+        assertThat(savedTransactions.getValue())
+                .extracting(Transaction::getDescription)
+                .containsExactly("Lastschrift eins", "Lastschrift zwei");
+    }
+
+    @Test
+    void commit_skips_duplicates_by_reference_and_guards_against_repeated_references_in_one_batch() {
+        givenAccountExists();
+        given(transactionRepository.findExistingExternalRefs(USER_ID, Set.of("EXISTING-REF", "NEW-REF")))
+                .willReturn(List.of("EXISTING-REF"));
 
         ImportResultResponse result = importService.commit(new ImportCommitRequest(
                 ACCOUNT_ID, ImportFormat.CAMT053, true,
@@ -329,9 +385,10 @@ class TransactionImportServiceTest {
     @Test
     void commit_uses_csv_import_source_and_the_heuristic_duplicate_check_without_references() {
         givenAccountExists();
-        given(transactionRepository.existsByUserIdAndDateAndAmountAndDescription(
-                USER_ID, LocalDate.of(2025, Month.MARCH, 15), new BigDecimal("-42.50"), "Coffee"))
-                .willReturn(true);
+        given(transactionRepository.findFingerprintsByUserIdAndDateBetween(
+                USER_ID, LocalDate.of(2025, Month.MARCH, 15), LocalDate.of(2025, Month.MARCH, 15)))
+                .willReturn(List.of(new TransactionFingerprint(
+                        LocalDate.of(2025, Month.MARCH, 15), new BigDecimal("-42.5000"), "Coffee")));
 
         ImportResultResponse result = importService.commit(new ImportCommitRequest(
                 ACCOUNT_ID, ImportFormat.CSV, true,
@@ -343,16 +400,36 @@ class TransactionImportServiceTest {
     }
 
     @Test
-    void commit_imports_duplicates_when_skipping_is_disabled() {
+    void commit_imports_heuristic_duplicates_when_skipping_is_disabled() {
         givenAccountExists();
-        given(transactionRepository.existsByUserIdAndExternalRef(USER_ID, "EXISTING-REF")).willReturn(true);
+        given(transactionRepository.findFingerprintsByUserIdAndDateBetween(
+                USER_ID, LocalDate.of(2025, Month.MARCH, 15), LocalDate.of(2025, Month.MARCH, 15)))
+                .willReturn(List.of(new TransactionFingerprint(
+                        LocalDate.of(2025, Month.MARCH, 15), new BigDecimal("-42.5000"), "Coffee")));
+
+        ImportResultResponse result = importService.commit(new ImportCommitRequest(
+                ACCOUNT_ID, ImportFormat.CSV, false,
+                List.of(commitRow("2025-03-15", "-42.50", "Coffee", null, null))), USER_ID);
+
+        assertThat(result.imported()).isEqualTo(1);
+        assertThat(result.skippedDuplicates()).isZero();
+    }
+
+    @Test
+    void commit_always_skips_rows_whose_reference_is_already_stored_even_without_skip_duplicates() {
+        // The partial unique index on (user_id, external_ref) would reject the insert and roll the
+        // whole batch back with a 409 — a known reference can never be re-imported.
+        givenAccountExists();
+        given(transactionRepository.findExistingExternalRefs(USER_ID, Set.of("EXISTING-REF")))
+                .willReturn(List.of("EXISTING-REF"));
 
         ImportResultResponse result = importService.commit(new ImportCommitRequest(
                 ACCOUNT_ID, ImportFormat.CAMT053, false,
                 List.of(commitRow("2025-03-15", "-1.00", "existing", "EXISTING-REF", null))), USER_ID);
 
-        assertThat(result.imported()).isEqualTo(1);
-        assertThat(result.skippedDuplicates()).isZero();
+        assertThat(result.imported()).isZero();
+        assertThat(result.skippedDuplicates()).isEqualTo(1);
+        then(transactionRepository).should().saveAll(List.of());
     }
 
     @Test

@@ -12,14 +12,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/auth/useAuth';
+import { ApiError } from '@/api/client';
 import { categoriesApi } from '@/api/categories';
 import { categoryRulesApi } from '@/api/categoryRules';
 import type { CategoryRule, CategoryRuleInput } from '@/api/categoryRules';
 import type { Category } from '@/types';
 
-/** Maps the opaque apiRequest error onto the duplicate-keyword message (409). */
+/**
+ * The backend answers a duplicate keyword with 409 and an English detail message —
+ * translate it, and fall back to the raw detail for everything else.
+ */
 function ruleErrorMessage(error: Error, t: (key: string) => string): string {
-  return error.message.includes('409') ? t('budget.rules.duplicate') : error.message;
+  return error instanceof ApiError && error.status === 409
+    ? t('budget.rules.duplicate')
+    : error.message;
 }
 
 interface RuleFormProps {

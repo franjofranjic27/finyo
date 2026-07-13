@@ -77,8 +77,9 @@ describe('MonthTab', () => {
         percentage: 25,
       },
       {
+        // the backend labels the null-category group in English — the UI must not show it
         categoryId: null,
-        categoryName: null,
+        categoryName: 'Uncategorized',
         categoryColor: null,
         total: '2400.00',
         percentage: 75,
@@ -97,7 +98,9 @@ describe('MonthTab', () => {
 
     expect(screen.getByText('Plan vs. actual')).toBeInTheDocument();
     expect(screen.getByText('Lebensmittel')).toBeInTheDocument();
+    // translated from the null category id, not passed through from the backend
     expect(screen.getByText('Uncategorised')).toBeInTheDocument();
+    expect(screen.queryByText('Uncategorized')).not.toBeInTheDocument();
 
     const { from, to } = monthRange(currentMonth());
     expect(analyticsApi.getSummaryRange).toHaveBeenCalledWith('test-token', from, to);

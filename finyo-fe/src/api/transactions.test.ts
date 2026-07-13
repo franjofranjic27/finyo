@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { previewImport, transactionsApi, TransactionImportError } from './transactions';
+import { previewImport, transactionsApi } from './transactions';
 import type { ImportCommitRequest, TransactionInput } from './transactions';
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
 
-vi.mock('./client', () => ({ apiRequest: vi.fn() }));
+// ApiError stays real: previewImport throws it and callers branch on `instanceof`.
+vi.mock('./client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./client')>()),
+  apiRequest: vi.fn(),
+}));
 
 const apiRequestMock = vi.mocked(apiRequest);
 const TOKEN = 'test-token';
@@ -105,16 +109,16 @@ describe('previewImport', () => {
     expect(body.get('hasHeader')).toBe('false');
   });
 
-  it('throws a TransactionImportError with the ProblemDetail message', async () => {
+  it('throws an ApiError with the ProblemDetail message', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ detail: 'Datei kann nicht gelesen werden' }), { status: 422 }),
     );
 
     const error = await previewImport(TOKEN, file, 'a1').catch((e: unknown) => e);
 
-    expect(error).toBeInstanceOf(TransactionImportError);
-    expect((error as TransactionImportError).status).toBe(422);
-    expect((error as TransactionImportError).message).toBe('Datei kann nicht gelesen werden');
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(422);
+    expect((error as ApiError).message).toBe('Datei kann nicht gelesen werden');
   });
 
   it('falls back to the status code when the error body is not JSON', async () => {
@@ -122,8 +126,8 @@ describe('previewImport', () => {
 
     const error = await previewImport(TOKEN, file, 'a1').catch((e: unknown) => e);
 
-    expect(error).toBeInstanceOf(TransactionImportError);
-    expect((error as TransactionImportError).status).toBe(413);
-    expect((error as TransactionImportError).message).toBe('Request failed: 413');
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(413);
+    expect((error as ApiError).message).toBe('Request failed: 413');
   });
 });

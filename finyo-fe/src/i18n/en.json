@@ -530,14 +530,12 @@
       "editTitle": "Edit monthly budget"
     },
     "month": {
-      "title": "Month view",
       "loadError": "Could not load the month view",
       "income": "Income",
       "expenses": "Expenses",
       "balance": "Balance",
       "planVsActual": "Plan vs. actual",
       "plan": "Plan",
-      "actual": "Actual",
       "plannedIncome": "Net income",
       "available": "Variable expenses",
       "availableHint": "Expenses excluding fixed costs, compared with the available amount",
@@ -578,7 +576,7 @@
       "colStatus": "Status",
       "selectRow": "Import row",
       "duplicate": "Duplicate",
-      "new": "New",
+      "duplicateLocked": "Already imported (bank reference) — cannot be imported again",
       "parseErrors": "{{count}} rows could not be read",
       "importCount": "Import {{count}} transactions",
       "resultSummary": "{{imported}} imported, {{skipped}} skipped, {{failed}} failed",

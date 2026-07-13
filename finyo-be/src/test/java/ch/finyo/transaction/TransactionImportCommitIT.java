@@ -144,6 +144,40 @@ class TransactionImportCommitIT extends BaseIntegrationTest {
     }
 
     @Test
+    void recommitting_a_known_bank_reference_is_skipped_even_without_skip_duplicates() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/import/commit").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commitBody(account.getId(), "CAMT053", true, camtRows())))
+                .andExpect(status().isOk());
+
+        // opting out of duplicate skipping must not run the batch into the partial unique index
+        // on (user_id, external_ref) — that 409 would roll back every row of the commit
+        mockMvc.perform(post("/api/v1/transactions/import/commit").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commitBody(account.getId(), "CAMT053", false, camtRows())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported", is(0)))
+                .andExpect(jsonPath("$.skippedDuplicates", is(2)));
+
+        assertThat(transactionRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void commit_persists_batch_rows_without_a_reference_that_only_differ_in_amount() throws Exception {
+        // sub-transactions of a Sammelbuchung carry no own reference — each one must land
+        mockMvc.perform(post("/api/v1/transactions/import/commit").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commitBody(account.getId(), "CAMT053", true, List.of(
+                                row("2025-06-01", "-25.00", "Lastschrift eins", null, null),
+                                row("2025-06-01", "-30.00", "Lastschrift zwei", null, null)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported", is(2)))
+                .andExpect(jsonPath("$.skippedDuplicates", is(0)));
+
+        assertThat(transactionRepository.count()).isEqualTo(2);
+    }
+
+    @Test
     void commit_with_a_csv_format_persists_the_csv_import_source() throws Exception {
         mockMvc.perform(post("/api/v1/transactions/import/commit").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
