@@ -128,6 +128,7 @@
       "gainLoss": "G/V",
       "returnPct": "Rendite",
       "allocation": "Anteil",
+      "edit": "Position bearbeiten",
       "remove": "Position entfernen",
       "confirmRemove": "Position «{{name}}» entfernen?",
       "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
@@ -179,6 +180,18 @@
         "factsheetUrl": "Factsheet-Link (URL)",
         "nameRequired": "Titel ist erforderlich",
         "terInvalid": "TER muss eine Zahl zwischen 0 und 10 sein"
+      },
+      "editPositionDialog": {
+        "title": "Position bearbeiten",
+        "quantity": "Anzahl",
+        "purchasePrice": "Ø Kaufkurs",
+        "purchaseDate": "Kaufdatum",
+        "currentPrice": "Aktueller Kurs (optional)",
+        "currentPriceHint": "Überschreibt den Marktkurs — ein Live-Kursabruf kann ihn wieder ersetzen",
+        "save": "Speichern",
+        "quantityInvalid": "Anzahl muss grösser als 0 sein",
+        "purchasePriceInvalid": "Kaufkurs muss 0 oder grösser sein",
+        "currentPriceInvalid": "Aktueller Kurs muss 0 oder grösser sein"
       },
       "factsheet": {
         "title": "Factsheet",

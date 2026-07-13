@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { positionDetailApi } from '@/api/positionDetail';
 import type { PositionDetail } from '@/api/positionDetail';
 import { formatCHF, formatPercent, amountColour } from '@/lib/formatters';
 import { EditInstrumentDialog } from './EditInstrumentDialog';
+import { EditPositionDialog } from './EditPositionDialog';
 import { FactsheetCard } from './FactsheetCard';
 
 function StatTile({ label, value, valueClass }: Readonly<{
@@ -108,6 +110,7 @@ export function PositionDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [editPositionOpen, setEditPositionOpen] = useState(false);
 
   const { data: position, isLoading, isError } = useQuery({
     queryKey: ['position', positionId],
@@ -146,14 +149,20 @@ export function PositionDetailPage() {
     <div className="space-y-6">
       {/* Instrument header */}
       <div className="space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-2xl font-semibold">{position.name}</h2>
-          <Badge variant="secondary">{t(`assetClass.${position.assetClass}`)}</Badge>
-          {position.priceSource === 'LIVE' && (
-            <Badge variant="outline" className="text-emerald-500">
-              {t('investments.position.liveChip')}
-            </Badge>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-semibold">{position.name}</h2>
+            <Badge variant="secondary">{t(`assetClass.${position.assetClass}`)}</Badge>
+            {position.priceSource === 'LIVE' && (
+              <Badge variant="outline" className="text-emerald-500">
+                {t('investments.position.liveChip')}
+              </Badge>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setEditPositionOpen(true)}>
+            <Pencil className="mr-1 h-4 w-4" aria-hidden="true" />
+            {t('investments.position.editPositionDialog.title')}
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">
           {[position.isin, position.currency].filter(Boolean).join(' · ')}
@@ -201,6 +210,18 @@ export function PositionDetailPage() {
       </div>
 
       {editOpen && <EditInstrumentDialog position={position} onClose={() => setEditOpen(false)} />}
+      {editPositionOpen && (
+        <EditPositionDialog
+          positionId={position.positionId}
+          initial={{
+            quantity: position.quantity,
+            purchasePrice: position.avgPurchasePrice,
+            purchaseDate: position.purchaseDate,
+            currentPrice: position.currentPrice,
+          }}
+          onClose={() => setEditPositionOpen(false)}
+        />
+      )}
     </div>
   );
 }

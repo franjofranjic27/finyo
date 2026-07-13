@@ -46,6 +46,37 @@ public class PositionDetailService {
         return portfolioService.getPositionDetail(positionId, userId);
     }
 
+    /**
+     * Applies the holding patch: quantity/purchasePrice/currentPrice only when
+     * present, purchaseDate always — null clears it (see
+     * {@link PositionPatchRequest} for the full contract). A present
+     * currentPrice always overwrites the instrument's manual price and its
+     * timestamp: the explicit user edit wins, although a later SIX refresh may
+     * overwrite it again.
+     *
+     * <p>The position and instrument writes are two separate transactions (the
+     * class is deliberately non-transactional); the instrument is loaded first
+     * so a failed lookup never leaves a partially applied patch behind.
+     */
+    public PositionDetailResponse updatePosition(UUID positionId, PositionPatchRequest patch, String userId) {
+        validate(patch);
+        Position position = positionRepository.findByIdAndUserId(positionId, userId)
+                .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
+        Instrument instrument = patch.currentPrice() == null ? null
+                : instrumentRepository.findByIdAndUserId(position.getInstrumentId(), userId)
+                        .orElseThrow(() ->
+                                ResourceNotFoundException.of(INSTRUMENT_RESOURCE, position.getInstrumentId()));
+        positionRepository.save(applyPatch(position, patch));
+        if (instrument != null) {
+            instrumentRepository.save(instrument.toBuilder()
+                    .lastPrice(patch.currentPrice())
+                    .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                    .build());
+        }
+        log.info("Updated holding for position={} user={}", positionId, userId);
+        return portfolioService.getPositionDetail(positionId, userId);
+    }
+
     /** Applies only the non-null fields of the patch to the position's instrument. */
     public PositionDetailResponse updateInstrument(UUID positionId, InstrumentPatchRequest patch, String userId) {
         validate(patch);
@@ -91,6 +122,47 @@ public class PositionDetailService {
                 .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
         return instrumentRepository.findByIdAndUserId(position.getInstrumentId(), userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(INSTRUMENT_RESOURCE, position.getInstrumentId()));
+    }
+
+    /**
+     * Value rules mirror {@link PositionService}'s message style. The empty
+     * check treats purchaseDate = null as "not provided" because the record
+     * cannot distinguish an absent field from an explicit null — an empty
+     * {@code {}} body must be a 400, so clearing the purchase date requires
+     * sending at least one other field.
+     */
+    private static void validate(PositionPatchRequest patch) {
+        if (patch.quantity() == null && patch.purchasePrice() == null
+                && patch.purchaseDate() == null && patch.currentPrice() == null) {
+            throw new IllegalArgumentException("at least one field must be provided");
+        }
+        if (patch.quantity() != null && patch.quantity().signum() <= 0) {
+            throw new IllegalArgumentException("quantity must be a positive number");
+        }
+        if (patch.purchasePrice() != null && patch.purchasePrice().signum() < 0) {
+            throw new IllegalArgumentException("purchasePrice must be zero or positive");
+        }
+        if (patch.currentPrice() != null && patch.currentPrice().signum() < 0) {
+            throw new IllegalArgumentException("currentPrice must be zero or positive");
+        }
+    }
+
+    /**
+     * quantity/purchasePrice are applied only when present (NOT NULL columns,
+     * never cleared); purchaseDate is always applied — the edit dialog sends
+     * the full field set and uses null as an explicit clear. toBuilder()
+     * preserves id, userId, instrumentId and createdAt.
+     */
+    private static Position applyPatch(Position position, PositionPatchRequest patch) {
+        Position.PositionBuilder builder = position.toBuilder();
+        if (patch.quantity() != null) {
+            builder.quantity(patch.quantity());
+        }
+        if (patch.purchasePrice() != null) {
+            builder.purchasePrice(patch.purchasePrice());
+        }
+        builder.purchaseDate(patch.purchaseDate());
+        return builder.build();
     }
 
     /** Presence-only rules that Bean Validation cannot express on optional fields. */

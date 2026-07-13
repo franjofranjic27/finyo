@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -30,13 +31,16 @@ import static org.mockito.BDDMockito.then;
  * Pure unit tests for PositionDetailService.
  *
  * Focus areas:
- *   1. PATCH semantics: name/assetClass only when present, valor/ter/
- *      factsheetUrl always (null/blank = clear); the stored factsheet
+ *   1. Instrument PATCH semantics: name/assetClass only when present, valor/
+ *      ter/factsheetUrl always (null/blank = clear); the stored factsheet
  *      PDF lives in its own table and is never touched by the patch.
- *   2. Presence-only validation: blank name, factsheet URL scheme.
- *   3. Factsheet upload validation: empty, oversized, non-PDF content,
+ *   2. Holding PATCH semantics: quantity/purchasePrice/currentPrice only when
+ *      present, purchaseDate always (null = clear, empty patch = 400);
+ *      currentPrice writes through to the instrument's manual price.
+ *   3. Presence-only validation: blank name, factsheet URL scheme.
+ *   4. Factsheet upload validation: empty, oversized, non-PDF content,
  *      filename sanitization.
- *   4. Multi-tenancy: a foreign position id is always a 404 and never mutates.
+ *   5. Multi-tenancy: a foreign position id is always a 404 and never mutates.
  */
 @ExtendWith(MockitoExtension.class)
 class PositionDetailServiceTest {
@@ -101,6 +105,109 @@ class PositionDetailServiceTest {
                 .build();
         given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID)).willReturn(Optional.of(position));
         given(instrumentRepository.findByIdAndUserId(INSTRUMENT_ID, USER_ID)).willReturn(Optional.of(instrument));
+    }
+
+    private Position existingPosition() {
+        return Position.builder()
+                .id(POSITION_ID)
+                .userId(USER_ID)
+                .instrumentId(INSTRUMENT_ID)
+                .quantity(BigDecimal.TEN)
+                .purchasePrice(new BigDecimal("100"))
+                .purchaseDate(LocalDate.of(2026, 1, 15))
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(30))
+                .build();
+    }
+
+    // =========================================================================
+    // updatePosition() — holding patch semantics
+    // =========================================================================
+
+    @Test
+    void updatePosition_applies_only_present_fields_and_preserves_identity() {
+        Position position = existingPosition();
+        given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID)).willReturn(Optional.of(position));
+
+        service.updatePosition(POSITION_ID,
+                new PositionPatchRequest(new BigDecimal("5"), null, LocalDate.of(2026, 3, 1), null), USER_ID);
+
+        then(positionRepository).should().save(argThat(saved ->
+                new BigDecimal("5").compareTo(saved.getQuantity()) == 0
+                        // purchasePrice absent from the patch — must survive
+                        && new BigDecimal("100").compareTo(saved.getPurchasePrice()) == 0
+                        && LocalDate.of(2026, 3, 1).equals(saved.getPurchaseDate())
+                        && USER_ID.equals(saved.getUserId())
+                        && INSTRUMENT_ID.equals(saved.getInstrumentId())
+                        && position.getCreatedAt().equals(saved.getCreatedAt())));
+        // no currentPrice in the patch — the instrument is never touched
+        then(instrumentRepository).shouldHaveNoInteractions();
+        then(portfolioService).should().getPositionDetail(POSITION_ID, USER_ID);
+    }
+
+    @Test
+    void updatePosition_clears_the_purchase_date_when_another_field_is_present() {
+        given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID))
+                .willReturn(Optional.of(existingPosition()));
+
+        service.updatePosition(POSITION_ID,
+                new PositionPatchRequest(null, new BigDecimal("90"), null, null), USER_ID);
+
+        then(positionRepository).should().save(argThat(saved ->
+                saved.getPurchaseDate() == null
+                        && new BigDecimal("90").compareTo(saved.getPurchasePrice()) == 0
+                        && BigDecimal.TEN.compareTo(saved.getQuantity()) == 0));
+    }
+
+    @Test
+    void updatePosition_rejects_an_all_null_patch() {
+        // {} must be a 400 — clearing purchaseDate alone is indistinguishable
+        // from an empty body and therefore requires another field.
+        PositionPatchRequest patch = new PositionPatchRequest(null, null, null, null);
+
+        assertThatThrownBy(() -> service.updatePosition(POSITION_ID, patch, USER_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one field");
+        then(positionRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void updatePosition_rejects_a_non_positive_quantity() {
+        PositionPatchRequest patch = new PositionPatchRequest(BigDecimal.ZERO, null, null, null);
+
+        assertThatThrownBy(() -> service.updatePosition(POSITION_ID, patch, USER_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("quantity");
+        then(positionRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void updatePosition_writes_the_current_price_onto_the_instrument_with_a_timestamp() {
+        given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID))
+                .willReturn(Optional.of(existingPosition()));
+        given(instrumentRepository.findByIdAndUserId(INSTRUMENT_ID, USER_ID))
+                .willReturn(Optional.of(existingInstrument().toBuilder()
+                        .lastPrice(new BigDecimal("80"))
+                        .build()));
+
+        service.updatePosition(POSITION_ID,
+                new PositionPatchRequest(null, null, LocalDate.of(2026, 3, 1),
+                        new BigDecimal("120")), USER_ID);
+
+        // the explicit user edit always overwrites the stored manual price
+        then(instrumentRepository).should().save(argThat(saved ->
+                new BigDecimal("120").compareTo(saved.getLastPrice()) == 0
+                        && saved.getLastPriceUpdatedAt() != null));
+    }
+
+    @Test
+    void updatePosition_throws_404_for_a_foreign_position() {
+        given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID)).willReturn(Optional.empty());
+        PositionPatchRequest patch = new PositionPatchRequest(BigDecimal.ONE, null, null, null);
+
+        assertThatThrownBy(() -> service.updatePosition(POSITION_ID, patch, USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class);
+        then(positionRepository).should(never()).save(any());
+        then(instrumentRepository).shouldHaveNoInteractions();
     }
 
     // =========================================================================
