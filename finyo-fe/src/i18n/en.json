@@ -128,6 +128,7 @@
       "gainLoss": "G/L",
       "returnPct": "Return",
       "allocation": "Share",
+      "edit": "Edit position",
       "remove": "Remove position",
       "confirmRemove": "Remove position \"{{name}}\"?",
       "empty": "No positions yet — add your first security above"
@@ -179,6 +180,18 @@
         "factsheetUrl": "Factsheet link (URL)",
         "nameRequired": "Title is required",
         "terInvalid": "TER must be a number between 0 and 10"
+      },
+      "editPositionDialog": {
+        "title": "Edit position",
+        "quantity": "Quantity",
+        "purchasePrice": "Avg. Purchase Price",
+        "purchaseDate": "Purchase Date",
+        "currentPrice": "Current Price (optional)",
+        "currentPriceHint": "Overrides the market price — a live price refresh may replace it again",
+        "save": "Save",
+        "quantityInvalid": "Quantity must be greater than 0",
+        "purchasePriceInvalid": "Purchase price must be 0 or greater",
+        "currentPriceInvalid": "Current price must be 0 or greater"
       },
       "factsheet": {
         "title": "Factsheet",

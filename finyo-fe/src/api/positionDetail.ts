@@ -20,6 +20,7 @@ export interface PositionDetail {
   currency: string;
   quantity: number;
   avgPurchasePrice: number;
+  purchaseDate: string | null;
   currentPrice: number;
   priceSource: PriceSource;
   priceUpdatedAt: string | null;
@@ -39,6 +40,18 @@ export interface UpdateInstrumentRequest {
   factsheetUrl?: string | null;
 }
 
+/**
+ * Holding patch: quantity/purchasePrice/currentPrice are applied only when
+ * present; purchaseDate is always applied — null is an explicit clear
+ * (requires at least one other field, an all-null patch is rejected).
+ */
+export interface UpdatePositionRequest {
+  quantity?: number;
+  purchasePrice?: number;
+  purchaseDate?: string | null;
+  currentPrice?: number;
+}
+
 /** Extracts the RFC-7807 `detail` from an error response and throws it. */
 async function throwProblem(response: Response): Promise<never> {
   const error = await response.json().catch(() => ({ detail: response.statusText }));
@@ -48,6 +61,13 @@ async function throwProblem(response: Response): Promise<never> {
 export const positionDetailApi = {
   getPosition: (token: string, positionId: string) =>
     apiRequest<PositionDetail>(`/positions/${positionId}`, {}, token),
+
+  updatePosition: (token: string, positionId: string, data: UpdatePositionRequest) =>
+    apiRequest<PositionDetail>(
+      `/positions/${positionId}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+      token,
+    ),
 
   updateInstrument: (token: string, positionId: string, data: UpdateInstrumentRequest) =>
     apiRequest<PositionDetail>(

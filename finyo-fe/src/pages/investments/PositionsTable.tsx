@@ -1,8 +1,8 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, Pencil, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/useAuth';
@@ -11,6 +11,7 @@ import type { AssetClass, PortfolioPosition } from '@/api/portfolio';
 import { formatCHF, formatPercent, amountColour } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { displayName } from './positionName';
+import { EditPositionDialog } from './EditPositionDialog';
 
 interface AssetClassGroup {
   assetClass: AssetClass;
@@ -56,10 +57,11 @@ function GroupHeaderRow({ group }: Readonly<{ group: AssetClassGroup }>) {
   );
 }
 
-function PositionRow({ position, index, onOpen, onRemove, removing }: Readonly<{
+function PositionRow({ position, index, onOpen, onEdit, onRemove, removing }: Readonly<{
   position: PortfolioPosition;
   index: number;
   onOpen: (position: PortfolioPosition) => void;
+  onEdit: (position: PortfolioPosition) => void;
   onRemove: (position: PortfolioPosition) => void;
   removing: boolean;
 }>) {
@@ -104,6 +106,18 @@ function PositionRow({ position, index, onOpen, onRemove, removing }: Readonly<{
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            aria-label={t('investments.table.edit')}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(position);
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-red-500"
             aria-label={t('investments.table.remove')}
             disabled={removing}
@@ -126,6 +140,7 @@ export function PositionsTable({ positions }: Readonly<{ positions: PortfolioPos
   const token = accessToken ?? '';
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [editing, setEditing] = useState<PortfolioPosition | null>(null);
 
   const deletePosition = useMutation({
     mutationFn: (id: string) => portfolioApi.deletePosition(token, id),
@@ -182,6 +197,7 @@ export function PositionsTable({ positions }: Readonly<{ positions: PortfolioPos
                         // sync with the allocation donut slice colours.
                         index={positions.indexOf(position)}
                         onOpen={openDetail}
+                        onEdit={setEditing}
                         onRemove={confirmRemove}
                         removing={deletePosition.isPending}
                       />
@@ -191,6 +207,18 @@ export function PositionsTable({ positions }: Readonly<{ positions: PortfolioPos
               </tbody>
             </table>
           </div>
+        )}
+        {editing && (
+          <EditPositionDialog
+            positionId={editing.positionId}
+            initial={{
+              quantity: editing.quantity,
+              purchasePrice: editing.purchasePrice,
+              purchaseDate: editing.purchaseDate,
+              currentPrice: editing.currentPrice,
+            }}
+            onClose={() => setEditing(null)}
+          />
         )}
       </CardContent>
     </Card>

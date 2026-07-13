@@ -19,6 +19,7 @@ export interface PortfolioPosition {
   valor: string | null;
   quantity: number;
   purchasePrice: number;
+  purchaseDate: string | null;
   currentPrice: number;
   priceSource: PriceSource;
   value: number;
