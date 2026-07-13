@@ -73,4 +73,21 @@ describe('OnboardingGate', () => {
 
     expect(await screen.findByText('onboarding wizard')).toBeInTheDocument();
   });
+
+  it('redirects completed users away from /onboarding to the dashboard', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue(userProfile({ onboardingCompleted: true }));
+
+    renderGate('/onboarding');
+
+    expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('onboarding wizard')).not.toBeInTheDocument();
+  });
+
+  it('keeps the wizard visible while the profile is still loading on /onboarding', () => {
+    vi.mocked(profileApi.get).mockReturnValue(new Promise(() => {}));
+
+    renderGate('/onboarding');
+
+    expect(screen.getByText('onboarding wizard')).toBeInTheDocument();
+  });
 });

@@ -6,16 +6,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SalaryService {
-
-    private static final BigDecimal TWELVE = new BigDecimal("12");
-    private static final BigDecimal THIRTEEN = new BigDecimal("13");
 
     private final SalaryProfileRepository salaryProfileRepository;
 
@@ -38,13 +34,12 @@ public class SalaryService {
                 .orElse(null);
 
         boolean thirteenthSalary = Boolean.TRUE.equals(request.thirteenthSalary());
-        BigDecimal monthsPerYear = thirteenthSalary ? THIRTEEN : TWELVE;
         // the entered gross is authoritative; the counterpart is derived
         BigDecimal grossYearly = inputMode == SalaryInputMode.YEARLY
                 ? request.grossYearly()
-                : request.grossMonthly().multiply(monthsPerYear);
+                : SalaryCalculationModel.deriveGrossYearly(request.grossMonthly(), thirteenthSalary);
         BigDecimal grossMonthly = inputMode == SalaryInputMode.YEARLY
-                ? request.grossYearly().divide(monthsPerYear, 2, RoundingMode.HALF_UP)
+                ? SalaryCalculationModel.deriveGrossMonthly(request.grossYearly(), thirteenthSalary)
                 : request.grossMonthly();
 
         var profile = SalaryProfile.builder()

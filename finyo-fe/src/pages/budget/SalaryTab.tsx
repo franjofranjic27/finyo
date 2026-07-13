@@ -71,6 +71,34 @@ function toFormState(salary: Salary): SalaryFormState {
 
 const roundToCents = (value: number) => Math.round(value * 100) / 100;
 
+/**
+ * Recomputes the counterpart gross from the field that was authoritative
+ * before the switch, so an edit made in the old mode is never silently
+ * discarded. An empty authoritative field leaves the counterpart untouched.
+ */
+function switchInputMode(prev: SalaryFormState, inputMode: SalaryInputMode): SalaryFormState {
+  if (prev.inputMode === inputMode) return prev;
+  const monthsPerYear = prev.thirteenthSalary ? 13 : 12;
+  if (inputMode === 'YEARLY') {
+    const grossMonthly = Number.parseFloat(prev.grossMonthly);
+    return {
+      ...prev,
+      inputMode,
+      grossYearly: Number.isFinite(grossMonthly)
+        ? String(roundToCents(grossMonthly * monthsPerYear))
+        : prev.grossYearly,
+    };
+  }
+  const grossYearly = Number.parseFloat(prev.grossYearly);
+  return {
+    ...prev,
+    inputMode,
+    grossMonthly: Number.isFinite(grossYearly)
+      ? String(roundToCents(grossYearly / monthsPerYear))
+      : prev.grossMonthly,
+  };
+}
+
 function toInput(form: SalaryFormState): SalaryInput {
   const num = (value: string) => Number.parseFloat(value) || 0;
   const monthsPerYear = form.thirteenthSalary ? 13 : 12;
@@ -169,7 +197,7 @@ function SalaryInputsCard({ form, setForm, onSubmit, saving, error }: Readonly<S
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const setInputMode = (inputMode: SalaryInputMode) =>
-    setForm((prev) => ({ ...prev, inputMode }));
+    setForm((prev) => switchInputMode(prev, inputMode));
 
   const grossMonthly = Number.parseFloat(form.grossMonthly) || 0;
   const grossYearly = Number.parseFloat(form.grossYearly) || 0;

@@ -717,7 +717,8 @@
     "chf": "CHF",
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus",
-    "language": "Sprache"
+    "language": "Sprache",
+    "toggleMenu": "Menü umschalten"
   },
   "auth": {
     "redirecting": "Anmeldung wird geladen …",

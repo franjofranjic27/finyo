@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.argThat;
 import static org.mockito.BDDMockito.given;
@@ -145,6 +146,18 @@ class UserProfileServiceTest {
 
         assertThat(response.onboardingCompleted()).isTrue();
         then(userProfileRepository).should().save(argThat(UserProfile::isOnboardingCompleted));
+    }
+
+    @Test
+    void upsert_with_a_birth_date_before_1900_is_rejected() {
+        UserProfileRequest request = new UserProfileRequest(
+                LocalDate.of(1899, 12, 31), null, null, null, null, null);
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> userProfileService.upsert(request, USER_ID))
+                .withMessage("birthDate must be in 1900 or later");
+
+        then(userProfileRepository).should(never()).save(any());
     }
 
     @Test

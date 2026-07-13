@@ -212,6 +212,26 @@ class SalaryIT extends BaseIntegrationTest {
     }
 
     @Test
+    void put_with_a_gross_monthly_above_100_million_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(salaryBody("100000001", false, "5.3", "1.1", "0.455", "0.17", "0", "0")))
+                .andExpect(status().isBadRequest());
+
+        assertThat(salaryProfileRepository.count()).isZero();
+    }
+
+    @Test
+    void put_with_a_gross_yearly_above_100_million_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(yearlyBody("100000000.01", false)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(salaryProfileRepository.count()).isZero();
+    }
+
+    @Test
     void other_user_still_sees_the_default_view_not_the_owners_profile() throws Exception {
         mockMvc.perform(put("/api/v1/salary").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)

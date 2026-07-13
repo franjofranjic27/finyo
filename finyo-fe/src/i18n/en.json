@@ -717,7 +717,8 @@
     "chf": "CHF",
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
-    "language": "Language"
+    "language": "Language",
+    "toggleMenu": "Toggle menu"
   },
   "auth": {
     "redirecting": "Signing you in …",

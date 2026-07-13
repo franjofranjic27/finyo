@@ -118,6 +118,16 @@ class ProfileIT extends BaseIntegrationTest {
     }
 
     @Test
+    void put_with_a_birth_date_before_1900_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/profile").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileBody("1899-12-31", "MARRIED", "NONE", "de", "DARK", true)))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userProfileRepository.count()).isZero();
+    }
+
+    @Test
     void put_with_an_unsupported_preferred_language_returns_400() throws Exception {
         mockMvc.perform(put("/api/v1/profile").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)

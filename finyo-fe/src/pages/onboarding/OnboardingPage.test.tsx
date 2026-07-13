@@ -3,10 +3,11 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { OnboardingPage } from './OnboardingPage';
+import { OnboardingGate } from '@/auth/OnboardingGate';
 import { profileApi } from '@/api/profile';
 import { salaryApi } from '@/api/salary';
 import { renderWithProviders } from '@/test/test-utils';
-import { userProfile } from '@/test/fixtures/profile';
+import { emptyUserProfile, userProfile } from '@/test/fixtures/profile';
 import { salary } from '@/test/fixtures/salary';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -31,19 +32,30 @@ vi.mock('@/api/salary', () => ({
   salaryApi: { get: vi.fn(), update: vi.fn() },
 }));
 
+// The wizard is rendered inside the OnboardingGate exactly like in main.tsx,
+// so the tests also prove that finishing does not bounce back to /onboarding.
 function renderOnboarding() {
   return renderWithProviders(
-    <Routes>
-      <Route path="/onboarding" element={<OnboardingPage />} />
-      <Route path="/dashboard" element={<div>dashboard page</div>} />
-    </Routes>,
+    <OnboardingGate>
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/dashboard" element={<div>dashboard page</div>} />
+      </Routes>
+    </OnboardingGate>,
     { route: '/onboarding' },
   );
 }
 
 describe('OnboardingPage', () => {
   beforeEach(() => {
-    vi.mocked(profileApi.update).mockResolvedValue(userProfile());
+    // Simulate the backend: after the PUT the GET reflects the completed
+    // onboarding, so the gate's refetch sees the up-to-date profile.
+    let currentProfile = emptyUserProfile();
+    vi.mocked(profileApi.get).mockImplementation(() => Promise.resolve(currentProfile));
+    vi.mocked(profileApi.update).mockImplementation(() => {
+      currentProfile = userProfile();
+      return Promise.resolve(currentProfile);
+    });
     vi.mocked(salaryApi.get).mockResolvedValue(salary());
     vi.mocked(salaryApi.update).mockResolvedValue(salary());
   });
@@ -89,6 +101,7 @@ describe('OnboardingPage', () => {
       expect(profileApi.update).toHaveBeenCalledWith('test-token', { onboardingCompleted: true }),
     );
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Welcome to finyo')).not.toBeInTheDocument();
     expect(salaryApi.update).not.toHaveBeenCalled();
   });
 
@@ -132,7 +145,10 @@ describe('OnboardingPage', () => {
         otherFixed: 11,
       }),
     );
+    // Lands on the dashboard exactly once — the gate must not bounce back.
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Welcome to finyo')).not.toBeInTheDocument();
+    expect(profileApi.update).toHaveBeenCalledTimes(1);
   });
 
   it('finish without a salary amount skips the salary update', async () => {

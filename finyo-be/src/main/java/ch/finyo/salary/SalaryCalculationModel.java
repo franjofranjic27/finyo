@@ -28,16 +28,30 @@ final class SalaryCalculationModel {
     private SalaryCalculationModel() {
     }
 
+    /** Yearly gross derived from the authoritative monthly gross (12 or 13 salaries). */
+    static BigDecimal deriveGrossYearly(BigDecimal grossMonthly, boolean thirteenthSalary) {
+        return grossMonthly.multiply(monthsPerYear(thirteenthSalary));
+    }
+
+    /** Monthly gross derived from the authoritative yearly gross, rounded to centimes. */
+    static BigDecimal deriveGrossMonthly(BigDecimal grossYearly, boolean thirteenthSalary) {
+        return grossYearly.divide(monthsPerYear(thirteenthSalary), 2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal monthsPerYear(boolean thirteenthSalary) {
+        return thirteenthSalary ? THIRTEEN : TWELVE;
+    }
+
     static SalaryResult calculate(SalaryProfile profile) {
-        BigDecimal monthsPerYear = profile.isThirteenthSalary() ? THIRTEEN : TWELVE;
+        boolean thirteenthSalary = profile.isThirteenthSalary();
         BigDecimal grossMonthly;
         BigDecimal grossYearly;
         if (profile.getInputMode() == SalaryInputMode.YEARLY) {
             grossYearly = profile.getGrossYearly().setScale(2, RoundingMode.HALF_UP);
-            grossMonthly = grossYearly.divide(monthsPerYear, 2, RoundingMode.HALF_UP);
+            grossMonthly = deriveGrossMonthly(grossYearly, thirteenthSalary);
         } else {
             grossMonthly = profile.getGrossMonthly();
-            grossYearly = grossMonthly.multiply(monthsPerYear).setScale(2, RoundingMode.HALF_UP);
+            grossYearly = deriveGrossYearly(grossMonthly, thirteenthSalary).setScale(2, RoundingMode.HALF_UP);
         }
 
         List<SalaryDeduction> deductions = List.of(

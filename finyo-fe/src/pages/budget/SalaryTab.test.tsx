@@ -139,6 +139,43 @@ describe('SalaryTab', () => {
     expect(screen.getByText("≈ CHF 5'787.00 per month")).toBeInTheDocument();
   });
 
+  it('recomputes the yearly gross from an edited monthly value when switching to yearly mode', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SalaryTab />);
+
+    const grossInput = await screen.findByLabelText('Gross salary per month');
+    await user.clear(grossInput);
+    await user.type(grossInput, '6000');
+    await user.click(screen.getByRole('button', { name: 'CHF per year' }));
+
+    expect(screen.getByLabelText('Gross salary per year')).toHaveValue(72000);
+  });
+
+  it('recomputes the monthly gross from an edited yearly value when switching back to monthly mode', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SalaryTab />);
+    await screen.findByLabelText('Gross salary per month');
+
+    await user.click(screen.getByRole('button', { name: 'CHF per year' }));
+    const yearlyInput = screen.getByLabelText('Gross salary per year');
+    await user.clear(yearlyInput);
+    await user.type(yearlyInput, '78000');
+    await user.click(screen.getByRole('button', { name: 'CHF per month' }));
+
+    expect(screen.getByLabelText('Gross salary per month')).toHaveValue(6500);
+  });
+
+  it('leaves the counterpart untouched when switching modes with an empty gross field', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SalaryTab />);
+
+    const grossInput = await screen.findByLabelText('Gross salary per month');
+    await user.clear(grossInput);
+    await user.click(screen.getByRole('button', { name: 'CHF per year' }));
+
+    expect(screen.getByLabelText('Gross salary per year')).toHaveValue(69444);
+  });
+
   it('submits the yearly gross with YEARLY mode and a derived monthly value', async () => {
     const user = userEvent.setup();
     renderWithProviders(<SalaryTab />);

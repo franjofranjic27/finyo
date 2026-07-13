@@ -58,7 +58,7 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
       {/* Mobile hamburger */}
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick}>
         <Menu className="h-5 w-5" />
-        <span className="sr-only">Toggle menu</span>
+        <span className="sr-only">{t('common.toggleMenu')}</span>
       </Button>
 
       {/* App wordmark — the page breadcrumb lives in the content area */}
@@ -123,7 +123,7 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              {t('auth.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

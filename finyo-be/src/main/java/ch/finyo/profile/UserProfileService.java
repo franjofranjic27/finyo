@@ -18,6 +18,9 @@ public class UserProfileService {
     /** Reference retirement age used for the derived planning figures (AHV reference age). */
     static final int REFERENCE_RETIREMENT_AGE = 65;
 
+    /** Plausibility floor for birth dates; anything earlier is a typo, not a person. */
+    private static final int MIN_BIRTH_YEAR = 1900;
+
     private final UserProfileRepository userProfileRepository;
 
     @Transactional(readOnly = true)
@@ -33,6 +36,7 @@ public class UserProfileService {
     @Transactional
     public UserProfileResponse upsert(UserProfileRequest request, String userId) {
         log.info("Upserting user profile for user={}", userId);
+        validateBirthDate(request.birthDate());
         var existing = userProfileRepository.findByUserId(userId);
         UUID existingId = existing.map(UserProfile::getId).orElse(null);
         boolean onboardingCompleted = request.onboardingCompleted() != null
@@ -53,6 +57,12 @@ public class UserProfileService {
         UserProfile saved = userProfileRepository.save(profile);
         log.info("Upserted user profile id={} for user={}", saved.getId(), userId);
         return UserProfileResponse.from(saved, LocalDate.now(SwissTime.ZONE));
+    }
+
+    private static void validateBirthDate(LocalDate birthDate) {
+        if (birthDate != null && birthDate.getYear() < MIN_BIRTH_YEAR) {
+            throw new IllegalArgumentException("birthDate must be in 1900 or later");
+        }
     }
 
     /** Age and retirement figures derived from the birth date; all null without one. */

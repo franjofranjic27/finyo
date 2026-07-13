@@ -84,7 +84,7 @@ describe('Header', () => {
     renderWithProviders(<Header onMenuClick={() => {}} />);
 
     await user.click(screen.getByText('AN'));
-    await user.click(await screen.findByRole('menuitem', { name: /Logout/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Log out' }));
 
     expect(logout).toHaveBeenCalledTimes(1);
   });
