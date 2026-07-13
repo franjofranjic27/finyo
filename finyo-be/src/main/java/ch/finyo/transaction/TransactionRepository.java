@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,7 +29,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    @Query("SELECT t.category.id, SUM(t.amount) FROM Transaction t WHERE t.userId = :userId AND t.date BETWEEN :from AND :to AND t.amount < 0 AND t.category IS NOT NULL GROUP BY t.category.id")
+    // uncategorized expenses are included as a NULL category-id group so the
+    // breakdown always sums up to the spending total
+    @Query("SELECT t.category.id, SUM(t.amount) FROM Transaction t WHERE t.userId = :userId AND t.date BETWEEN :from AND :to AND t.amount < 0 GROUP BY t.category.id")
     List<Object[]> sumExpensesByCategoryForPeriod(
             @Param("userId") String userId,
             @Param("from") LocalDate from,
@@ -45,4 +48,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             LocalDate date,
             BigDecimal amount,
             String description);
+
+    /** Batch duplicate check for statement rows that carry a bank reference. */
+    @Query("SELECT t.externalRef FROM Transaction t WHERE t.userId = :userId AND t.externalRef IN :externalRefs")
+    List<String> findExistingExternalRefs(
+            @Param("userId") String userId,
+            @Param("externalRefs") Collection<String> externalRefs);
+
+    /** Batch duplicate check for statement rows without a bank reference — one range query per import. */
+    @Query("""
+            SELECT new ch.finyo.transaction.TransactionFingerprint(t.date, t.amount, t.description)
+            FROM Transaction t
+            WHERE t.userId = :userId AND t.date BETWEEN :from AND :to
+            """)
+    List<TransactionFingerprint> findFingerprintsByUserIdAndDateBetween(
+            @Param("userId") String userId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }

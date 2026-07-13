@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,7 +7,15 @@ import { useAuth } from '@/auth/useAuth';
 import { budgetApi } from '@/api/budget';
 import { FixedCostsCard } from './FixedCostsCard';
 import { MonthlyBudgetCard } from './MonthlyBudgetCard';
+import { MonthTab } from './MonthTab';
 import { SalaryTab } from './SalaryTab';
+
+const TABS = ['plan', 'month', 'salary'] as const;
+type BudgetTab = (typeof TABS)[number];
+
+function isBudgetTab(value: string | null): value is BudgetTab {
+  return TABS.includes(value as BudgetTab);
+}
 
 function BudgetSkeleton() {
   return (
@@ -21,6 +30,11 @@ export function BudgetPage() {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
+
+  // The active tab lives in the URL so /budget?tab=month deep-links work.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab: BudgetTab = isBudgetTab(tabParam) ? tabParam : 'plan';
 
   const fixedCosts = useQuery({
     queryKey: ['fixed-costs'],
@@ -38,9 +52,15 @@ export function BudgetPage() {
   const isError = fixedCosts.isError || monthlyBudget.isError;
 
   return (
-    <Tabs defaultValue="plan">
+    <Tabs
+      value={tab}
+      onValueChange={(value) =>
+        setSearchParams(value === 'plan' ? {} : { tab: value }, { replace: true })
+      }
+    >
       <TabsList>
         <TabsTrigger value="plan">{t('budget.tabs.plan')}</TabsTrigger>
+        <TabsTrigger value="month">{t('budget.tabs.month')}</TabsTrigger>
         <TabsTrigger value="salary">{t('budget.tabs.salary')}</TabsTrigger>
       </TabsList>
       <TabsContent value="plan" className="mt-4">
@@ -57,6 +77,9 @@ export function BudgetPage() {
             </div>
           )}
         </div>
+      </TabsContent>
+      <TabsContent value="month" className="mt-4">
+        <MonthTab />
       </TabsContent>
       <TabsContent value="salary" className="mt-4">
         <SalaryTab />

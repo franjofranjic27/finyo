@@ -38,6 +38,7 @@ public class TransactionController {
 
     private final TransactionService transactionService;
     private final CsvImportService csvImportService;
+    private final TransactionImportService transactionImportService;
     private final UserContextProvider userContextProvider;
 
     @GetMapping
@@ -104,7 +105,8 @@ public class TransactionController {
     }
 
     @PostMapping(value = "/import/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Import transactions from a CSV file")
+    @Operation(summary = "Import transactions from a CSV file",
+            description = "Imported rows are auto-categorized via the user's category rules (keyword match on the description).")
     @ApiResponse(responseCode = "200", description = "Import completed")
     @ApiResponse(responseCode = "400", description = "Invalid file or parameters")
     @ApiResponse(responseCode = "404", description = "Account not found")
@@ -129,7 +131,8 @@ public class TransactionController {
     }
 
     @PostMapping(value = "/import/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Import transactions from an Excel file (.xlsx)")
+    @Operation(summary = "Import transactions from an Excel file (.xlsx)",
+            description = "Imported rows are auto-categorized via the user's category rules (keyword match on the description).")
     @ApiResponse(responseCode = "200", description = "Import completed")
     @ApiResponse(responseCode = "400", description = "Invalid file or parameters")
     @ApiResponse(responseCode = "404", description = "Account not found")
@@ -151,5 +154,50 @@ public class TransactionController {
                 -1, dateFormat, ".", hasHeader, skipDuplicates
         );
         return ResponseEntity.ok(csvImportService.importExcel(file, request, userId));
+    }
+
+    @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Preview a statement import (CSV, Excel or camt.053) without persisting anything",
+            description = "Detects the file format (override via 'format'), flags duplicate rows and suggests "
+                    + "categories from the user's category rules. The CSV column parameters are ignored for camt.053.")
+    @ApiResponse(responseCode = "200", description = "Preview computed")
+    @ApiResponse(responseCode = "400", description = "Invalid file or parameters")
+    @ApiResponse(responseCode = "404", description = "Account not found")
+    @ApiResponse(responseCode = "413", description = "File exceeds the upload size limit")
+    @ApiResponse(responseCode = "422", description = "File could not be processed (malformed or rejected camt.053)")
+    public ResponseEntity<ImportPreviewResponse> importPreview(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("accountId") UUID accountId,
+            @RequestParam(value = "format", required = false) ImportFormat format,
+            @RequestParam(value = "preset", defaultValue = "CUSTOM") String preset,
+            @RequestParam(value = "dateColumn", defaultValue = "0") int dateColumn,
+            @RequestParam(value = "amountColumn", defaultValue = "1") int amountColumn,
+            @RequestParam(value = "descriptionColumn", defaultValue = "2") int descriptionColumn,
+            @RequestParam(value = "dateFormat", defaultValue = "dd.MM.yyyy") String dateFormat,
+            @RequestParam(value = "hasHeader", defaultValue = "true") boolean hasHeader
+    ) throws IOException {
+        String userId = userContextProvider.getUserId();
+        log.info("POST /api/v1/transactions/import/preview user={} accountId={} format={}", userId, accountId, format);
+        ImportRequest csvParams = new ImportRequest(
+                accountId, preset, dateColumn, amountColumn, descriptionColumn,
+                -1, dateFormat, ".", hasHeader, true
+        );
+        return ResponseEntity.ok(transactionImportService.preview(file, accountId, csvParams, format, userId));
+    }
+
+    @PostMapping("/import/commit")
+    @Operation(summary = "Persist previously previewed statement rows",
+            description = "Duplicates are re-checked against the database. Rows whose bank reference "
+                    + "(external_ref) already exists are always skipped — they are unique per user by "
+                    + "design and could not be inserted anyway. 'skipDuplicates' only controls the "
+                    + "date/amount/description heuristic used for rows without a bank reference.")
+    @ApiResponse(responseCode = "200", description = "Import completed")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    @ApiResponse(responseCode = "404", description = "Account or Category not found")
+    public ResponseEntity<ImportResultResponse> importCommit(@Valid @RequestBody ImportCommitRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("POST /api/v1/transactions/import/commit user={} accountId={} rows={}",
+                userId, request.accountId(), request.rows().size());
+        return ResponseEntity.ok(transactionImportService.commit(request, userId));
     }
 }
