@@ -41,7 +41,23 @@
     "totalIncome": "Total Income",
     "biggestCategory": "Biggest Category",
     "spendingByCategory": "Spending by Category",
-    "monthlyOverview": "Monthly Overview"
+    "monthlyOverview": "Monthly Overview",
+    "transactionCount_one": "{{count}} transaction",
+    "transactionCount_other": "{{count}} transactions",
+    "wealthTotal": "Total wealth",
+    "allocation": "Allocation",
+    "ytd": "YTD",
+    "budgetStatus": "Budget this month",
+    "spentOfAvailable": "Variable expenses",
+    "incomeOfPlan": "Net income",
+    "empty": {
+      "noWealth": "No wealth buckets yet — add your accounts and depots to see your allocation.",
+      "createBuckets": "Set up wealth",
+      "noTransactions": "No transactions this month yet.",
+      "importStatement": "Import bank statement",
+      "noBudget": "No monthly budget planned yet.",
+      "setupBudget": "Plan budget"
+    }
   },
   "wealth": {
     "loadError": "Could not load wealth overview",

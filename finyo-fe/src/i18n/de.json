@@ -41,7 +41,23 @@
     "totalIncome": "Gesamteinkommen",
     "biggestCategory": "Grösste Kategorie",
     "spendingByCategory": "Ausgaben nach Kategorie",
-    "monthlyOverview": "Monatsübersicht"
+    "monthlyOverview": "Monatsübersicht",
+    "transactionCount_one": "{{count}} Transaktion",
+    "transactionCount_other": "{{count}} Transaktionen",
+    "wealthTotal": "Gesamtvermögen",
+    "allocation": "Allokation",
+    "ytd": "YTD",
+    "budgetStatus": "Budget diesen Monat",
+    "spentOfAvailable": "Variable Ausgaben",
+    "incomeOfPlan": "Nettoeinkommen",
+    "empty": {
+      "noWealth": "Noch keine Vermögenstöpfe — erfasse deine Konten und Depots, um die Allokation zu sehen.",
+      "createBuckets": "Vermögen einrichten",
+      "noTransactions": "Diesen Monat noch keine Transaktionen.",
+      "importStatement": "Kontoauszug importieren",
+      "noBudget": "Noch kein Monatsbudget geplant.",
+      "setupBudget": "Budget planen"
+    }
   },
   "wealth": {
     "loadError": "Vermögensübersicht konnte nicht geladen werden",
