@@ -22,8 +22,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 /**
- * Unit tests for the MANUAL/PORTFOLIO presence rules, the one-bucket-per-asset-class
- * invariant and the request-to-entity defaults of WealthBucketService.
+ * Unit tests for the per-source presence rules, the one-bucket-per-asset-class
+ * and one-PILLAR3-bucket-per-user invariants and the request-to-entity
+ * defaults of WealthBucketService.
  */
 @ExtendWith(MockitoExtension.class)
 class WealthBucketServiceTest {
@@ -44,6 +45,12 @@ class WealthBucketServiceTest {
     private static WealthBucketRequest portfolioRequest(String name, List<AssetClass> classes) {
         return new WealthBucketRequest(name, null, WealthSource.PORTFOLIO,
                 null, classes, null, null);
+    }
+
+    private static WealthBucketRequest pillar3Request(String name, String manualBalance,
+                                                      List<AssetClass> assetClasses) {
+        return new WealthBucketRequest(name, null, WealthSource.PILLAR3,
+                manualBalance != null ? new BigDecimal(manualBalance) : null, assetClasses, null, null);
     }
 
     private static WealthBucket portfolioBucket(UUID id, String name, String assetClasses) {
@@ -90,6 +97,57 @@ class WealthBucketServiceTest {
                 .isThrownBy(() -> bucketService.create(portfolioRequest("Broker", List.of()), USER_ID))
                 .withMessageContaining("assetClasses");
         then(bucketRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void pillar3_bucket_with_a_manual_balance_is_rejected() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> bucketService.create(pillar3Request("Säule 3a", "100", null), USER_ID))
+                .withMessageContaining("manualBalance must be empty for PILLAR3");
+        then(bucketRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void pillar3_bucket_with_asset_classes_is_rejected() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> bucketService.create(
+                        pillar3Request("Säule 3a", null, List.of(AssetClass.ETF)), USER_ID))
+                .withMessageContaining("assetClasses must be empty for PILLAR3");
+        then(bucketRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void second_pillar3_bucket_is_rejected() {
+        given(bucketRepository.existsByUserIdAndSource(USER_ID, WealthSource.PILLAR3)).willReturn(true);
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> bucketService.create(pillar3Request("Säule 3a II", null, null), USER_ID))
+                .withMessageContaining("PILLAR3 wealth bucket already exists");
+    }
+
+    @Test
+    void update_may_keep_the_pillar3_bucket_itself() {
+        UUID id = UUID.randomUUID();
+        WealthBucket existing = WealthBucket.builder()
+                .id(id)
+                .userId(USER_ID)
+                .name("Säule 3a")
+                .source(WealthSource.PILLAR3)
+                .monthlyRate(BigDecimal.ZERO)
+                .sortOrder(0)
+                .build();
+        given(bucketRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(existing));
+        given(bucketRepository.existsByUserIdAndSourceAndIdNot(USER_ID, WealthSource.PILLAR3, id))
+                .willReturn(false);
+        given(bucketRepository.existsByUserIdAndNameAndIdNot(USER_ID, "Vorsorge 3a", id)).willReturn(false);
+        given(bucketRepository.save(any(WealthBucket.class))).willAnswer(inv -> inv.getArgument(0));
+
+        WealthBucketResponse response = bucketService.update(id,
+                pillar3Request("Vorsorge 3a", null, null), USER_ID);
+
+        assertThat(response.source()).isEqualTo(WealthSource.PILLAR3);
+        assertThat(response.manualBalance()).isNull();
+        assertThat(response.assetClasses()).isEmpty();
     }
 
     // -------------------------------------------------------------------------
