@@ -5,12 +5,15 @@ import { CalculatorTab } from './CalculatorTab';
 import { taxApi } from '@/api/tax';
 import type { Pillar3Result } from '@/api/tax';
 import { pillar3Api } from '@/api/pillar3';
+import { profileApi } from '@/api/profile';
+import type { UserProfile } from '@/api/profile';
 import {
   pillar3Product,
   pillar3Result,
   pillar3Scenario,
   pillar3ScenarioInputs,
 } from '@/test/fixtures/pillar3';
+import { emptyUserProfile, userProfile } from '@/test/fixtures/profile';
 import { renderWithProviders } from '@/test/test-utils';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -39,6 +42,13 @@ vi.mock('@/api/pillar3', () => ({
     createScenario: vi.fn(),
     setDefaultScenario: vi.fn(),
     deleteScenario: vi.fn(),
+  },
+}));
+
+vi.mock('@/api/profile', () => ({
+  PROFILE_QUERY_KEY: ['profile'],
+  profileApi: {
+    get: vi.fn(),
   },
 }));
 
@@ -78,6 +88,7 @@ const savedScenario = pillar3Scenario({
 beforeEach(() => {
   vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
   vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+  vi.mocked(profileApi.get).mockResolvedValue(emptyUserProfile());
 });
 
 describe('CalculatorTab', () => {
@@ -201,6 +212,48 @@ describe('CalculatorTab', () => {
       'aria-pressed',
       'false',
     );
+  });
+
+  it('prefills the years to retirement from the profile with a hint', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue(userProfile({ yearsToRetirement: 29 }));
+    renderWithProviders(<CalculatorTab />);
+
+    expect(await screen.findByDisplayValue('29')).toBeInTheDocument();
+    expect(screen.getByText('Prefilled from your profile')).toBeInTheDocument();
+  });
+
+  it('sends the untouched profile prefill in the calculate payload', async () => {
+    vi.mocked(profileApi.get).mockResolvedValue(userProfile({ yearsToRetirement: 29 }));
+    vi.mocked(taxApi.calculatePillar3).mockResolvedValue(result);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await screen.findByDisplayValue('29');
+    await user.click(screen.getByRole('button', { name: /Calculate/ }));
+
+    await waitFor(() => expect(taxApi.calculatePillar3).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(taxApi.calculatePillar3).mock.calls[0];
+    expect(payload).toMatchObject({ yearsToRetirement: 29 });
+  });
+
+  it('does not replace a user-typed years value with the profile', async () => {
+    let resolveProfile!: (profile: UserProfile) => void;
+    vi.mocked(profileApi.get).mockReturnValue(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    const yearsInput = screen.getByDisplayValue('30');
+    await user.clear(yearsInput);
+    await user.type(yearsInput, '25');
+
+    resolveProfile(userProfile({ yearsToRetirement: 29 }));
+
+    await waitFor(() => expect(yearsInput).toHaveValue(25));
+    expect(screen.queryByText('Prefilled from your profile')).not.toBeInTheDocument();
   });
 
   it('saves the current form state as a scenario via the inline panel', async () => {

@@ -37,6 +37,7 @@ vi.mock('@/api/portfolio', async (importOriginal) => {
 vi.mock('@/api/positionDetail', () => ({
   positionDetailApi: {
     getPosition: vi.fn(),
+    updatePosition: vi.fn(),
     updateInstrument: vi.fn(),
     uploadFactsheet: vi.fn(),
     fetchFactsheet: vi.fn(),
@@ -73,6 +74,7 @@ const detail = positionDetail({
   currency: 'CHF',
   quantity: 10,
   avgPurchasePrice: 90,
+  purchaseDate: '2026-01-15',
   currentPrice: 100,
   value: 1000,
   gainLoss: 100,
@@ -83,6 +85,7 @@ const detail = positionDetail({
 describe('PositionDetailPage', () => {
   beforeEach(() => {
     vi.mocked(positionDetailApi.getPosition).mockResolvedValue(detail);
+    vi.mocked(positionDetailApi.updatePosition).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.updateInstrument).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.uploadFactsheet).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.deleteFactsheet).mockResolvedValue(undefined);
@@ -156,6 +159,34 @@ describe('PositionDetailPage', () => {
         valor: '3886335',
         ter: 0.2,
         factsheetUrl: null,
+      }),
+    );
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['position', 'p1'] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['portfolio'] });
+  });
+
+  it('PATCHes the holding from the edit-holding dialog and refreshes the queries', async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await user.click(await screen.findByRole('button', { name: 'Edit position' }));
+    // the dialog is prefilled from the loaded detail
+    expect(screen.getByLabelText('Quantity')).toHaveValue(10);
+    expect(screen.getByLabelText('Purchase Date')).toHaveValue('2026-01-15');
+
+    const quantityInput = screen.getByLabelText('Quantity');
+    await user.clear(quantityInput);
+    await user.type(quantityInput, '12');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(positionDetailApi.updatePosition).toHaveBeenCalledWith('test-token', 'p1', {
+        quantity: 12,
+        purchasePrice: 90,
+        purchaseDate: '2026-01-15',
       }),
     );
     await waitFor(() =>

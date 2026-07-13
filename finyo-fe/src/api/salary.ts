@@ -23,8 +23,17 @@ export interface SalaryResult {
   netYearly: number;
 }
 
+/**
+ * Which gross field the user entered. With YEARLY the entered yearly gross is
+ * the total annual gross INCLUDING the 13th salary (if enabled); the monthly
+ * gross is derived by the backend (yearly / 13 or / 12).
+ */
+export type SalaryInputMode = 'MONTHLY' | 'YEARLY';
+
 export interface Salary {
   grossMonthly: number;
+  grossYearly: number;
+  inputMode: SalaryInputMode;
   thirteenthSalary: boolean;
   ahvPct: number;
   alvPct: number;
@@ -37,6 +46,8 @@ export interface Salary {
 
 export interface SalaryInput {
   grossMonthly: number;
+  grossYearly: number;
+  inputMode: SalaryInputMode;
   thirteenthSalary: boolean;
   ahvPct: number;
   alvPct: number;

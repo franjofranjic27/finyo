@@ -56,6 +56,19 @@ class SalaryIT extends BaseIntegrationTest {
         return salaryBody("5787", false, "5.3", "1.1", "0.455", "0.17", "85.35", "11");
     }
 
+    private String yearlyBody(String grossYearly, boolean thirteenthSalary) {
+        return objectMapper.writeValueAsString(Map.of(
+                "inputMode", "YEARLY",
+                "grossYearly", grossYearly,
+                "thirteenthSalary", thirteenthSalary,
+                "ahvPct", "5.3",
+                "alvPct", "1.1",
+                "nbuPct", "0.455",
+                "ktgPct", "0.17",
+                "pensionFixed", "85.35",
+                "otherFixed", "11"));
+    }
+
     private JsonNode getSalary(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor user) throws Exception {
         String body = mockMvc.perform(get("/api/v1/salary").with(user))
                 .andExpect(status().isOk())
@@ -133,6 +146,57 @@ class SalaryIT extends BaseIntegrationTest {
     }
 
     @Test
+    void put_in_yearly_mode_stores_the_yearly_gross_and_derives_the_monthly_view() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(yearlyBody("100000", true)))
+                .andExpect(status().isOk());
+
+        JsonNode json = getSalary(asUser());
+        assertThat(json.get("inputMode").asText()).isEqualTo("YEARLY");
+        assertThat(decimal(json, "grossYearly")).isEqualByComparingTo("100000");
+        // 100000 / 13 = 7692.307... -> 7692.31 (HALF_UP)
+        assertThat(decimal(json, "grossMonthly")).isEqualByComparingTo("7692.31");
+
+        JsonNode result = json.get("result");
+        // the entered yearly gross is redisplayed exactly as the annual total
+        assertThat(decimal(result, "grossYearly")).isEqualByComparingTo("100000.00");
+        assertThat(decimal(result, "grossMonthly")).isEqualByComparingTo("7692.31");
+    }
+
+    @Test
+    void put_in_monthly_mode_echoes_the_derived_yearly_gross() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(referenceBody()))
+                .andExpect(status().isOk());
+
+        JsonNode json = getSalary(asUser());
+        assertThat(json.get("inputMode").asText()).isEqualTo("MONTHLY");
+        assertThat(decimal(json, "grossMonthly")).isEqualByComparingTo("5787");
+        assertThat(decimal(json, "grossYearly")).isEqualByComparingTo("69444");
+    }
+
+    @Test
+    void put_in_yearly_mode_without_gross_yearly_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "inputMode", "YEARLY",
+                                "grossMonthly", "5787",
+                                "thirteenthSalary", false,
+                                "ahvPct", "5.3",
+                                "alvPct", "1.1",
+                                "nbuPct", "0.455",
+                                "ktgPct", "0.17",
+                                "pensionFixed", "85.35",
+                                "otherFixed", "11"))))
+                .andExpect(status().isBadRequest());
+
+        assertThat(salaryProfileRepository.count()).isZero();
+    }
+
+    @Test
     void put_with_negative_gross_or_out_of_range_percentage_returns_400() throws Exception {
         mockMvc.perform(put("/api/v1/salary").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -142,6 +206,26 @@ class SalaryIT extends BaseIntegrationTest {
         mockMvc.perform(put("/api/v1/salary").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(salaryBody("5787", false, "101", "1.1", "0.455", "0.17", "0", "0")))
+                .andExpect(status().isBadRequest());
+
+        assertThat(salaryProfileRepository.count()).isZero();
+    }
+
+    @Test
+    void put_with_a_gross_monthly_above_100_million_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(salaryBody("100000001", false, "5.3", "1.1", "0.455", "0.17", "0", "0")))
+                .andExpect(status().isBadRequest());
+
+        assertThat(salaryProfileRepository.count()).isZero();
+    }
+
+    @Test
+    void put_with_a_gross_yearly_above_100_million_returns_400() throws Exception {
+        mockMvc.perform(put("/api/v1/salary").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(yearlyBody("100000000.01", false)))
                 .andExpect(status().isBadRequest());
 
         assertThat(salaryProfileRepository.count()).isZero();

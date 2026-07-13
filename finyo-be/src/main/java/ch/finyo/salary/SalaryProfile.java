@@ -26,8 +26,15 @@ public class SalaryProfile {
     @Column(name = "user_id", nullable = false, unique = true)
     private String userId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "input_mode", nullable = false, length = 10)
+    private SalaryInputMode inputMode;
+
     @Column(name = "gross_monthly", precision = 19, scale = 4, nullable = false)
     private BigDecimal grossMonthly;
+
+    @Column(name = "gross_yearly", precision = 19, scale = 4, nullable = false)
+    private BigDecimal grossYearly;
 
     @Column(name = "thirteenth_salary", nullable = false)
     private boolean thirteenthSalary;
@@ -61,12 +68,15 @@ public class SalaryProfile {
     /**
      * Unsaved default profile for users without a salary_profile row yet.
      * The rate defaults mirror the column defaults in V25 (common Swiss
-     * employee contributions: AHV/IV/EO 5.3%, ALV 1.1%, NBU 0.455%, KTG 0.17%).
+     * employee contributions: AHV/IV/EO 5.3%, ALV 1.1%, NBU 0.455%, KTG 0.17%);
+     * the input-mode defaults mirror V28 (MONTHLY, gross_yearly 0).
      */
     static SalaryProfile withDefaults(String userId) {
         return SalaryProfile.builder()
                 .userId(userId)
+                .inputMode(SalaryInputMode.MONTHLY)
                 .grossMonthly(BigDecimal.ZERO)
+                .grossYearly(BigDecimal.ZERO)
                 .thirteenthSalary(false)
                 .ahvPct(new BigDecimal("5.3"))
                 .alvPct(new BigDecimal("1.1"))

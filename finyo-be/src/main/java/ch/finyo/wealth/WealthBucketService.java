@@ -13,8 +13,10 @@ import java.util.UUID;
 
 /**
  * CRUD for wealth buckets, including the source-dependent presence rules and
- * the invariant that each asset class is linked to at most one bucket per user
- * (a class linked twice would double-count its portfolio value in the overview).
+ * two uniqueness invariants that prevent double counting in the overview:
+ * each asset class is linked to at most one bucket per user, and at most one
+ * PILLAR3 bucket exists per user (there is only one default pillar 3a
+ * scenario whose balance would otherwise be counted twice).
  */
 @Slf4j
 @Service
@@ -28,7 +30,7 @@ public class WealthBucketService {
     @Transactional
     public WealthBucketResponse create(WealthBucketRequest request, String userId) {
         log.info("Creating wealth bucket name='{}' for user={}", request.name(), userId);
-        validateSourceFields(request);
+        validateSourceFields(request, userId, null);
         if (bucketRepository.existsByUserIdAndName(userId, request.name())) {
             throw new IllegalArgumentException("A wealth bucket named '" + request.name() + "' already exists");
         }
@@ -44,7 +46,7 @@ public class WealthBucketService {
         log.info("Updating wealth bucket id={} for user={}", id, userId);
         WealthBucket existing = bucketRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(RESOURCE_NAME, id));
-        validateSourceFields(request);
+        validateSourceFields(request, userId, id);
         if (bucketRepository.existsByUserIdAndNameAndIdNot(userId, request.name(), id)) {
             throw new IllegalArgumentException("A wealth bucket named '" + request.name() + "' already exists");
         }
@@ -64,16 +66,45 @@ public class WealthBucketService {
         log.info("Deleted wealth bucket id={} for user={}", id, userId);
     }
 
-    private static void validateSourceFields(WealthBucketRequest request) {
-        if (request.source() == WealthSource.MANUAL) {
-            if (request.manualBalance() == null) {
-                throw new IllegalArgumentException("manualBalance is required for MANUAL wealth buckets");
+    /** Per-source presence rules; excludeId skips the bucket being updated. */
+    private void validateSourceFields(WealthBucketRequest request, String userId, UUID excludeId) {
+        switch (request.source()) {
+            case MANUAL -> {
+                if (request.manualBalance() == null) {
+                    throw new IllegalArgumentException("manualBalance is required for MANUAL wealth buckets");
+                }
+                requireNoAssetClasses(request);
             }
-            if (request.assetClasses() != null && !request.assetClasses().isEmpty()) {
-                throw new IllegalArgumentException("assetClasses must be empty for MANUAL wealth buckets");
+            case PORTFOLIO -> {
+                if (request.assetClasses() == null || request.assetClasses().isEmpty()) {
+                    throw new IllegalArgumentException("assetClasses must not be empty for PORTFOLIO wealth buckets");
+                }
             }
-        } else if (request.assetClasses() == null || request.assetClasses().isEmpty()) {
-            throw new IllegalArgumentException("assetClasses must not be empty for PORTFOLIO wealth buckets");
+            case PILLAR3 -> {
+                if (request.manualBalance() != null) {
+                    throw new IllegalArgumentException("manualBalance must be empty for PILLAR3 wealth buckets");
+                }
+                requireNoAssetClasses(request);
+                validateSinglePillar3Bucket(userId, excludeId);
+            }
+        }
+    }
+
+    private static void requireNoAssetClasses(WealthBucketRequest request) {
+        if (request.assetClasses() != null && !request.assetClasses().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "assetClasses must be empty for " + request.source() + " wealth buckets");
+        }
+    }
+
+    /** A second PILLAR3 bucket would double-count the default-scenario balance in the overview. */
+    private void validateSinglePillar3Bucket(String userId, UUID excludeId) {
+        boolean pillar3BucketExists = excludeId == null
+                ? bucketRepository.existsByUserIdAndSource(userId, WealthSource.PILLAR3)
+                : bucketRepository.existsByUserIdAndSourceAndIdNot(userId, WealthSource.PILLAR3, excludeId);
+        if (pillar3BucketExists) {
+            throw new IllegalArgumentException("A PILLAR3 wealth bucket already exists"
+                    + " — a second one would double-count the pillar 3a balance");
         }
     }
 
@@ -95,15 +126,16 @@ public class WealthBucketService {
     }
 
     private static WealthBucket toEntity(WealthBucketRequest request, String userId, WealthBucket existing) {
-        boolean manual = request.source() == WealthSource.MANUAL;
+        WealthSource source = request.source();
         return WealthBucket.builder()
                 .id(existing != null ? existing.getId() : null)
                 .userId(userId)
                 .name(request.name())
                 .note(request.note())
-                .source(request.source())
-                .manualBalance(manual ? request.manualBalance() : null)
-                .assetClasses(manual ? null : WealthBucket.toStorage(request.assetClasses()))
+                .source(source)
+                .manualBalance(source == WealthSource.MANUAL ? request.manualBalance() : null)
+                .assetClasses(source == WealthSource.PORTFOLIO
+                        ? WealthBucket.toStorage(request.assetClasses()) : null)
                 .monthlyRate(request.monthlyRate() != null ? request.monthlyRate() : BigDecimal.ZERO)
                 .sortOrder(request.sortOrder() != null ? request.sortOrder() : 0)
                 .createdAt(existing != null ? existing.getCreatedAt() : null)

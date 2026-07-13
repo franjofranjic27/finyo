@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Settings } from './Settings';
 import { accountsApi } from '@/api/accounts';
 import { apiRequest } from '@/api/client';
+import { profileApi } from '@/api/profile';
 import { renderWithProviders } from '@/test/test-utils';
+import { userProfile } from '@/test/fixtures/profile';
 import type { Account, Category } from '@/types';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -28,6 +30,11 @@ vi.mock('@/api/accounts', () => ({
     update: vi.fn(),
     delete: vi.fn(),
   },
+}));
+
+vi.mock('@/api/profile', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/profile')>()),
+  profileApi: { get: vi.fn(), update: vi.fn(), updatePreferences: vi.fn() },
 }));
 
 vi.mock('@/api/client', () => ({ apiRequest: vi.fn() }));
@@ -56,19 +63,74 @@ const categories: Category[] = [
   { id: 'c2', name: 'Salary', type: 'INCOME' },
 ];
 
+async function openAccountsTab() {
+  const user = userEvent.setup();
+  renderWithProviders(<Settings />);
+  await user.click(screen.getByRole('tab', { name: 'Accounts' }));
+  return user;
+}
+
 describe('Settings', () => {
-  it('shows the accounts tab with existing accounts by default', async () => {
-    vi.mocked(accountsApi.getAll).mockResolvedValue(accounts);
+  beforeEach(() => {
+    vi.mocked(profileApi.get).mockResolvedValue(userProfile());
+    vi.mocked(profileApi.update).mockResolvedValue(userProfile());
+    vi.mocked(profileApi.updatePreferences).mockReset();
+    vi.mocked(profileApi.updatePreferences).mockResolvedValue(userProfile());
+  });
+
+  it('shows the profile tab with the stored profile by default', async () => {
     renderWithProviders(<Settings />);
+
+    expect(await screen.findByLabelText('Date of birth')).toHaveValue('1990-05-01');
+    expect(screen.getByText('Age: 36 · Years to retirement (65): 29 · Retirement in 2055'))
+      .toBeInTheDocument();
+    expect(profileApi.get).toHaveBeenCalledWith('test-token');
+  });
+
+  it('saves the profile and flashes a confirmation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const birthDate = await screen.findByLabelText('Date of birth');
+
+    // Date inputs do not support per-key typing; set the value directly.
+    fireEvent.change(birthDate, { target: { value: '1985-03-15' } });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // the PUT is a full replace — the stored preferences must be resent, not dropped
+    expect(profileApi.update).toHaveBeenCalledWith('test-token', {
+      birthDate: '1985-03-15',
+      civilStatus: 'SINGLE',
+      churchAffiliation: 'NONE',
+      preferredLanguage: 'en',
+      theme: 'SYSTEM',
+    });
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
+  });
+
+  it('patches theme changes from the preferences tab without touching the master data', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.click(screen.getByRole('tab', { name: 'Appearance' }));
+    await user.click(screen.getByRole('button', { name: 'Dark' }));
+
+    expect(profileApi.updatePreferences).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
+    expect(profileApi.update).not.toHaveBeenCalled();
+    expect(document.documentElement).toHaveClass('dark');
+  });
+
+  it('shows the accounts tab with existing accounts', async () => {
+    vi.mocked(accountsApi.getAll).mockResolvedValue(accounts);
+    await openAccountsTab();
 
     expect(await screen.findByText('UBS Checking')).toBeInTheDocument();
     expect(screen.getByText(/CHF 1'250\.00 initial · CHF/)).toBeInTheDocument();
-    expect(screen.getByText('CHECKING')).toBeInTheDocument();
+    expect(screen.getByText('Checking')).toBeInTheDocument();
   });
 
   it('shows an empty state without accounts', async () => {
     vi.mocked(accountsApi.getAll).mockResolvedValue([]);
-    renderWithProviders(<Settings />);
+    await openAccountsTab();
 
     expect(await screen.findByText('No accounts yet.')).toBeInTheDocument();
   });
@@ -77,8 +139,7 @@ describe('Settings', () => {
     vi.mocked(accountsApi.getAll).mockResolvedValue(accounts);
     vi.mocked(accountsApi.delete).mockResolvedValue(undefined);
     vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
-    const user = userEvent.setup();
-    renderWithProviders(<Settings />);
+    const user = await openAccountsTab();
     await screen.findByText('UBS Checking');
 
     const deleteButton = screen
@@ -107,8 +168,7 @@ describe('Settings', () => {
   it('opens the add-account dialog and creates an account', async () => {
     vi.mocked(accountsApi.getAll).mockResolvedValue([]);
     vi.mocked(accountsApi.create).mockResolvedValue(accounts[0]);
-    const user = userEvent.setup();
-    renderWithProviders(<Settings />);
+    const user = await openAccountsTab();
     await screen.findByText('No accounts yet.');
 
     await user.click(screen.getByRole('button', { name: /Add Account/ }));

@@ -103,6 +103,7 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.currency", is("CHF")))
                 .andExpect(jsonPath("$.quantity", is(10.0)))
                 .andExpect(jsonPath("$.avgPurchasePrice", is(100.0)))
+                .andExpect(jsonPath("$.purchaseDate", nullValue())) // POST does not accept one
                 .andExpect(jsonPath("$.currentPrice", is(150.0)))
                 .andExpect(jsonPath("$.priceSource", is("CACHE")))
                 .andExpect(jsonPath("$.priceUpdatedAt", notNullValue()))
@@ -122,6 +123,80 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/positions/{id}", positionId).with(asOtherUser()))
                 .andExpect(status().isNotFound());
+    }
+
+    // =========================================================================
+    // PATCH /api/v1/positions/{positionId} — the holding itself
+    // =========================================================================
+
+    @Test
+    void patch_position_updates_the_holding_and_the_manual_price() throws Exception {
+        UUID positionId = createPosition("Global ETF", "10", "100", "150");
+
+        mockMvc.perform(patch("/api/v1/positions/{id}", positionId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":20,\"purchasePrice\":95,"
+                                + "\"purchaseDate\":\"2026-03-01\",\"currentPrice\":200}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity", is(20.0)))
+                .andExpect(jsonPath("$.avgPurchasePrice", is(95.0)))
+                .andExpect(jsonPath("$.purchaseDate", is("2026-03-01")))
+                // the explicit edit overwrites the manual price set on creation
+                .andExpect(jsonPath("$.currentPrice", is(200.0)))
+                .andExpect(jsonPath("$.priceSource", is("CACHE")))
+                .andExpect(jsonPath("$.priceUpdatedAt", notNullValue()))
+                .andExpect(jsonPath("$.value", is(4000.0)));
+
+        // purchaseDate is always applied: omitting it while sending another
+        // field is an explicit clear (the dialog sends the full field set)
+        mockMvc.perform(patch("/api/v1/positions/{id}", positionId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":15}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity", is(15.0)))
+                .andExpect(jsonPath("$.avgPurchasePrice", is(95.0)))
+                .andExpect(jsonPath("$.purchaseDate", nullValue()));
+    }
+
+    @Test
+    void patch_position_rejects_invalid_values_and_an_empty_body() throws Exception {
+        UUID positionId = createPosition("Global ETF", "10", "100", "150");
+
+        // bean validation (@Positive)
+        mockMvc.perform(patch("/api/v1/positions/{id}", positionId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":-1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title", is("Validation Failed")));
+
+        // service rule: an all-null patch is an empty body
+        mockMvc.perform(patch("/api/v1/positions/{id}", positionId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title", is("Bad Request")));
+    }
+
+    @Test
+    void patch_position_returns_404_for_foreign_and_unknown_positions() throws Exception {
+        UUID positionId = createPosition("Owner Fund", "1", "10", "10");
+
+        mockMvc.perform(patch("/api/v1/positions/{id}", positionId).with(asOtherUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":5}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/api/v1/positions/{id}", UUID.randomUUID()).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":5}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void patch_position_requires_authentication() throws Exception {
+        mockMvc.perform(patch("/api/v1/positions/{id}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":5}"))
+                .andExpect(status().isUnauthorized());
     }
 
     // =========================================================================

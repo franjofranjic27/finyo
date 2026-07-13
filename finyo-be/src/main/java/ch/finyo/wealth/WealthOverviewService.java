@@ -3,6 +3,7 @@ package ch.finyo.wealth;
 import ch.finyo.common.SwissTime;
 import ch.finyo.investment.AssetClass;
 import ch.finyo.investment.PortfolioService;
+import ch.finyo.pillar3.Pillar3ScenarioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -36,11 +37,13 @@ public class WealthOverviewService {
     private final WealthBucketRepository bucketRepository;
     private final NetWorthSnapshotRepository snapshotRepository;
     private final PortfolioService portfolioService;
+    private final Pillar3ScenarioService pillar3ScenarioService;
 
     /**
      * Resolves all bucket balances (MANUAL from the stored balance, PORTFOLIO
-     * live from the investment portfolio) and upserts today's net-worth
-     * snapshot so the history grows over time.
+     * live from the investment portfolio, PILLAR3 from the default pillar 3a
+     * scenario) and upserts today's net-worth snapshot so the history grows
+     * over time.
      *
      * Deliberately NOT transactional: {@link PortfolioService#getPortfolio}
      * performs live SIX price fetches that must not run inside a database
@@ -59,10 +62,12 @@ public class WealthOverviewService {
         }
 
         Map<AssetClass, BigDecimal> portfolioValues = loadPortfolioValues(userId, buckets);
+        BigDecimal pillar3Balance = loadPillar3Balance(userId, buckets);
         int remainingMonths = monthsRemaining(today);
 
         List<ResolvedBucket> resolved = buckets.stream()
-                .map(bucket -> new ResolvedBucket(bucket, resolveBalance(bucket, portfolioValues)))
+                .map(bucket -> new ResolvedBucket(bucket,
+                        resolveBalance(bucket, portfolioValues, pillar3Balance)))
                 .toList();
         BigDecimal total = resolved.stream()
                 .map(ResolvedBucket::balance)
@@ -108,13 +113,26 @@ public class WealthOverviewService {
         return values;
     }
 
-    private static BigDecimal resolveBalance(WealthBucket bucket, Map<AssetClass, BigDecimal> portfolioValues) {
-        if (bucket.getSource() == WealthSource.MANUAL) {
-            return bucket.getManualBalance() != null ? bucket.getManualBalance() : BigDecimal.ZERO;
+    /** One scenario read per overview request, and only when a PILLAR3 bucket exists. */
+    private BigDecimal loadPillar3Balance(String userId, List<WealthBucket> buckets) {
+        boolean hasPillar3Bucket = buckets.stream()
+                .anyMatch(bucket -> bucket.getSource() == WealthSource.PILLAR3);
+        if (!hasPillar3Bucket) {
+            return BigDecimal.ZERO;
         }
-        return bucket.assetClassList().stream()
-                .map(assetClass -> portfolioValues.getOrDefault(assetClass, BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return pillar3ScenarioService.getDefaultCurrentBalance(userId)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private static BigDecimal resolveBalance(WealthBucket bucket, Map<AssetClass, BigDecimal> portfolioValues,
+                                             BigDecimal pillar3Balance) {
+        return switch (bucket.getSource()) {
+            case MANUAL -> bucket.getManualBalance() != null ? bucket.getManualBalance() : BigDecimal.ZERO;
+            case PILLAR3 -> pillar3Balance;
+            case PORTFOLIO -> bucket.assetClassList().stream()
+                    .map(assetClass -> portfolioValues.getOrDefault(assetClass, BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        };
     }
 
     private static WealthBucketOverviewResponse toRow(WealthBucket bucket, BigDecimal balance,

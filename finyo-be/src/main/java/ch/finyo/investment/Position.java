@@ -20,7 +20,9 @@ import java.util.UUID;
 @Table(name = "position")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Builder
+// toBuilder: entities are immutable — every update copies via toBuilder() so
+// new columns can never be wiped by a forgotten field in a manual copy.
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class Position {

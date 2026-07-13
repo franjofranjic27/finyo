@@ -6,6 +6,7 @@ import ch.finyo.investment.PortfolioPositionResponse;
 import ch.finyo.investment.PortfolioResponse;
 import ch.finyo.investment.PortfolioService;
 import ch.finyo.investment.PriceSource;
+import ch.finyo.pillar3.Pillar3ScenarioService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,8 +34,10 @@ import static org.mockito.BDDMockito.then;
  *   1. Balance resolution: MANUAL from the stored balance, PORTFOLIO as the
  *      sum of positions in the linked asset classes (single portfolio read).
  *   2. Share and year-end forecast math incl. the zero guards.
- *   3. Year-to-date change against the earliest snapshot of the current year.
- *   4. Snapshot upsert: exactly one per overview read, none without buckets.
+ *   3. PILLAR3 balance resolution from the default pillar 3a scenario,
+ *      including the lazy repository read.
+ *   4. Year-to-date change against the earliest snapshot of the current year.
+ *   5. Snapshot upsert: exactly one per overview read, none without buckets.
  */
 @ExtendWith(MockitoExtension.class)
 class WealthOverviewServiceTest {
@@ -51,6 +54,9 @@ class WealthOverviewServiceTest {
 
     @Mock
     private PortfolioService portfolioService;
+
+    @Mock
+    private Pillar3ScenarioService pillar3ScenarioService;
 
     @InjectMocks
     private WealthOverviewService overviewService;
@@ -83,11 +89,22 @@ class WealthOverviewServiceTest {
                 .build();
     }
 
+    private static WealthBucket pillar3Bucket(String name) {
+        return WealthBucket.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .name(name)
+                .source(WealthSource.PILLAR3)
+                .monthlyRate(BigDecimal.ZERO)
+                .sortOrder(0)
+                .build();
+    }
+
     private static PortfolioPositionResponse position(AssetClass assetClass, String value) {
         UUID id = UUID.randomUUID();
         return new PortfolioPositionResponse(id, id, UUID.randomUUID(), assetClass,
                 "Position " + assetClass, null, null,
-                BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, PriceSource.CACHE,
+                BigDecimal.ONE, BigDecimal.ONE, null, BigDecimal.ONE, PriceSource.CACHE,
                 new BigDecimal(value), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
@@ -163,6 +180,52 @@ class WealthOverviewServiceTest {
         overviewService.getOverview(USER_ID);
 
         then(portfolioService).shouldHaveNoInteractions();
+    }
+
+    // -------------------------------------------------------------------------
+    // PILLAR3 balance resolution
+    // -------------------------------------------------------------------------
+
+    @Test
+    void pillar3_bucket_resolves_the_default_scenarios_current_balance() {
+        given(bucketRepository.findByUserIdOrderBySortOrderAscNameAsc(USER_ID)).willReturn(List.of(
+                manualBucket("Cash", "5000", "0", 0),
+                pillar3Bucket("Säule 3a")));
+        given(pillar3ScenarioService.getDefaultCurrentBalance(USER_ID))
+                .willReturn(Optional.of(new BigDecimal("25000")));
+        givenNoYtdBaseline();
+
+        WealthOverviewResponse overview = overviewService.getOverview(USER_ID);
+
+        WealthBucketOverviewResponse pillar3 = overview.buckets().get(1);
+        assertThat(pillar3.balance()).isEqualByComparingTo("25000");
+        assertThat(overview.total()).isEqualByComparingTo("30000");
+        then(portfolioService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void pillar3_bucket_without_a_default_scenario_has_zero_balance() {
+        given(bucketRepository.findByUserIdOrderBySortOrderAscNameAsc(USER_ID))
+                .willReturn(List.of(pillar3Bucket("Säule 3a")));
+        given(pillar3ScenarioService.getDefaultCurrentBalance(USER_ID))
+                .willReturn(Optional.empty());
+        givenNoYtdBaseline();
+
+        WealthOverviewResponse overview = overviewService.getOverview(USER_ID);
+
+        assertThat(overview.buckets().getFirst().balance()).isEqualByComparingTo("0");
+        assertThat(overview.total()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void pillar3_scenarios_are_not_read_without_a_pillar3_bucket() {
+        given(bucketRepository.findByUserIdOrderBySortOrderAscNameAsc(USER_ID))
+                .willReturn(List.of(manualBucket("Cash", "100", "0", 0)));
+        givenNoYtdBaseline();
+
+        overviewService.getOverview(USER_ID);
+
+        then(pillar3ScenarioService).shouldHaveNoInteractions();
     }
 
     // -------------------------------------------------------------------------
