@@ -17,13 +17,15 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Integration tests for /api/v1/profile: default view (never 404, never
  * persisted on GET), PUT upsert semantics with derived age and retirement
- * figures, validation, tenant isolation and authentication.
+ * figures, PATCH /preferences partial semantics, validation, tenant isolation
+ * and authentication.
  */
 class ProfileIT extends BaseIntegrationTest {
 
@@ -151,6 +153,107 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(userProfileRepository.count()).isEqualTo(1);
     }
 
+    /**
+     * Regression: a preference toggle used to go through the full-replace PUT
+     * and wiped every master-data field the caller did not resend.
+     */
+    @Test
+    void patching_the_theme_preserves_the_master_data() throws Exception {
+        mockMvc.perform(put("/api/v1/profile").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(referenceBody()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"theme\":\"DARK\"}"))
+                .andExpect(status().isOk());
+
+        JsonNode json = getProfile(asUser());
+        assertThat(json.get("birthDate").asText()).isEqualTo("1990-04-15");
+        assertThat(json.get("civilStatus").asText()).isEqualTo("MARRIED");
+        assertThat(json.get("churchAffiliation").asText()).isEqualTo("NONE");
+        assertThat(json.get("preferredLanguage").asText()).isEqualTo("de");
+        assertThat(json.get("theme").asText()).isEqualTo("DARK");
+        assertThat(json.get("onboardingCompleted").asBoolean()).isTrue();
+        assertThat(userProfileRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void patching_the_language_preserves_the_master_data_and_the_theme() throws Exception {
+        mockMvc.perform(put("/api/v1/profile").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(referenceBody()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"preferredLanguage\":\"en\"}"))
+                .andExpect(status().isOk());
+
+        JsonNode json = getProfile(asUser());
+        assertThat(json.get("preferredLanguage").asText()).isEqualTo("en");
+        assertThat(json.get("theme").asText()).isEqualTo("DARK");
+        assertThat(json.get("birthDate").asText()).isEqualTo("1990-04-15");
+        assertThat(json.get("civilStatus").asText()).isEqualTo("MARRIED");
+    }
+
+    @Test
+    void patching_preferences_without_a_stored_profile_creates_one_with_the_defaults() throws Exception {
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"theme\":\"LIGHT\"}"))
+                .andExpect(status().isOk());
+
+        JsonNode json = getProfile(asUser());
+        assertThat(json.get("theme").asText()).isEqualTo("LIGHT");
+        assertThat(json.get("birthDate").isNull()).isTrue();
+        assertThat(json.get("onboardingCompleted").asBoolean()).isFalse();
+        assertThat(userProfileRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void patching_preferences_with_an_empty_patch_returns_400() throws Exception {
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userProfileRepository.count()).isZero();
+    }
+
+    @Test
+    void patching_preferences_with_an_unsupported_language_returns_400() throws Exception {
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"preferredLanguage\":\"fr\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userProfileRepository.count()).isZero();
+    }
+
+    @Test
+    void patching_preferences_does_not_touch_another_users_profile() throws Exception {
+        mockMvc.perform(put("/api/v1/profile").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(referenceBody()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asOtherUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"theme\":\"LIGHT\"}"))
+                .andExpect(status().isOk());
+
+        JsonNode owner = getProfile(asUser());
+        assertThat(owner.get("theme").asText()).isEqualTo("DARK");
+        assertThat(owner.get("birthDate").asText()).isEqualTo("1990-04-15");
+
+        JsonNode other = getProfile(asOtherUser());
+        assertThat(other.get("theme").asText()).isEqualTo("LIGHT");
+        assertThat(other.get("birthDate").isNull()).isTrue();
+        assertThat(userProfileRepository.count()).isEqualTo(2);
+    }
+
     @Test
     void unauthenticated_requests_return_401() throws Exception {
         mockMvc.perform(get("/api/v1/profile"))
@@ -159,6 +262,11 @@ class ProfileIT extends BaseIntegrationTest {
         mockMvc.perform(put("/api/v1/profile")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(referenceBody()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(patch("/api/v1/profile/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"theme\":\"DARK\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }

@@ -1,6 +1,6 @@
 import { Menu, Sun, Moon, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/auth/useAuth';
-import { profileApi } from '@/api/profile';
-import type { PreferredLanguage, UserProfileInput } from '@/api/profile';
+import { profileApi, PROFILE_QUERY_KEY } from '@/api/profile';
+import type { PreferencesInput, PreferredLanguage } from '@/api/profile';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -25,11 +25,14 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
   const { isDark, setTheme } = useTheme();
   const { user, accessToken, logout } = useAuth();
   const token = accessToken ?? '';
+  const queryClient = useQueryClient();
 
   // Fire-and-forget persistence: preferences apply locally either way, a
-  // failed PUT is silently ignored (the profile sync re-applies on next load).
+  // failed PATCH is silently ignored (the profile sync re-applies on next load).
+  // PATCH (not PUT) — a full replace would wipe the profile master data.
   const persistPreference = useMutation({
-    mutationFn: (input: UserProfileInput) => profileApi.update(token, input),
+    mutationFn: (input: PreferencesInput) => profileApi.updatePreferences(token, input),
+    onSuccess: (profile) => queryClient.setQueryData(PROFILE_QUERY_KEY, profile),
   });
 
   const username =

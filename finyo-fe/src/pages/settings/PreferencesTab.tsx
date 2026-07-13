@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/auth/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import type { ThemePreference } from '@/hooks/useTheme';
-import { profileApi } from '@/api/profile';
-import type { PreferredLanguage, Theme, UserProfileInput } from '@/api/profile';
+import { profileApi, PROFILE_QUERY_KEY } from '@/api/profile';
+import type { PreferencesInput, PreferredLanguage, Theme } from '@/api/profile';
 import { LanguageToggle, ThemeToggle } from '@/components/profile/PreferenceToggles';
 
 const toThemeEnum = (theme: ThemePreference): Theme => theme.toUpperCase() as Theme;
@@ -17,6 +17,7 @@ export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
+  const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -25,9 +26,13 @@ export function PreferencesTab() {
     return () => clearTimeout(timer);
   }, [saved]);
 
+  // PATCH (not PUT) — a full replace would wipe the profile master data.
   const persist = useMutation({
-    mutationFn: (input: UserProfileInput) => profileApi.update(token, input),
-    onSuccess: () => setSaved(true),
+    mutationFn: (input: PreferencesInput) => profileApi.updatePreferences(token, input),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(PROFILE_QUERY_KEY, profile);
+      setSaved(true);
+    },
   });
 
   const language: PreferredLanguage = i18n.language === 'de' ? 'de' : 'en';

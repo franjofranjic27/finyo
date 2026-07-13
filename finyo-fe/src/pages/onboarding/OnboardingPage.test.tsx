@@ -97,8 +97,13 @@ describe('OnboardingPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Skip' }));
 
+    // Skip still sends the live preferences — the PUT would otherwise reset them.
     await waitFor(() =>
-      expect(profileApi.update).toHaveBeenCalledWith('test-token', { onboardingCompleted: true }),
+      expect(profileApi.update).toHaveBeenCalledWith('test-token', {
+        preferredLanguage: 'en',
+        theme: 'SYSTEM',
+        onboardingCompleted: true,
+      }),
     );
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
     expect(screen.queryByText('Welcome to finyo')).not.toBeInTheDocument();

@@ -33,6 +33,11 @@ public class UserProfileService {
                 .orElseGet(() -> UserProfileResponse.from(UserProfile.withDefaults(userId), today));
     }
 
+    /**
+     * Full replace of the master data — every field of the request is written,
+     * null clearing the stored value. Never use this for a single preference
+     * toggle; that is what {@link #updatePreferences} is for.
+     */
     @Transactional
     public UserProfileResponse upsert(UserProfileRequest request, String userId) {
         log.info("Upserting user profile for user={}", userId);
@@ -56,6 +61,35 @@ public class UserProfileService {
 
         UserProfile saved = userProfileRepository.save(profile);
         log.info("Upserted user profile id={} for user={}", saved.getId(), userId);
+        return UserProfileResponse.from(saved, LocalDate.now(SwissTime.ZONE));
+    }
+
+    /**
+     * Applies only the non-null preference fields; the master data and the
+     * onboarding flag of the stored row are preserved. Users may toggle the
+     * theme before ever saving a profile, so a missing row is created with
+     * the defaults instead of failing.
+     */
+    @Transactional
+    public UserProfileResponse updatePreferences(PreferencesPatchRequest patch, String userId) {
+        if (patch.isEmpty()) {
+            throw new IllegalArgumentException("at least one preference must be provided");
+        }
+        log.info("Updating profile preferences for user={}", userId);
+
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElseGet(() -> UserProfile.withDefaults(userId));
+
+        var builder = profile.toBuilder();
+        if (patch.theme() != null) {
+            builder.theme(patch.theme());
+        }
+        if (patch.preferredLanguage() != null) {
+            builder.preferredLanguage(patch.preferredLanguage());
+        }
+
+        UserProfile saved = userProfileRepository.save(builder.build());
+        log.info("Updated profile preferences id={} for user={}", saved.getId(), userId);
         return UserProfileResponse.from(saved, LocalDate.now(SwissTime.ZONE));
     }
 

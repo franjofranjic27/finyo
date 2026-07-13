@@ -27,7 +27,9 @@ import static org.mockito.BDDMockito.then;
  *   1. GET without a row: defaults (theme SYSTEM, onboarding false), nothing persisted.
  *   2. Upsert semantics: first PUT creates the row, later PUTs reuse its id;
  *      a null onboardingCompleted preserves the stored flag.
- *   3. derive(): age, yearsToRetirement and retirementYear including the
+ *   3. updatePreferences(): partial patch — only the given preference is
+ *      applied, the master data survives; empty patches are rejected.
+ *   4. derive(): age, yearsToRetirement and retirementYear including the
  *      birthday-today, past-65 and missing-birth-date edge cases.
  */
 @ExtendWith(MockitoExtension.class)
@@ -171,6 +173,74 @@ class UserProfileServiceTest {
 
         assertThat(response.theme()).isEqualTo(Theme.SYSTEM);
         assertThat(response.onboardingCompleted()).isFalse();
+    }
+
+    // =========================================================================
+    // updatePreferences()
+    // =========================================================================
+
+    @Test
+    void update_preferences_applies_only_the_theme_and_preserves_the_master_data() {
+        UUID existingId = UUID.randomUUID();
+        given(userProfileRepository.findByUserId(USER_ID))
+                .willReturn(Optional.of(referenceProfile(existingId, true)));
+        given(userProfileRepository.save(any(UserProfile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfileResponse response = userProfileService.updatePreferences(
+                new PreferencesPatchRequest(Theme.LIGHT, null), USER_ID);
+
+        assertThat(response.theme()).isEqualTo(Theme.LIGHT);
+        assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 4, 15));
+        assertThat(response.civilStatus()).isEqualTo(TaxCivilStatus.MARRIED);
+        assertThat(response.churchAffiliation()).isEqualTo(ChurchAffiliation.NONE);
+        assertThat(response.preferredLanguage()).isEqualTo("de");
+        assertThat(response.onboardingCompleted()).isTrue();
+        then(userProfileRepository).should().save(argThat(p -> existingId.equals(p.getId())));
+    }
+
+    @Test
+    void update_preferences_applies_only_the_language_and_preserves_the_theme() {
+        given(userProfileRepository.findByUserId(USER_ID))
+                .willReturn(Optional.of(referenceProfile(UUID.randomUUID(), true)));
+        given(userProfileRepository.save(any(UserProfile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfileResponse response = userProfileService.updatePreferences(
+                new PreferencesPatchRequest(null, "en"), USER_ID);
+
+        assertThat(response.preferredLanguage()).isEqualTo("en");
+        assertThat(response.theme()).isEqualTo(Theme.DARK);
+        assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 4, 15));
+        assertThat(response.civilStatus()).isEqualTo(TaxCivilStatus.MARRIED);
+    }
+
+    @Test
+    void update_preferences_creates_a_default_profile_when_no_row_exists() {
+        given(userProfileRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
+        given(userProfileRepository.save(any(UserProfile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfileResponse response = userProfileService.updatePreferences(
+                new PreferencesPatchRequest(Theme.DARK, null), USER_ID);
+
+        assertThat(response.theme()).isEqualTo(Theme.DARK);
+        assertThat(response.birthDate()).isNull();
+        assertThat(response.preferredLanguage()).isNull();
+        assertThat(response.onboardingCompleted()).isFalse();
+        then(userProfileRepository).should()
+                .save(argThat(p -> p.getId() == null && USER_ID.equals(p.getUserId())));
+    }
+
+    @Test
+    void update_preferences_with_an_all_null_patch_is_rejected() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> userProfileService.updatePreferences(
+                        new PreferencesPatchRequest(null, null), USER_ID))
+                .withMessage("at least one preference must be provided");
+
+        then(userProfileRepository).should(never()).save(any());
+        then(userProfileRepository).should(never()).findByUserId(any());
     }
 
     // =========================================================================

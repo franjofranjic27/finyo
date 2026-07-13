@@ -55,12 +55,16 @@ function ProfileForm({ profile }: Readonly<{ profile: UserProfile }>) {
     return () => clearTimeout(timer);
   }, [saved]);
 
+  // PUT replaces the whole profile — the preferences must be resent from the
+  // (PATCH-updated) cache, otherwise saving the basics would reset them.
   const save = useMutation({
     mutationFn: () =>
       profileApi.update(token, {
         birthDate: values.birthDate || null,
         civilStatus: values.civilStatus,
         churchAffiliation: values.churchAffiliation,
+        preferredLanguage: profile.preferredLanguage,
+        theme: profile.theme,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(PROFILE_QUERY_KEY, updated);

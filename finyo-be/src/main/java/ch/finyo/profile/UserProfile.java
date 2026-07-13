@@ -16,7 +16,7 @@ import java.util.UUID;
 @Table(name = "user_profile")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserProfile {

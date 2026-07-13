@@ -34,7 +34,7 @@ vi.mock('@/api/accounts', () => ({
 
 vi.mock('@/api/profile', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/profile')>()),
-  profileApi: { get: vi.fn(), update: vi.fn() },
+  profileApi: { get: vi.fn(), update: vi.fn(), updatePreferences: vi.fn() },
 }));
 
 vi.mock('@/api/client', () => ({ apiRequest: vi.fn() }));
@@ -74,6 +74,8 @@ describe('Settings', () => {
   beforeEach(() => {
     vi.mocked(profileApi.get).mockResolvedValue(userProfile());
     vi.mocked(profileApi.update).mockResolvedValue(userProfile());
+    vi.mocked(profileApi.updatePreferences).mockReset();
+    vi.mocked(profileApi.updatePreferences).mockResolvedValue(userProfile());
   });
 
   it('shows the profile tab with the stored profile by default', async () => {
@@ -94,22 +96,26 @@ describe('Settings', () => {
     fireEvent.change(birthDate, { target: { value: '1985-03-15' } });
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
+    // the PUT is a full replace — the stored preferences must be resent, not dropped
     expect(profileApi.update).toHaveBeenCalledWith('test-token', {
       birthDate: '1985-03-15',
       civilStatus: 'SINGLE',
       churchAffiliation: 'NONE',
+      preferredLanguage: 'en',
+      theme: 'SYSTEM',
     });
     expect(await screen.findByText('Saved')).toBeInTheDocument();
   });
 
-  it('persists language and theme changes from the preferences tab', async () => {
+  it('patches theme changes from the preferences tab without touching the master data', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Settings />);
 
     await user.click(screen.getByRole('tab', { name: 'Appearance' }));
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
-    expect(profileApi.update).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
+    expect(profileApi.updatePreferences).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
+    expect(profileApi.update).not.toHaveBeenCalled();
     expect(document.documentElement).toHaveClass('dark');
   });
 

@@ -15,6 +15,10 @@ import java.time.LocalDate;
  * null clearing the stored value. A null {@code theme} falls back to SYSTEM.
  * A null {@code onboardingCompleted} preserves the stored value, so profile
  * edits after onboarding never reset the flag.
+ *
+ * <p>Callers must therefore always send the complete field set. For partial
+ * preference updates use {@link PreferencesPatchRequest} via
+ * {@code PATCH /api/v1/profile/preferences}.
  */
 public record UserProfileRequest(
         @Past LocalDate birthDate,

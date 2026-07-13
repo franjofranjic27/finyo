@@ -9,7 +9,7 @@ import { userProfile } from '@/test/fixtures/profile';
 
 vi.mock('@/api/profile', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/profile')>()),
-  profileApi: { get: vi.fn(), update: vi.fn() },
+  profileApi: { get: vi.fn(), update: vi.fn(), updatePreferences: vi.fn() },
 }));
 
 vi.mock('@/auth/useAuth', () => ({

@@ -52,8 +52,15 @@ export function OnboardingPage() {
     navigate('/dashboard');
   };
 
+  // PUT is a full replace — the live preferences must ride along, otherwise
+  // skipping would reset a theme or language the user already picked.
   const skip = useMutation({
-    mutationFn: () => profileApi.update(token, { onboardingCompleted: true }),
+    mutationFn: () =>
+      profileApi.update(token, {
+        preferredLanguage: language,
+        theme: theme.toUpperCase() as Theme,
+        onboardingCompleted: true,
+      }),
     onSuccess: goToDashboard,
   });
 

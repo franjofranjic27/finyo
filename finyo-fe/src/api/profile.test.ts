@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileApi } from './profile';
-import type { UserProfileInput } from './profile';
+import type { PreferencesInput, UserProfileInput } from './profile';
 import { apiRequest } from './client';
 
 vi.mock('./client', () => ({ apiRequest: vi.fn() }));
@@ -43,6 +43,38 @@ describe('profileApi', () => {
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/profile',
       { method: 'PUT', body: JSON.stringify({ onboardingCompleted: true }) },
+      TOKEN,
+    );
+  });
+
+  it('updatePreferences PATCHes only the changed theme', () => {
+    profileApi.updatePreferences(TOKEN, { theme: 'DARK' });
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/profile/preferences',
+      { method: 'PATCH', body: JSON.stringify({ theme: 'DARK' }) },
+      TOKEN,
+    );
+  });
+
+  it('updatePreferences PATCHes only the changed language', () => {
+    profileApi.updatePreferences(TOKEN, { preferredLanguage: 'de' });
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/profile/preferences',
+      { method: 'PATCH', body: JSON.stringify({ preferredLanguage: 'de' }) },
+      TOKEN,
+    );
+  });
+
+  it('updatePreferences sends both preferences at once', () => {
+    const input: PreferencesInput = { theme: 'SYSTEM', preferredLanguage: 'en' };
+
+    profileApi.updatePreferences(TOKEN, input);
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/profile/preferences',
+      { method: 'PATCH', body: JSON.stringify(input) },
       TOKEN,
     );
   });

@@ -22,6 +22,12 @@ export interface UserProfile {
   retirementYear: number | null;
 }
 
+/**
+ * PUT payload — full replace of the master data: every omitted field is
+ * cleared on the server. Only for the onboarding wizard and the profile form,
+ * which send the complete field set. Single toggles go through
+ * {@link PreferencesInput}.
+ */
 export interface UserProfileInput {
   birthDate?: string | null;
   civilStatus?: ProfileCivilStatus | null;
@@ -32,6 +38,12 @@ export interface UserProfileInput {
   onboardingCompleted?: boolean;
 }
 
+/** PATCH payload — only the given preference is applied, master data is untouched. */
+export interface PreferencesInput {
+  theme?: Theme;
+  preferredLanguage?: PreferredLanguage;
+}
+
 /** Query key for the shared `['profile']` cache entry. */
 export const PROFILE_QUERY_KEY = ['profile'] as const;
 
@@ -40,4 +52,11 @@ export const profileApi = {
 
   update: (token: string, data: UserProfileInput) =>
     apiRequest<UserProfile>('/profile', { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  updatePreferences: (token: string, data: PreferencesInput) =>
+    apiRequest<UserProfile>(
+      '/profile/preferences',
+      { method: 'PATCH', body: JSON.stringify(data) },
+      token,
+    ),
 };
