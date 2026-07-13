@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Tag, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { useMonthCategoryBreakdown, useMonthSummary } from '@/hooks/financeQueries';
 import { amountColour, formatCHF } from '@/lib/formatters';
 import { BudgetStatusCard } from './BudgetStatusCard';
 import { MonthlyTrendCard } from './MonthlyTrendCard';
@@ -7,7 +8,6 @@ import { SpendingDonutCard } from './SpendingDonutCard';
 import { SummaryCard, SummaryCardSkeleton } from './SummaryCard';
 import { WealthSummaryCard } from './WealthSummaryCard';
 import { biggestCategory, categoryAmount, categoryLabel } from './categoryBreakdown';
-import { useMonthCategoryBreakdown, useMonthSummary } from './dashboardQueries';
 
 const SUMMARY_SKELETON_KEYS = ['net', 'income', 'expenses', 'category'];
 
@@ -28,11 +28,11 @@ function MonthKpiRow() {
   }
 
   if (summary.isError || breakdown.isError || !summary.data || !breakdown.data) {
-    return <p className="text-sm text-destructive">{t('budget.month.loadError')}</p>;
+    return <p className="text-sm text-destructive">{t('dashboard.loadError')}</p>;
   }
 
   const { totalIncome, totalExpenses, netAmount, transactionCount } = summary.data;
-  const topCategory = breakdown.data.length > 0 ? biggestCategory(breakdown.data) : null;
+  const topCategory = biggestCategory(breakdown.data);
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

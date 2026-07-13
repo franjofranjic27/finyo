@@ -32,9 +32,21 @@ describe('WealthSummaryCard', () => {
     expect(screen.getByText('Sparen')).toBeInTheDocument();
     expect(screen.getByText('Wertschriftendepot')).toBeInTheDocument();
     expect(screen.getByText('Krypto')).toBeInTheDocument();
+    expect(screen.getAllByTestId('donut-legend-item')).toHaveLength(3);
     expect(screen.getByText("CHF 77'000.00")).toBeInTheDocument();
     expect(screen.getByText('77.2%')).toBeInTheDocument();
     expect(wealthApi.getOverview).toHaveBeenCalledWith('test-token');
+  });
+
+  it('hides the YTD chip when there is no comparison data yet', async () => {
+    vi.mocked(wealthApi.getOverview).mockResolvedValue(
+      wealthOverview({ ytdChange: null, ytdChangePct: null }),
+    );
+    renderWithProviders(<WealthSummaryCard />);
+
+    expect(await screen.findByText("CHF 99'719.00")).toBeInTheDocument();
+    expect(screen.getAllByTestId('donut-legend-item')).toHaveLength(3);
+    expect(screen.queryByText('YTD')).not.toBeInTheDocument();
   });
 
   it('links to the wealth page when no buckets exist', async () => {

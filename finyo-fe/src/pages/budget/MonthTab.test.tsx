@@ -97,6 +97,11 @@ describe('MonthTab', () => {
     expect(screen.getByText("CHF 2'068.90")).toBeInTheDocument();
 
     expect(screen.getByText('Plan vs. actual')).toBeInTheDocument();
+    // variable: 3200.00 expenses minus 314.55 fixed costs = 2885.45 of 1924.35 available
+    expect(screen.getByText(/CHF 2'885\.45/)).toBeInTheDocument();
+    expect(screen.getByText('149.9%')).toBeInTheDocument();
+    expect(screen.getByText('CHF 314.55')).toBeInTheDocument();
+
     expect(screen.getByText('Lebensmittel')).toBeInTheDocument();
     // translated from the null category id, not passed through from the backend
     expect(screen.getByText('Uncategorised')).toBeInTheDocument();
@@ -106,6 +111,20 @@ describe('MonthTab', () => {
     expect(analyticsApi.getSummaryRange).toHaveBeenCalledWith('test-token', from, to);
     expect(analyticsApi.getCategoryBreakdownRange).toHaveBeenCalledWith('test-token', from, to);
     expect(screen.getByText(`transactions-table ${from} ${to}`)).toBeInTheDocument();
+  });
+
+  it('offers to plan the budget instead of comparing against an empty plan', async () => {
+    vi.mocked(budgetApi.getMonthlyBudget).mockResolvedValue(
+      monthlyBudget({ netIncome: 0, available: 0 }),
+    );
+    renderWithProviders(<MonthTab />);
+
+    const cta = await screen.findByRole('link', { name: /Plan budget/ });
+    expect(cta).toHaveAttribute('href', '/budget?tab=plan');
+    expect(screen.getByText('No monthly budget planned yet.')).toBeInTheDocument();
+    // no zeroed-out comparison rows
+    expect(screen.queryByText('Variable expenses')).not.toBeInTheDocument();
+    expect(screen.queryByText('0.0%')).not.toBeInTheDocument();
   });
 
   it('navigates to the previous month and queries its range', async () => {

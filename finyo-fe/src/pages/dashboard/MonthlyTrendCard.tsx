@@ -19,33 +19,16 @@ import {
   formatTooltipCHF,
   renderLegendText,
 } from '@/components/charts/chartStyle';
+import { CardEmptyState } from '@/components/CardEmptyState';
+import { useMonthlyTrend } from '@/hooks/financeQueries';
 import { CHART_COLOURS } from '@/lib/chartColours';
-import type { MonthlyDataPoint } from '@/types';
-import { CardEmptyState } from './CardEmptyState';
-import { useMonthlyTrend } from './dashboardQueries';
+import { hasMovement, toTrendBars } from './trendBars';
+import type { TrendBar } from './trendBars';
 
 const CHART_HEIGHT = 260;
 const INCOME_COLOUR = '#10b981';
 const EXPENSE_COLOUR = CHART_COLOURS[0];
 const BAR_RADIUS: [number, number, number, number] = [3, 3, 0, 0];
-
-interface TrendBar {
-  month: string;
-  income: number;
-  expenses: number;
-}
-
-function toTrendBars(points: readonly MonthlyDataPoint[]): TrendBar[] {
-  return points.map((point) => ({
-    month: `${String(point.month).padStart(2, '0')}/${point.year}`,
-    income: Math.abs(Number(point.income)),
-    expenses: Math.abs(Number(point.expenses)),
-  }));
-}
-
-function hasMovement(bars: readonly TrendBar[]): boolean {
-  return bars.some((bar) => bar.income !== 0 || bar.expenses !== 0);
-}
 
 function TrendChart({ bars }: Readonly<{ bars: TrendBar[] }>) {
   const { t } = useTranslation();
@@ -88,7 +71,7 @@ export function MonthlyTrendCard() {
       </CardHeader>
       <CardContent>
         {isLoading && <Skeleton className="h-64 w-full" />}
-        {isError && <p className="text-sm text-destructive">{t('budget.month.loadError')}</p>}
+        {isError && <p className="text-sm text-destructive">{t('dashboard.loadError')}</p>}
         {points &&
           (hasMovement(bars) ? (
             <TrendChart bars={bars} />

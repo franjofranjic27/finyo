@@ -35,12 +35,13 @@
     "OTHER": "Sonstiges"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "loadError": "Dashboard konnte nicht geladen werden",
     "netThisMonth": "Netto diesen Monat",
     "totalSpent": "Gesamtausgaben",
     "totalIncome": "Gesamteinkommen",
     "biggestCategory": "Grösste Kategorie",
     "spendingByCategory": "Ausgaben nach Kategorie",
+    "otherCategories": "Übrige",
     "monthlyOverview": "Monatsübersicht",
     "transactionCount_one": "{{count}} Transaktion",
     "transactionCount_other": "{{count}} Transaktionen",
@@ -54,6 +55,7 @@
       "noWealth": "Noch keine Vermögenstöpfe — erfasse deine Konten und Depots, um die Allokation zu sehen.",
       "createBuckets": "Vermögen einrichten",
       "noTransactions": "Diesen Monat noch keine Transaktionen.",
+      "noSpending": "Diesen Monat noch keine Ausgaben erfasst.",
       "importStatement": "Kontoauszug importieren",
       "noBudget": "Noch kein Monatsbudget geplant.",
       "setupBudget": "Budget planen"
@@ -552,6 +554,8 @@
       "balance": "Saldo",
       "planVsActual": "Plan vs. Ist",
       "plan": "Plan",
+      "noPlan": "Noch kein Monatsbudget geplant.",
+      "planCta": "Budget planen",
       "plannedIncome": "Nettoeinkommen",
       "available": "Variable Ausgaben",
       "availableHint": "Ausgaben ohne Fixkosten, verglichen mit dem verfügbaren Betrag",

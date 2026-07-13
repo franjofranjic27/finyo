@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CardEmptyState } from '@/components/CardEmptyState';
 import {
   chartTooltipStyle,
   formatTooltipCHF,
 } from '@/components/charts/chartStyle';
 import type { WealthBucket, WealthOverview } from '@/api/wealth';
+import { useWealthOverview } from '@/hooks/financeQueries';
 import { amountColour, formatCHF, formatPercent } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
-import { CardEmptyState } from './CardEmptyState';
-import { useWealthOverview } from './dashboardQueries';
 
 const CHART_HEIGHT = 220;
 
@@ -71,7 +71,11 @@ function AllocationChart({ buckets }: Readonly<{ buckets: WealthBucket[] }>) {
         </p>
         <ul className="flex flex-col gap-2">
           {buckets.map((bucket, index) => (
-            <li key={bucket.id} className="flex min-w-0 items-center gap-2 text-sm">
+            <li
+              key={bucket.id}
+              data-testid="donut-legend-item"
+              className="flex min-w-0 items-center gap-2 text-sm"
+            >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: bucketColour(index) }}

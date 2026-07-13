@@ -35,12 +35,13 @@
     "OTHER": "Other"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "loadError": "Could not load the dashboard",
     "netThisMonth": "Net This Month",
     "totalSpent": "Total Spent",
     "totalIncome": "Total Income",
     "biggestCategory": "Biggest Category",
     "spendingByCategory": "Spending by Category",
+    "otherCategories": "Other",
     "monthlyOverview": "Monthly Overview",
     "transactionCount_one": "{{count}} transaction",
     "transactionCount_other": "{{count}} transactions",
@@ -54,6 +55,7 @@
       "noWealth": "No wealth buckets yet — add your accounts and depots to see your allocation.",
       "createBuckets": "Set up wealth",
       "noTransactions": "No transactions this month yet.",
+      "noSpending": "No spending recorded this month yet.",
       "importStatement": "Import bank statement",
       "noBudget": "No monthly budget planned yet.",
       "setupBudget": "Plan budget"
@@ -552,6 +554,8 @@
       "balance": "Balance",
       "planVsActual": "Plan vs. actual",
       "plan": "Plan",
+      "noPlan": "No monthly budget planned yet.",
+      "planCta": "Plan budget",
       "plannedIncome": "Net income",
       "available": "Variable expenses",
       "availableHint": "Expenses excluding fixed costs, compared with the available amount",

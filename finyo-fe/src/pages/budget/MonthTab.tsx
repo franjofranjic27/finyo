@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, SlidersHorizontal, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CardEmptyState } from '@/components/CardEmptyState';
 import { PlanVsActualRow } from '@/components/budget/PlanVsActualRow';
-import { derivePlanVsActual } from '@/components/budget/planVsActual';
-import { useAuth } from '@/auth/useAuth';
-import { analyticsApi } from '@/api/analytics';
+import { derivePlanVsActual, hasBudgetPlan } from '@/components/budget/planVsActual';
 import type { RangeCategoryBreakdown } from '@/api/analytics';
-import { budgetApi } from '@/api/budget';
 import type { MonthlyBudget } from '@/api/budget';
+import {
+  useMonthCategoryBreakdown,
+  useMonthlyBudget,
+  useMonthSummary,
+} from '@/hooks/financeQueries';
 import type { SpendingSummary } from '@/types';
 import { currentMonth, monthLabel, monthRange, shiftMonth } from '@/lib/dates';
 import { amountColour, formatCHF, formatPercent } from '@/lib/formatters';
@@ -22,31 +24,15 @@ import { StatementImportDialog } from './StatementImportDialog';
 /** Month overview: summary, plan-vs-actual, category breakdown and transactions. */
 export function MonthTab() {
   const { t, i18n } = useTranslation();
-  const { accessToken } = useAuth();
-  const token = accessToken ?? '';
 
   const [month, setMonth] = useState(currentMonth);
   const [importOpen, setImportOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const { from, to } = monthRange(month);
 
-  const summary = useQuery({
-    queryKey: ['analytics', 'summary', from, to],
-    queryFn: () => analyticsApi.getSummaryRange(token, from, to),
-    enabled: !!token,
-  });
-
-  const breakdown = useQuery({
-    queryKey: ['analytics', 'categories', from, to],
-    queryFn: () => analyticsApi.getCategoryBreakdownRange(token, from, to),
-    enabled: !!token,
-  });
-
-  const budget = useQuery({
-    queryKey: ['monthly-budget'],
-    queryFn: () => budgetApi.getMonthlyBudget(token),
-    enabled: !!token,
-  });
+  const summary = useMonthSummary(month);
+  const breakdown = useMonthCategoryBreakdown(month);
+  const budget = useMonthlyBudget();
 
   const locale = i18n.language === 'de' ? 'de-CH' : 'en-GB';
   const isError = summary.isError || breakdown.isError || budget.isError;
@@ -149,7 +135,6 @@ function MonthBudgetComparisonCard({
   summary,
 }: Readonly<{ budget: MonthlyBudget; summary: SpendingSummary }>) {
   const { t } = useTranslation();
-  const comparison = derivePlanVsActual(budget, summary);
 
   return (
     <Card>
@@ -157,30 +142,53 @@ function MonthBudgetComparisonCard({
         <CardTitle className="text-base">{t('budget.month.planVsActual')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <PlanVsActualRow
-          label={t('budget.month.plannedIncome')}
-          planned={comparison.plannedIncome}
-          actual={comparison.actualIncome}
-          overIsBad={false}
-        />
-        <PlanVsActualRow
-          label={t('budget.month.available')}
-          hint={t('budget.month.availableHint')}
-          planned={comparison.plannedVariable}
-          actual={comparison.actualVariable}
-          overIsBad
-        />
-        <div className="flex items-baseline justify-between border-t border-border pt-3 text-sm">
-          <span>
-            <span className="font-medium">{t('budget.month.fixedCosts')}</span>
-            <span className="ml-2 text-xs text-muted-foreground">
-              {t('budget.month.fixedCostsHint')}
-            </span>
-          </span>
-          <span className="tabular-nums">{formatCHF(comparison.fixedCosts)}</span>
-        </div>
+        {hasBudgetPlan(budget) ? (
+          <PlanVsActualBody budget={budget} summary={summary} />
+        ) : (
+          // Without a planned net income every bar would read CHF 0.00 / 0.0 %.
+          <CardEmptyState
+            message={t('budget.month.noPlan')}
+            ctaLabel={t('budget.month.planCta')}
+            to="/budget?tab=plan"
+          />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function PlanVsActualBody({
+  budget,
+  summary,
+}: Readonly<{ budget: MonthlyBudget; summary: SpendingSummary }>) {
+  const { t } = useTranslation();
+  const comparison = derivePlanVsActual(budget, summary);
+
+  return (
+    <>
+      <PlanVsActualRow
+        label={t('budget.month.plannedIncome')}
+        planned={comparison.plannedIncome}
+        actual={comparison.actualIncome}
+        overIsBad={false}
+      />
+      <PlanVsActualRow
+        label={t('budget.month.available')}
+        hint={t('budget.month.availableHint')}
+        planned={comparison.plannedVariable}
+        actual={comparison.actualVariable}
+        overIsBad
+      />
+      <div className="flex items-baseline justify-between border-t border-border pt-3 text-sm">
+        <span>
+          <span className="font-medium">{t('budget.month.fixedCosts')}</span>
+          <span className="ml-2 text-xs text-muted-foreground">
+            {t('budget.month.fixedCostsHint')}
+          </span>
+        </span>
+        <span className="tabular-nums">{formatCHF(comparison.fixedCosts)}</span>
+      </div>
+    </>
   );
 }
 

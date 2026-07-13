@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CardEmptyState } from '@/components/CardEmptyState';
 import { PlanVsActualRow } from '@/components/budget/PlanVsActualRow';
 import { derivePlanVsActual, hasBudgetPlan } from '@/components/budget/planVsActual';
 import type { MonthlyBudget } from '@/api/budget';
+import { useMonthlyBudget, useMonthSummary } from '@/hooks/financeQueries';
 import type { SpendingSummary } from '@/types';
 import { formatCHF } from '@/lib/formatters';
-import { CardEmptyState } from './CardEmptyState';
-import { useMonthlyBudget, useMonthSummary } from './dashboardQueries';
 
 function BudgetStatusContent({
   budget,
@@ -76,7 +76,7 @@ export function BudgetStatusCard() {
       </CardHeader>
       <CardContent>
         {isLoading && <Skeleton className="h-40 w-full" />}
-        {isError && <p className="text-sm text-destructive">{t('budget.month.loadError')}</p>}
+        {isError && <p className="text-sm text-destructive">{t('dashboard.loadError')}</p>}
         {budget.data && summary.data && (
           <BudgetStatusContent budget={budget.data} summary={summary.data} />
         )}

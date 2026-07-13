@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useAuth } from '@/auth/useAuth';
@@ -13,9 +13,10 @@ import type { DateRange } from '@/lib/dates';
 import type { MonthlyDataPoint, SpendingSummary } from '@/types';
 
 /**
- * Query hooks shared by the dashboard cards. Each card owns its loading and
- * error state; react-query dedupes the identical keys into one request and the
- * keys match the budget page, so both screens share the same cache entries.
+ * Query hooks for the month figures, the budget plan and the wealth overview.
+ * Single source of truth for the query keys: the dashboard cards and the budget
+ * month tab go through these hooks, so react-query dedupes identical months
+ * into one request and both screens share the same cache entries.
  */
 
 const TREND_RANGE = 'LAST_6_MONTHS';
@@ -25,14 +26,18 @@ function useToken(): string {
   return accessToken ?? '';
 }
 
-/** The running calendar month, stable for the lifetime of the component. */
-export function useCurrentMonthRange(): DateRange {
-  return useMemo(() => monthRange(currentMonth()), []);
+/** Range of the given `YYYY-MM` month, defaulting to the running month. */
+function useMonthRange(ym?: string): DateRange {
+  // The fallback is captured once so the query key stays stable across renders.
+  const [runningMonth] = useState(currentMonth);
+  const month = ym ?? runningMonth;
+
+  return useMemo(() => monthRange(month), [month]);
 }
 
-export function useMonthSummary(): UseQueryResult<SpendingSummary> {
+export function useMonthSummary(ym?: string): UseQueryResult<SpendingSummary> {
   const token = useToken();
-  const { from, to } = useCurrentMonthRange();
+  const { from, to } = useMonthRange(ym);
 
   return useQuery({
     queryKey: ['analytics', 'summary', from, to],
@@ -41,9 +46,11 @@ export function useMonthSummary(): UseQueryResult<SpendingSummary> {
   });
 }
 
-export function useMonthCategoryBreakdown(): UseQueryResult<RangeCategoryBreakdown[]> {
+export function useMonthCategoryBreakdown(
+  ym?: string,
+): UseQueryResult<RangeCategoryBreakdown[]> {
   const token = useToken();
-  const { from, to } = useCurrentMonthRange();
+  const { from, to } = useMonthRange(ym);
 
   return useQuery({
     queryKey: ['analytics', 'categories', from, to],

@@ -7,7 +7,7 @@ interface CardEmptyStateProps {
   to: string;
 }
 
-/** Empty state inside a dashboard card: explanation plus a link to fix it. */
+/** Empty state inside a card: explanation plus a link to fix it. */
 export function CardEmptyState({ message, ctaLabel, to }: Readonly<CardEmptyStateProps>) {
   return (
     <div className="flex flex-col items-center gap-2 py-10 text-center">

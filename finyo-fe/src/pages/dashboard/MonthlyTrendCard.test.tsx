@@ -55,6 +55,6 @@ describe('MonthlyTrendCard', () => {
     vi.mocked(analyticsApi.getMonthlyTrend).mockRejectedValue(new Error('boom'));
     renderWithProviders(<MonthlyTrendCard />);
 
-    expect(await screen.findByText('Could not load the month view')).toBeInTheDocument();
+    expect(await screen.findByText('Could not load the dashboard')).toBeInTheDocument();
   });
 });

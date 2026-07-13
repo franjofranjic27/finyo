@@ -100,6 +100,6 @@ describe('BudgetStatusCard', () => {
     vi.mocked(budgetApi.getMonthlyBudget).mockRejectedValue(new Error('boom'));
     renderWithProviders(<BudgetStatusCard />);
 
-    expect(await screen.findByText('Could not load the month view')).toBeInTheDocument();
+    expect(await screen.findByText('Could not load the dashboard')).toBeInTheDocument();
   });
 });
