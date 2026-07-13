@@ -9,7 +9,7 @@ import { OnboardingGate } from './auth/OnboardingGate';
 import { ThemeProvider } from './hooks/useTheme';
 import { AppLayout } from './components/layout/AppLayout';
 import { OnboardingPage } from './pages/onboarding/OnboardingPage';
-import { Dashboard } from './pages/Dashboard';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { WealthPage } from './pages/wealth/WealthPage';
 import { BudgetPage } from './pages/budget/BudgetPage';
 import { AccountsPage } from './pages/accounts/AccountsPage';
@@ -45,7 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <Route path="/onboarding" element={<OnboardingPage />} />
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/wealth" element={<WealthPage />} />
                     <Route path="/budget" element={<BudgetPage />} />
                     <Route path="/accounts" element={<AccountsPage />} />
