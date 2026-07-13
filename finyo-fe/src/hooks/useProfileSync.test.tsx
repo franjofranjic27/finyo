@@ -43,9 +43,13 @@ describe('useProfileSync', () => {
 
     renderWithProviders(<SyncProbe />);
 
-    await waitFor(() => expect(screen.getByTestId('theme-probe')).toHaveTextContent('dark'));
-    expect(document.documentElement).toHaveClass('dark');
-    expect(i18n.language).toBe('de');
+    // The document class lands in a passive effect, so it may trail the rendered
+    // preference by a tick — both have to be awaited, not asserted afterwards.
+    await waitFor(() => {
+      expect(document.documentElement).toHaveClass('dark');
+      expect(i18n.language).toBe('de');
+    });
+    expect(screen.getByTestId('theme-probe')).toHaveTextContent('dark');
   });
 
   it('keeps the current language when the profile has none stored', async () => {
