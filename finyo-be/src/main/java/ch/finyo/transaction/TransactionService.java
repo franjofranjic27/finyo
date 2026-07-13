@@ -97,6 +97,9 @@ public class TransactionService {
                 .category(category)
                 .account(account)
                 .source(existing.getSource())
+                // the bank reference must survive manual edits, otherwise a
+                // re-import would resurrect the transaction as a duplicate
+                .externalRef(existing.getExternalRef())
                 .build();
 
         return TransactionResponse.from(transactionRepository.save(updated));

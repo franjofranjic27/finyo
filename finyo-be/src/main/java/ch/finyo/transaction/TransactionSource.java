@@ -2,5 +2,6 @@ package ch.finyo.transaction;
 
 public enum TransactionSource {
     MANUAL,
-    CSV_IMPORT
+    CSV_IMPORT,
+    CAMT_IMPORT
 }

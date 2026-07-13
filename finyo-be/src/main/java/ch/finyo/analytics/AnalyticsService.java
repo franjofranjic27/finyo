@@ -70,7 +70,9 @@ public class AnalyticsService {
                             .multiply(BigDecimal.valueOf(100))
                             .doubleValue();
 
-            var category = categoryRepository.findById(categoryId).orElse(null);
+            // categoryId is null for uncategorized expenses (the aggregation
+            // includes them as their own group since the statement import)
+            var category = categoryId != null ? categoryRepository.findById(categoryId).orElse(null) : null;
             String categoryName = category != null ? category.getName() : "Uncategorized";
             String categoryColor = category != null ? category.getColor() : null;
 

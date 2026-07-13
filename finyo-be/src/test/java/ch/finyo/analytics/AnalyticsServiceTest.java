@@ -192,6 +192,31 @@ class AnalyticsServiceTest {
     }
 
     @Test
+    void getCategoryBreakdown_groups_uncategorized_expenses_under_a_null_category_id() {
+        // the aggregation now includes transactions without a category as a
+        // NULL group — no repository lookup must happen for it
+        UUID groceriesId = UUID.randomUUID();
+        given(transactionRepository.sumExpensesByCategoryForPeriod(USER_ID, FROM, TO))
+                .willReturn(List.<Object[]>of(
+                        new Object[]{null, new BigDecimal("-300.00")},
+                        new Object[]{groceriesId, new BigDecimal("-100.00")}));
+        given(categoryRepository.findById(groceriesId))
+                .willReturn(Optional.of(buildCategory(groceriesId, "Groceries", "#8b5cf6")));
+
+        List<CategoryBreakdownItem> result = analyticsService.getCategoryBreakdown(USER_ID, null, FROM, TO);
+
+        assertThat(result).hasSize(2);
+        CategoryBreakdownItem uncategorized = result.get(0);
+        assertThat(uncategorized.categoryId()).isNull();
+        assertThat(uncategorized.categoryName()).isEqualTo("Uncategorized");
+        assertThat(uncategorized.categoryColor()).isNull();
+        assertThat(uncategorized.total()).isEqualByComparingTo("300.00");
+        assertThat(uncategorized.percentage()).isCloseTo(75.0, within(0.001));
+        then(categoryRepository).should().findById(groceriesId);
+        then(categoryRepository).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
     void getCategoryBreakdown_returns_empty_list_when_there_are_no_expenses() {
         given(transactionRepository.sumExpensesByCategoryForPeriod(USER_ID, FROM, TO))
                 .willReturn(List.of());

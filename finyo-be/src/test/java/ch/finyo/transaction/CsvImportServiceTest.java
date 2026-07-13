@@ -3,12 +3,15 @@ package ch.finyo.transaction;
 import ch.finyo.account.Account;
 import ch.finyo.account.AccountRepository;
 import ch.finyo.account.AccountType;
+import ch.finyo.category.CategoryRuleMatcher;
+import ch.finyo.category.CategoryRuleService;
 import ch.finyo.common.ResourceNotFoundException;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +39,7 @@ import static org.mockito.BDDMockito.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.lenient;
 
 /**
  * Pure unit tests for CsvImportService (no Spring context, no database).
@@ -63,11 +67,21 @@ class CsvImportServiceTest {
     @Mock
     private AccountRepository accountRepository;
 
+    @Mock
+    private CategoryRuleService categoryRuleService;
+
     @InjectMocks
     private CsvImportService csvImportService;
 
     @Captor
     private ArgumentCaptor<List<Transaction>> savedTransactions;
+
+    @BeforeEach
+    void stubEmptyRuleMatcher() {
+        // lenient: tests that fail before row processing (e.g. unknown account)
+        // never load the matcher
+        lenient().when(categoryRuleService.loadMatcher(USER_ID)).thenReturn(CategoryRuleMatcher.empty());
+    }
 
     // -------------------------------------------------------------------------
     // Builders / factories

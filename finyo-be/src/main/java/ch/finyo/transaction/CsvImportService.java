@@ -2,6 +2,9 @@ package ch.finyo.transaction;
 
 import ch.finyo.account.Account;
 import ch.finyo.account.AccountRepository;
+import ch.finyo.category.Category;
+import ch.finyo.category.CategoryRuleMatcher;
+import ch.finyo.category.CategoryRuleService;
 import ch.finyo.common.ResourceNotFoundException;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
@@ -23,6 +26,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -31,6 +35,7 @@ public class CsvImportService {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final CategoryRuleService categoryRuleService;
 
     @Transactional
     public ImportResultResponse importCsv(MultipartFile file, ImportRequest request, String userId) throws IOException {
@@ -38,13 +43,7 @@ public class CsvImportService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Account", request.accountId()));
 
         CsvColumnMapping mapping = resolveMapping(request);
-
-        CsvParserSettings settings = new CsvParserSettings();
-        settings.setHeaderExtractionEnabled(mapping.hasHeader());
-        settings.setDelimiterDetectionEnabled(true, ',', ';');
-
-        CsvParser parser = new CsvParser(settings);
-        List<String[]> rows = parser.parseAll(file.getInputStream(), "UTF-8");
+        List<String[]> rows = readCsvRows(file, mapping);
 
         return processRows(rows, mapping, account, userId, request.skipDuplicates());
     }
@@ -55,8 +54,24 @@ public class CsvImportService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Account", request.accountId()));
 
         CsvColumnMapping mapping = resolveMapping(request);
-        List<String[]> rows = new ArrayList<>();
+        List<String[]> rows = readExcelRows(file, mapping);
 
+        return processRows(rows, mapping, account, userId, request.skipDuplicates());
+    }
+
+    /** Reads the raw CSV cell matrix (header stripped when configured). Shared with the preview flow. */
+    List<String[]> readCsvRows(MultipartFile file, CsvColumnMapping mapping) throws IOException {
+        CsvParserSettings settings = new CsvParserSettings();
+        settings.setHeaderExtractionEnabled(mapping.hasHeader());
+        settings.setDelimiterDetectionEnabled(true, ',', ';');
+
+        CsvParser parser = new CsvParser(settings);
+        return parser.parseAll(file.getInputStream(), "UTF-8");
+    }
+
+    /** Reads the raw cell matrix of the first sheet. Shared with the preview flow. */
+    List<String[]> readExcelRows(MultipartFile file, CsvColumnMapping mapping) throws IOException {
+        List<String[]> rows = new ArrayList<>();
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             int startRow = mapping.hasHeader() ? 1 : 0;
@@ -71,17 +86,20 @@ public class CsvImportService {
                 rows.add(rowData);
             }
         }
-
-        return processRows(rows, mapping, account, userId, request.skipDuplicates());
+        return rows;
     }
 
     private enum RowOutcome {
         IMPORTED, SKIPPED, FAILED
     }
 
+    /** Date, amount and description of a single successfully parsed statement row — nothing persisted. */
+    record ParsedRow(LocalDate date, BigDecimal amount, String description) {
+    }
+
     /** Immutable per-import settings shared by every row. */
-    private record ImportContext(CsvColumnMapping mapping, DateTimeFormatter formatter,
-                                 Account account, String userId, boolean skipDuplicates) {
+    private record ImportContext(CsvColumnMapping mapping, DateTimeFormatter formatter, Account account,
+                                 String userId, boolean skipDuplicates, CategoryRuleMatcher matcher) {
     }
 
     private ImportResultResponse processRows(List<String[]> rows, CsvColumnMapping mapping, Account account, String userId, boolean skipDuplicates) {
@@ -92,7 +110,8 @@ public class CsvImportService {
         List<Transaction> toSave = new ArrayList<>();
 
         ImportContext context = new ImportContext(
-                mapping, DateTimeFormatter.ofPattern(mapping.dateFormat()), account, userId, skipDuplicates);
+                mapping, DateTimeFormatter.ofPattern(mapping.dateFormat()), account, userId, skipDuplicates,
+                categoryRuleService.loadMatcher(userId));
 
         for (int i = 0; i < rows.size(); i++) {
             switch (processRow(rows.get(i), i + 1, context, toSave, errors)) {
@@ -109,36 +128,26 @@ public class CsvImportService {
 
     private RowOutcome processRow(String[] row, int rowNumber, ImportContext context,
                                   List<Transaction> toSave, List<String> errors) {
-        CsvColumnMapping mapping = context.mapping();
         try {
-            if (row.length <= Math.max(mapping.dateColumn(), mapping.amountColumn())) {
-                errors.add("Row " + rowNumber + ": insufficient columns");
+            Optional<ParsedRow> maybeParsed = parseRow(row, context.mapping(), context.formatter());
+            if (maybeParsed.isEmpty()) {
                 return RowOutcome.FAILED;
             }
-
-            String dateStr = row[mapping.dateColumn()].trim();
-            String amountStr = row[mapping.amountColumn()].trim();
-            String description = mapping.descriptionColumn() >= 0 && row.length > mapping.descriptionColumn()
-                    ? row[mapping.descriptionColumn()].trim() : "";
-
-            if (dateStr.isEmpty() || amountStr.isEmpty()) {
-                return RowOutcome.FAILED;
-            }
-
-            LocalDate date = LocalDate.parse(dateStr, context.formatter());
-            BigDecimal amount = parseAmount(amountStr, mapping.decimalSeparator(), mapping.groupingSeparator());
+            ParsedRow parsed = maybeParsed.get();
 
             if (context.skipDuplicates() && transactionRepository.existsByUserIdAndDateAndAmountAndDescription(
-                    context.userId(), date, amount, description)) {
+                    context.userId(), parsed.date(), parsed.amount(), parsed.description())) {
                 return RowOutcome.SKIPPED;
             }
 
+            Category category = context.matcher().match(parsed.description()).orElse(null);
             toSave.add(Transaction.builder()
                     .userId(context.userId())
-                    .amount(amount)
+                    .amount(parsed.amount())
                     .currency("CHF")
-                    .date(date)
-                    .description(description)
+                    .date(parsed.date())
+                    .description(parsed.description())
+                    .category(category)
                     .account(context.account())
                     .source(TransactionSource.CSV_IMPORT)
                     .build());
@@ -147,6 +156,32 @@ public class CsvImportService {
             errors.add("Row " + rowNumber + ": " + e.getMessage());
             return RowOutcome.FAILED;
         }
+    }
+
+    /**
+     * Parses one raw statement row without saving anything. Returns empty when
+     * the date or amount cell is blank (silently skipped, matching the legacy
+     * behavior) and throws for structurally broken rows (missing columns,
+     * unparseable date or amount). Shared with the preview flow.
+     */
+    Optional<ParsedRow> parseRow(String[] row, CsvColumnMapping mapping, DateTimeFormatter formatter) {
+        if (row.length <= Math.max(mapping.dateColumn(), mapping.amountColumn())) {
+            throw new IllegalArgumentException("insufficient columns");
+        }
+
+        String dateStr = row[mapping.dateColumn()].trim();
+        String amountStr = row[mapping.amountColumn()].trim();
+        String description = mapping.descriptionColumn() >= 0 && row.length > mapping.descriptionColumn()
+                && row[mapping.descriptionColumn()] != null
+                ? row[mapping.descriptionColumn()].trim() : "";
+
+        if (dateStr.isEmpty() || amountStr.isEmpty()) {
+            return Optional.empty();
+        }
+
+        LocalDate date = LocalDate.parse(dateStr, formatter);
+        BigDecimal amount = parseAmount(amountStr, mapping.decimalSeparator(), mapping.groupingSeparator());
+        return Optional.of(new ParsedRow(date, amount, description));
     }
 
     private BigDecimal parseAmount(String raw, String decimalSep, String groupSep) {
@@ -173,7 +208,7 @@ public class CsvImportService {
         };
     }
 
-    private CsvColumnMapping resolveMapping(ImportRequest request) {
+    CsvColumnMapping resolveMapping(ImportRequest request) {
         if (request.preset() != null) {
             return switch (request.preset().toUpperCase()) {
                 case "UBS" -> CsvColumnMapping.ubs();

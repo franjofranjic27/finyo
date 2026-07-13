@@ -53,6 +53,10 @@ public class Transaction {
     @Column(nullable = false)
     private TransactionSource source;
 
+    /** Bank-side reference (camt.053 AcctSvcrRef/EndToEndId); unique per user when present. */
+    @Column(name = "external_ref")
+    private String externalRef;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

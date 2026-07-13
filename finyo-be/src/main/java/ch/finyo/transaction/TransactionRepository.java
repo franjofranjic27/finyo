@@ -28,7 +28,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    @Query("SELECT t.category.id, SUM(t.amount) FROM Transaction t WHERE t.userId = :userId AND t.date BETWEEN :from AND :to AND t.amount < 0 AND t.category IS NOT NULL GROUP BY t.category.id")
+    // uncategorized expenses are included as a NULL category-id group so the
+    // breakdown always sums up to the spending total
+    @Query("SELECT t.category.id, SUM(t.amount) FROM Transaction t WHERE t.userId = :userId AND t.date BETWEEN :from AND :to AND t.amount < 0 GROUP BY t.category.id")
     List<Object[]> sumExpensesByCategoryForPeriod(
             @Param("userId") String userId,
             @Param("from") LocalDate from,
@@ -45,4 +47,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             LocalDate date,
             BigDecimal amount,
             String description);
+
+    boolean existsByUserIdAndExternalRef(String userId, String externalRef);
 }
