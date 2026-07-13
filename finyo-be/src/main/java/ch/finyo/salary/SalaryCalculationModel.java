@@ -12,20 +12,33 @@ import java.util.List;
  * deductions (AHV, ALV, NBU, KTG) apply to the full yearly gross including
  * a 13th salary; fixed contributions (PENSION, OTHER) are charged 12 times
  * per year regardless of the 13th salary.
+ *
+ * <p>The authoritative gross depends on the input mode: MONTHLY multiplies
+ * the entered monthly gross by 12 (13 with a 13th salary), while YEARLY
+ * treats the entered yearly gross as the total annual amount — including the
+ * 13th salary if enabled — and derives the monthly display value from it.
  */
 final class SalaryCalculationModel {
 
     private static final BigDecimal TWENTY = new BigDecimal("20");
     private static final BigDecimal TWELVE = new BigDecimal("12");
+    private static final BigDecimal THIRTEEN = new BigDecimal("13");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private SalaryCalculationModel() {
     }
 
     static SalaryResult calculate(SalaryProfile profile) {
-        BigDecimal grossMonthly = profile.getGrossMonthly();
-        BigDecimal monthsPerYear = profile.isThirteenthSalary() ? new BigDecimal("13") : TWELVE;
-        BigDecimal grossYearly = grossMonthly.multiply(monthsPerYear).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal monthsPerYear = profile.isThirteenthSalary() ? THIRTEEN : TWELVE;
+        BigDecimal grossMonthly;
+        BigDecimal grossYearly;
+        if (profile.getInputMode() == SalaryInputMode.YEARLY) {
+            grossYearly = profile.getGrossYearly().setScale(2, RoundingMode.HALF_UP);
+            grossMonthly = grossYearly.divide(monthsPerYear, 2, RoundingMode.HALF_UP);
+        } else {
+            grossMonthly = profile.getGrossMonthly();
+            grossYearly = grossMonthly.multiply(monthsPerYear).setScale(2, RoundingMode.HALF_UP);
+        }
 
         List<SalaryDeduction> deductions = List.of(
                 percentageLine(SalaryDeductionType.AHV, profile.getAhvPct(), grossMonthly, grossYearly),
