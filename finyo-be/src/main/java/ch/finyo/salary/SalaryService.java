@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Slf4j
@@ -26,15 +27,28 @@ public class SalaryService {
     @Transactional
     public SalaryResponse upsert(SalaryRequest request, String userId) {
         log.info("Upserting salary profile for user={}", userId);
+        SalaryInputMode inputMode = request.inputMode() != null ? request.inputMode() : SalaryInputMode.MONTHLY;
+        validateGrossForMode(inputMode, request);
         UUID existingId = salaryProfileRepository.findByUserId(userId)
                 .map(SalaryProfile::getId)
                 .orElse(null);
 
+        boolean thirteenthSalary = Boolean.TRUE.equals(request.thirteenthSalary());
+        // the entered gross is authoritative; the counterpart is derived
+        BigDecimal grossYearly = inputMode == SalaryInputMode.YEARLY
+                ? request.grossYearly()
+                : SalaryCalculationModel.deriveGrossYearly(request.grossMonthly(), thirteenthSalary);
+        BigDecimal grossMonthly = inputMode == SalaryInputMode.YEARLY
+                ? SalaryCalculationModel.deriveGrossMonthly(request.grossYearly(), thirteenthSalary)
+                : request.grossMonthly();
+
         var profile = SalaryProfile.builder()
                 .id(existingId)
                 .userId(userId)
-                .grossMonthly(request.grossMonthly())
-                .thirteenthSalary(Boolean.TRUE.equals(request.thirteenthSalary()))
+                .inputMode(inputMode)
+                .grossMonthly(grossMonthly)
+                .grossYearly(grossYearly)
+                .thirteenthSalary(thirteenthSalary)
                 .ahvPct(request.ahvPct())
                 .alvPct(request.alvPct())
                 .nbuPct(request.nbuPct())
@@ -46,5 +60,15 @@ public class SalaryService {
         SalaryProfile saved = salaryProfileRepository.save(profile);
         log.info("Upserted salary profile id={} for user={}", saved.getId(), userId);
         return SalaryResponse.from(saved);
+    }
+
+    private static void validateGrossForMode(SalaryInputMode inputMode, SalaryRequest request) {
+        if (inputMode == SalaryInputMode.YEARLY) {
+            if (request.grossYearly() == null) {
+                throw new IllegalArgumentException("grossYearly is required for YEARLY input mode");
+            }
+        } else if (request.grossMonthly() == null) {
+            throw new IllegalArgumentException("grossMonthly is required for MONTHLY input mode");
+        }
     }
 }
