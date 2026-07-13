@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TaxPage } from './TaxPage';
+import { pillar3Api } from '@/api/pillar3';
+import { salaryApi } from '@/api/salary';
 import { taxApi } from '@/api/tax';
+import { salary } from '@/test/fixtures/salary';
 import {
   taxResult,
   taxScenario,
@@ -43,6 +46,28 @@ vi.mock('@/api/tax', () => ({
     deleteScenario: vi.fn(),
   },
 }));
+
+vi.mock('@/api/pillar3', () => ({
+  pillar3Api: {
+    getScenarios: vi.fn(),
+  },
+}));
+
+vi.mock('@/api/salary', () => ({
+  salaryApi: {
+    get: vi.fn(),
+  },
+}));
+
+// Neutral defaults so the calculator's cross-module prefill stays inactive.
+beforeEach(() => {
+  vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+  const stored = salary();
+  vi.mocked(salaryApi.get).mockResolvedValue({
+    ...stored,
+    result: { ...stored.result, grossYearly: 0 },
+  });
+});
 
 function renderTaxPage(route: string) {
   return renderWithProviders(<TaxPage />, { route, path: '/tax/:year?' });

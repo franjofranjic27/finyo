@@ -99,6 +99,13 @@ export function BucketFormDialog({ bucket, onClose }: Readonly<BucketFormDialogP
               >
                 {t('wealth.form.sourcePortfolio')}
               </Button>
+              <Button
+                variant={source === 'PILLAR3' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSource('PILLAR3')}
+              >
+                {t('wealth.form.sourcePillar3')}
+              </Button>
             </div>
           </div>
           {source === 'MANUAL' && (
@@ -132,6 +139,9 @@ export function BucketFormDialog({ bucket, onClose }: Readonly<BucketFormDialogP
               </div>
               <p className="text-xs text-muted-foreground">{t('wealth.form.assetClassesHint')}</p>
             </div>
+          )}
+          {source === 'PILLAR3' && (
+            <p className="text-xs text-muted-foreground">{t('wealth.form.pillar3Hint')}</p>
           )}
           <div className="space-y-2">
             <Label htmlFor="bucket-monthly-rate">{t('wealth.form.monthlyRate')}</Label>

@@ -2,7 +2,7 @@ import { apiRequest } from './client';
 import type { AssetClass } from './portfolio';
 
 /** How a wealth bucket's balance is maintained (mirrors the backend enum). */
-export type WealthSource = 'MANUAL' | 'PORTFOLIO';
+export type WealthSource = 'MANUAL' | 'PORTFOLIO' | 'PILLAR3';
 
 export interface WealthBucket {
   id: string;
