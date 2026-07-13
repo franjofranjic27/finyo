@@ -39,6 +39,11 @@ vi.mock('@/api/salary', () => ({
   },
 }));
 
+// The month view has its own test suite — keep this one focused on the tabs.
+vi.mock('./MonthTab', () => ({
+  MonthTab: () => <div>month-tab-content</div>,
+}));
+
 describe('BudgetPage', () => {
   it('renders fixed costs and monthly budget from both queries in the plan tab', async () => {
     vi.mocked(budgetApi.getFixedCosts).mockResolvedValue(fixedCostList());
@@ -55,15 +60,39 @@ describe('BudgetPage', () => {
     expect(budgetApi.getMonthlyBudget).toHaveBeenCalledWith('test-token');
   });
 
-  it('renders both tab triggers with the plan tab as the default', async () => {
+  it('renders all tab triggers with the plan tab as the default', async () => {
     vi.mocked(budgetApi.getFixedCosts).mockResolvedValue(fixedCostList());
     vi.mocked(budgetApi.getMonthlyBudget).mockResolvedValue(monthlyBudget());
     renderWithProviders(<BudgetPage />);
 
     expect(screen.getByRole('tab', { name: 'Monthly budget' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Month view' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Salary calculator' })).toBeInTheDocument();
     expect(await screen.findByText('Krankenkasse')).toBeInTheDocument();
     expect(screen.queryByText('Inputs')).not.toBeInTheDocument();
+    expect(screen.queryByText('month-tab-content')).not.toBeInTheDocument();
+  });
+
+  it('deep-links to the month tab via ?tab=month', async () => {
+    vi.mocked(budgetApi.getFixedCosts).mockResolvedValue(fixedCostList());
+    vi.mocked(budgetApi.getMonthlyBudget).mockResolvedValue(monthlyBudget());
+    renderWithProviders(<BudgetPage />, { route: '/budget?tab=month' });
+
+    expect(await screen.findByText('month-tab-content')).toBeInTheDocument();
+    expect(screen.queryByText('Krankenkasse')).not.toBeInTheDocument();
+  });
+
+  it('switches to the month tab and back via the trigger', async () => {
+    vi.mocked(budgetApi.getFixedCosts).mockResolvedValue(fixedCostList());
+    vi.mocked(budgetApi.getMonthlyBudget).mockResolvedValue(monthlyBudget());
+    const user = userEvent.setup();
+    renderWithProviders(<BudgetPage />);
+
+    await user.click(screen.getByRole('tab', { name: 'Month view' }));
+    expect(await screen.findByText('month-tab-content')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Monthly budget' }));
+    expect(await screen.findByText('Krankenkasse')).toBeInTheDocument();
   });
 
   it('switches to the salary calculator tab', async () => {

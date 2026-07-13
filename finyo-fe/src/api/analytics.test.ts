@@ -22,6 +22,24 @@ describe('analyticsApi', () => {
     expect(apiRequestMock).toHaveBeenCalledWith('/analytics/summary?range=LAST_30_DAYS', {}, TOKEN);
   });
 
+  it('getSummaryRange passes explicit from/to dates', () => {
+    analyticsApi.getSummaryRange(TOKEN, '2026-07-01', '2026-07-31');
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/analytics/summary?from=2026-07-01&to=2026-07-31',
+      {},
+      TOKEN,
+    );
+  });
+
+  it('getCategoryBreakdownRange passes explicit from/to dates', () => {
+    analyticsApi.getCategoryBreakdownRange(TOKEN, '2026-07-01', '2026-07-31');
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/analytics/by-category?from=2026-07-01&to=2026-07-31',
+      {},
+      TOKEN,
+    );
+  });
+
   it('getCategoryBreakdown uses the by-category endpoint', () => {
     analyticsApi.getCategoryBreakdown(TOKEN, 'LAST_MONTH');
     expect(apiRequestMock).toHaveBeenCalledWith(
