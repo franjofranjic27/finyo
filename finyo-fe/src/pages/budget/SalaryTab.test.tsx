@@ -113,6 +113,8 @@ describe('SalaryTab', () => {
     await waitFor(() =>
       expect(salaryApi.update).toHaveBeenCalledWith('test-token', {
         grossMonthly: 6000,
+        grossYearly: 72000,
+        inputMode: 'MONTHLY',
         thirteenthSalary: false,
         ahvPct: 5.3,
         alvPct: 1.1,
@@ -122,6 +124,51 @@ describe('SalaryTab', () => {
         otherFixed: 11,
       }),
     );
+  });
+
+  it('switches to yearly mode and shows the derived monthly gross', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SalaryTab />);
+    await screen.findByLabelText('Gross salary per month');
+
+    await user.click(screen.getByRole('button', { name: 'CHF per year' }));
+
+    const yearlyInput = screen.getByLabelText('Gross salary per year');
+    expect(yearlyInput).toHaveValue(69444);
+    expect(screen.queryByLabelText('Gross salary per month')).not.toBeInTheDocument();
+    expect(screen.getByText("≈ CHF 5'787.00 per month")).toBeInTheDocument();
+  });
+
+  it('submits the yearly gross with YEARLY mode and a derived monthly value', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SalaryTab />);
+    await screen.findByLabelText('Gross salary per month');
+
+    await user.click(screen.getByRole('button', { name: 'CHF per year' }));
+    const yearlyInput = screen.getByLabelText('Gross salary per year');
+    await user.clear(yearlyInput);
+    await user.type(yearlyInput, '78000');
+    await user.click(screen.getByRole('checkbox', { name: '13th month salary' }));
+    await user.click(screen.getByRole('button', { name: 'Calculate & save' }));
+
+    await waitFor(() =>
+      expect(salaryApi.update).toHaveBeenCalledWith('test-token', {
+        grossMonthly: 6000,
+        grossYearly: 78000,
+        inputMode: 'YEARLY',
+        thirteenthSalary: true,
+        ahvPct: 5.3,
+        alvPct: 1.1,
+        nbuPct: 0.455,
+        ktgPct: 0.17,
+        pensionFixed: 85.35,
+        otherFixed: 11,
+      }),
+    );
+    // The yearly amount includes the 13th salary — the hint makes that explicit.
+    expect(
+      screen.getByText('The yearly amount includes the 13th month salary.'),
+    ).toBeInTheDocument();
   });
 
   it('applies the net salary to the monthly budget preserving the other fields', async () => {

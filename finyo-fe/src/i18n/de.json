@@ -442,8 +442,14 @@
       "loadError": "Lohnrechner konnte nicht geladen werden",
       "inputs": {
         "title": "Eingaben",
+        "mode": "Eingabe",
+        "modeMonthly": "CHF pro Monat",
+        "modeYearly": "CHF pro Jahr",
         "grossMonthly": "Bruttolohn pro Monat",
+        "grossYearlyLabel": "Bruttolohn pro Jahr",
         "grossYearly": "= {{amount}} pro Jahr",
+        "monthlyDerived": "≈ {{amount}} pro Monat",
+        "yearlyIncludesThirteenth": "Der Jahresbetrag versteht sich inklusive 13. Monatslohn.",
         "thirteenth": "13. Monatslohn",
         "ratesTitle": "Abzugssätze (anpassbar)",
         "pension": "Pensionskasse (fix)",
@@ -616,6 +622,85 @@
         "valorInvalid": "Valor darf nur Ziffern enthalten",
         "equityRange": "Aktienquote muss zwischen 0 und 100 liegen",
         "terRange": "TER muss zwischen 0 und 10 liegen"
+      }
+    }
+  },
+  "profile": {
+    "birthDate": "Geburtsdatum",
+    "derivedInfo": "Alter: {{age}} · Jahre bis Pensionierung (65): {{years}}",
+    "retirementYear": "Pensionierung im Jahr {{year}}",
+    "theme": {
+      "label": "Erscheinungsbild",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "saved": "Gespeichert",
+    "loadError": "Profil konnte nicht geladen werden"
+  },
+  "onboarding": {
+    "title": "Willkommen bei finyo",
+    "subtitle": "Richte dein Profil in drei kurzen Schritten ein",
+    "stepIndicator": "Schritt {{current}} von {{total}}",
+    "steps": {
+      "basics": "Persönliches",
+      "income": "Einkommen",
+      "preferences": "Darstellung"
+    },
+    "back": "Zurück",
+    "next": "Weiter",
+    "skip": "Überspringen",
+    "finish": "Abschliessen",
+    "basics": {
+      "hint": "Diese Angaben fliessen in Steuer- und Vorsorgeberechnungen ein."
+    },
+    "income": {
+      "hint": "Optional — du kannst den Lohn später im Budget anpassen."
+    },
+    "preferences": {
+      "hint": "Sprache und Erscheinungsbild kannst du jederzeit in den Einstellungen ändern."
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "tabs": {
+      "profile": "Profil",
+      "preferences": "Darstellung",
+      "accounts": "Konten",
+      "categories": "Kategorien"
+    },
+    "accounts": {
+      "add": "Konto hinzufügen",
+      "empty": "Noch keine Konten erfasst.",
+      "initial": "{{amount}} Anfangssaldo · {{currency}}",
+      "confirmDelete": "Konto «{{name}}» löschen? Dies kann nicht rückgängig gemacht werden.",
+      "dialog": {
+        "title": "Konto hinzufügen",
+        "name": "Name *",
+        "namePlaceholder": "UBS Privatkonto",
+        "type": "Kontoart",
+        "initialBalance": "Anfangssaldo (CHF)",
+        "color": "Farbe (Hex, optional)"
+      }
+    },
+    "categories": {
+      "add": "Kategorie hinzufügen",
+      "expenses": "Ausgaben",
+      "income": "Einnahmen",
+      "emptyExpenses": "Keine Ausgabenkategorien",
+      "emptyIncome": "Keine Einnahmenkategorien",
+      "confirmDelete": "Kategorie «{{name}}» löschen?",
+      "dialog": {
+        "title": "Kategorie hinzufügen",
+        "name": "Name *",
+        "namePlaceholder": "Lebensmittel",
+        "type": "Typ",
+        "expense": "Ausgabe",
+        "income": "Einnahme",
+        "parent": "Übergeordnete Kategorie (optional)",
+        "noParent": "Keine (oberste Ebene)",
+        "icon": "Icon (Emoji)",
+        "color": "Farbe (Hex)"
       }
     }
   },

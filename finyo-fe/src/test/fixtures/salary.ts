@@ -25,6 +25,8 @@ function salaryResult(): SalaryResult {
 export function salary(overrides: Partial<Salary> = {}): Salary {
   return {
     grossMonthly: 5787,
+    grossYearly: 69444,
+    inputMode: 'MONTHLY',
     thirteenthSalary: false,
     ahvPct: 5.3,
     alvPct: 1.1,

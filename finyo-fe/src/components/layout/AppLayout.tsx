@@ -5,11 +5,14 @@ import { Header } from './Header';
 import { PageBreadcrumb } from './Breadcrumb';
 import { BreadcrumbProvider } from './BreadcrumbContext';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { useProfileSync } from '@/hooks/useProfileSync';
 import { cn } from '@/lib/utils';
 
 const SIDEBAR_COLLAPSED_KEY = 'finyo.sidebar.collapsed';
 
 export function AppLayout() {
+  useProfileSync();
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'

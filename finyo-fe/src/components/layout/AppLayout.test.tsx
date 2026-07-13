@@ -1,9 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
+import { profileApi } from '@/api/profile';
 import { renderWithProviders } from '@/test/test-utils';
+import { userProfile } from '@/test/fixtures/profile';
+
+vi.mock('@/api/profile', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/profile')>()),
+  profileApi: { get: vi.fn(), update: vi.fn() },
+}));
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -30,6 +37,10 @@ function renderLayout() {
 }
 
 describe('AppLayout', () => {
+  beforeEach(() => {
+    vi.mocked(profileApi.get).mockResolvedValue(userProfile());
+  });
+
   it('renders the routed page inside the layout with header and sidebar', () => {
     renderLayout();
 

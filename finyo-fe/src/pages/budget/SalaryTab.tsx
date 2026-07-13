@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/auth/useAuth';
 import { salaryApi } from '@/api/salary';
-import type { Salary, SalaryDeduction, SalaryInput, SalaryResult } from '@/api/salary';
+import type {
+  Salary, SalaryDeduction, SalaryInput, SalaryInputMode, SalaryResult,
+} from '@/api/salary';
 import { budgetApi } from '@/api/budget';
 import type { MonthlyBudget } from '@/api/budget';
 import { formatCHF, formatPercent } from '@/lib/formatters';
@@ -44,15 +46,19 @@ const SOCIAL_TYPES = new Set<string>(['AHV', 'ALV', 'NBU', 'KTG']);
 type NumericField =
   | (typeof RATE_FIELDS)[number]['field']
   | (typeof FIXED_FIELDS)[number]['field']
-  | 'grossMonthly';
+  | 'grossMonthly'
+  | 'grossYearly';
 
 interface SalaryFormState extends Record<NumericField, string> {
+  inputMode: SalaryInputMode;
   thirteenthSalary: boolean;
 }
 
 function toFormState(salary: Salary): SalaryFormState {
   return {
     grossMonthly: String(salary.grossMonthly),
+    grossYearly: String(salary.grossYearly),
+    inputMode: salary.inputMode,
     thirteenthSalary: salary.thirteenthSalary,
     ahvPct: String(salary.ahvPct),
     alvPct: String(salary.alvPct),
@@ -63,10 +69,25 @@ function toFormState(salary: Salary): SalaryFormState {
   };
 }
 
+const roundToCents = (value: number) => Math.round(value * 100) / 100;
+
 function toInput(form: SalaryFormState): SalaryInput {
   const num = (value: string) => Number.parseFloat(value) || 0;
+  const monthsPerYear = form.thirteenthSalary ? 13 : 12;
+  // The non-authoritative gross is derived from the entered one, so the
+  // payload stays consistent regardless of stale values in the other field.
+  const grossMonthly =
+    form.inputMode === 'MONTHLY'
+      ? num(form.grossMonthly)
+      : roundToCents(num(form.grossYearly) / monthsPerYear);
+  const grossYearly =
+    form.inputMode === 'YEARLY'
+      ? num(form.grossYearly)
+      : roundToCents(num(form.grossMonthly) * monthsPerYear);
   return {
-    grossMonthly: num(form.grossMonthly),
+    grossMonthly,
+    grossYearly,
+    inputMode: form.inputMode,
     thirteenthSalary: form.thirteenthSalary,
     ahvPct: num(form.ahvPct),
     alvPct: num(form.alvPct),
@@ -147,8 +168,13 @@ function SalaryInputsCard({ form, setForm, onSubmit, saving, error }: Readonly<S
   const setField = (field: NumericField) => (e: ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
+  const setInputMode = (inputMode: SalaryInputMode) =>
+    setForm((prev) => ({ ...prev, inputMode }));
+
   const grossMonthly = Number.parseFloat(form.grossMonthly) || 0;
+  const grossYearly = Number.parseFloat(form.grossYearly) || 0;
   const monthsPerYear = form.thirteenthSalary ? 13 : 12;
+  const isYearly = form.inputMode === 'YEARLY';
 
   return (
     <Card>
@@ -157,31 +183,79 @@ function SalaryInputsCard({ form, setForm, onSubmit, saving, error }: Readonly<S
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="salary-grossMonthly">{t('budget.salary.inputs.grossMonthly')}</Label>
-          <Input
-            id="salary-grossMonthly"
-            type="number"
-            min={0}
-            step={0.01}
-            value={form.grossMonthly}
-            onChange={setField('grossMonthly')}
-          />
-          <p className="text-xs text-muted-foreground">
-            {t('budget.salary.inputs.grossYearly', {
-              amount: formatCHF(grossMonthly * monthsPerYear),
-            })}
-          </p>
+          <Label>{t('budget.salary.inputs.mode')}</Label>
+          <div className="flex gap-1">
+            <Button
+              variant={form.inputMode === 'MONTHLY' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setInputMode('MONTHLY')}
+            >
+              {t('budget.salary.inputs.modeMonthly')}
+            </Button>
+            <Button
+              variant={form.inputMode === 'YEARLY' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setInputMode('YEARLY')}
+            >
+              {t('budget.salary.inputs.modeYearly')}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="salary-thirteenth"
-            checked={form.thirteenthSalary}
-            onCheckedChange={(checked) =>
-              setForm((prev) => ({ ...prev, thirteenthSalary: checked === true }))
-            }
-          />
-          <Label htmlFor="salary-thirteenth">{t('budget.salary.inputs.thirteenth')}</Label>
+        {isYearly ? (
+          <div className="space-y-2">
+            <Label htmlFor="salary-grossYearly">
+              {t('budget.salary.inputs.grossYearlyLabel')}
+            </Label>
+            <Input
+              id="salary-grossYearly"
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.grossYearly}
+              onChange={setField('grossYearly')}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('budget.salary.inputs.monthlyDerived', {
+                amount: formatCHF(grossYearly / monthsPerYear),
+              })}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="salary-grossMonthly">{t('budget.salary.inputs.grossMonthly')}</Label>
+            <Input
+              id="salary-grossMonthly"
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.grossMonthly}
+              onChange={setField('grossMonthly')}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('budget.salary.inputs.grossYearly', {
+                amount: formatCHF(grossMonthly * monthsPerYear),
+              })}
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="salary-thirteenth"
+              checked={form.thirteenthSalary}
+              onCheckedChange={(checked) =>
+                setForm((prev) => ({ ...prev, thirteenthSalary: checked === true }))
+              }
+            />
+            <Label htmlFor="salary-thirteenth">{t('budget.salary.inputs.thirteenth')}</Label>
+          </div>
+          {isYearly && form.thirteenthSalary && (
+            <p className="text-xs text-muted-foreground">
+              {t('budget.salary.inputs.yearlyIncludesThirteenth')}
+            </p>
+          )}
         </div>
 
         <div className="space-y-4 border-t border-border pt-4">

@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Header } from './Header';
+import { profileApi } from '@/api/profile';
 import { renderWithProviders } from '@/test/test-utils';
+import { userProfile } from '@/test/fixtures/profile';
 import i18n from '@/i18n';
 
 const logout = vi.fn();
@@ -20,7 +22,16 @@ vi.mock('@/auth/useAuth', () => ({
   }),
 }));
 
+vi.mock('@/api/profile', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/profile')>()),
+  profileApi: { get: vi.fn(), update: vi.fn() },
+}));
+
 describe('Header', () => {
+  beforeEach(() => {
+    vi.mocked(profileApi.update).mockResolvedValue(userProfile());
+  });
+
   it('shows the finyo wordmark', () => {
     renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/investments' });
 
@@ -33,24 +44,28 @@ describe('Header', () => {
     expect(screen.getByText('AN')).toBeInTheDocument();
   });
 
-  it('switches the language with the EN/DE buttons', async () => {
+  it('switches the language with the EN/DE buttons and persists the choice', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/dashboard' });
 
     await user.click(screen.getByRole('button', { name: 'DE' }));
     expect(i18n.language).toBe('de');
+    expect(profileApi.update).toHaveBeenCalledWith('test-token', { preferredLanguage: 'de' });
 
     await user.click(screen.getByRole('button', { name: 'EN' }));
     expect(i18n.language).toBe('en');
+    expect(profileApi.update).toHaveBeenCalledWith('test-token', { preferredLanguage: 'en' });
   });
 
-  it('toggles the theme', async () => {
+  it('toggles the theme between light and dark and persists the choice', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Header onMenuClick={() => {}} />);
 
     await user.click(screen.getByRole('button', { name: 'Dark Mode' }));
 
     expect(document.documentElement).toHaveClass('dark');
+    expect(localStorage.getItem('finyo-theme')).toBe('dark');
+    expect(profileApi.update).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
     expect(screen.getByRole('button', { name: 'Light Mode' })).toBeInTheDocument();
   });
 

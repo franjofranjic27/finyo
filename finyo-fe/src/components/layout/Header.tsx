@@ -1,5 +1,6 @@
 import { Menu, Sun, Moon, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -12,6 +13,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/auth/useAuth';
+import { profileApi } from '@/api/profile';
+import type { PreferredLanguage, UserProfileInput } from '@/api/profile';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -19,8 +22,15 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: Readonly<HeaderProps>) {
   const { t, i18n } = useTranslation();
-  const { isDark, toggle } = useTheme();
-  const { user, logout } = useAuth();
+  const { isDark, setTheme } = useTheme();
+  const { user, accessToken, logout } = useAuth();
+  const token = accessToken ?? '';
+
+  // Fire-and-forget persistence: preferences apply locally either way, a
+  // failed PUT is silently ignored (the profile sync re-applies on next load).
+  const persistPreference = useMutation({
+    mutationFn: (input: UserProfileInput) => profileApi.update(token, input),
+  });
 
   const username =
     (user?.profile?.preferred_username as string | undefined) ??
@@ -28,8 +38,19 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
     'User';
   const initials = username.slice(0, 2).toUpperCase();
 
+  const changeLanguage = (language: PreferredLanguage) => {
+    void i18n.changeLanguage(language);
+    persistPreference.mutate({ preferredLanguage: language });
+  };
+
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark';
+    setTheme(next);
+    persistPreference.mutate({ theme: next === 'dark' ? 'DARK' : 'LIGHT' });
+  };
+
   const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'de' : 'en');
+    changeLanguage(i18n.language === 'en' ? 'de' : 'en');
   };
 
   return (
@@ -52,7 +73,7 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
             variant="ghost"
             size="sm"
             className={`h-8 rounded-r-none px-2 text-xs ${i18n.language === 'en' ? 'bg-primary text-primary-foreground' : ''}`}
-            onClick={() => i18n.changeLanguage('en')}
+            onClick={() => changeLanguage('en')}
           >
             EN
           </Button>
@@ -60,17 +81,17 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
             variant="ghost"
             size="sm"
             className={`h-8 rounded-l-none px-2 text-xs ${i18n.language === 'de' ? 'bg-primary text-primary-foreground' : ''}`}
-            onClick={() => i18n.changeLanguage('de')}
+            onClick={() => changeLanguage('de')}
           >
             DE
           </Button>
         </div>
 
-        {/* Dark/light toggle */}
+        {/* Dark/light toggle — 'system' is available in Settings and Onboarding */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={toggle}
+          onClick={toggleTheme}
           aria-label={isDark ? t('common.lightMode') : t('common.darkMode')}
         >
           {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

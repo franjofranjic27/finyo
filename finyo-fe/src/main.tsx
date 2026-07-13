@@ -5,7 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth } from './auth/RequireAuth';
 import { RequireRole } from './auth/RequireRole';
+import { OnboardingGate } from './auth/OnboardingGate';
+import { ThemeProvider } from './hooks/useTheme';
 import { AppLayout } from './components/layout/AppLayout';
+import { OnboardingPage } from './pages/onboarding/OnboardingPage';
 import { Dashboard } from './pages/Dashboard';
 import { WealthPage } from './pages/wealth/WealthPage';
 import { BudgetPage } from './pages/budget/BudgetPage';
@@ -33,34 +36,43 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <RequireAuth>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/wealth" element={<WealthPage />} />
-                <Route path="/budget" element={<BudgetPage />} />
-                <Route path="/accounts" element={<AccountsPage />} />
-                <Route path="/investments" element={<PortfolioPage />} />
-                <Route path="/investments/positions/:positionId" element={<PositionDetailPage />} />
-                <Route path="/tax" element={<TaxPage />} />
-                <Route path="/tax/:year" element={<TaxPage />} />
-                <Route path="/pillar3" element={<Pillar3Page />} />
-                <Route path="/insurance" element={<Insurance />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route
-                  path="/admin/pillar3-products"
-                  element={
-                    <RequireRole role="admin">
-                      <Pillar3ProductsAdminPage />
-                    </RequireRole>
-                  }
-                />
-              </Route>
-            </Routes>
-          </RequireAuth>
-        </BrowserRouter>
+        <ThemeProvider>
+          <BrowserRouter>
+            <RequireAuth>
+              <OnboardingGate>
+                <Routes>
+                  {/* Onboarding lives outside the AppLayout (minimal centered layout). */}
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/wealth" element={<WealthPage />} />
+                    <Route path="/budget" element={<BudgetPage />} />
+                    <Route path="/accounts" element={<AccountsPage />} />
+                    <Route
+                      path="/investments/positions/:positionId"
+                      element={<PositionDetailPage />}
+                    />
+                    <Route path="/investments" element={<PortfolioPage />} />
+                    <Route path="/tax" element={<TaxPage />} />
+                    <Route path="/tax/:year" element={<TaxPage />} />
+                    <Route path="/pillar3" element={<Pillar3Page />} />
+                    <Route path="/insurance" element={<Insurance />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route
+                      path="/admin/pillar3-products"
+                      element={
+                        <RequireRole role="admin">
+                          <Pillar3ProductsAdminPage />
+                        </RequireRole>
+                      }
+                    />
+                  </Route>
+                </Routes>
+              </OnboardingGate>
+            </RequireAuth>
+          </BrowserRouter>
+        </ThemeProvider>
       </QueryClientProvider>
     </AuthProvider>
   </React.StrictMode>
