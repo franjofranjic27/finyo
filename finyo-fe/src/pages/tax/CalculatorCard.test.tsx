@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CalculatorCard } from './CalculatorCard';
+import { pillar3Api } from '@/api/pillar3';
+import { salaryApi } from '@/api/salary';
 import { taxApi } from '@/api/tax';
+import { pillar3Scenario, pillar3ScenarioInputs } from '@/test/fixtures/pillar3';
+import { salary } from '@/test/fixtures/salary';
 import { taxYearDetail, taxYearInputs } from '@/test/fixtures/tax';
 import { renderWithProviders } from '@/test/test-utils';
 
@@ -25,6 +29,31 @@ vi.mock('@/api/tax', () => ({
     upsertYear: vi.fn(),
   },
 }));
+
+vi.mock('@/api/pillar3', () => ({
+  pillar3Api: {
+    getScenarios: vi.fn(),
+  },
+}));
+
+vi.mock('@/api/salary', () => ({
+  salaryApi: {
+    get: vi.fn(),
+  },
+}));
+
+/** Salary without a stored gross — the default so most tests see no prefill. */
+function salaryWithoutGross() {
+  const stored = salary();
+  return { ...stored, result: { ...stored.result, grossYearly: 0 } };
+}
+
+// vi.restoreAllMocks in the global afterEach wipes implementations, so the
+// query defaults have to be re-established before every test.
+beforeEach(() => {
+  vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+  vi.mocked(salaryApi.get).mockResolvedValue(salaryWithoutGross());
+});
 
 describe('CalculatorCard', () => {
   it('disables the calculate button without a gross income', async () => {
@@ -106,5 +135,108 @@ describe('CalculatorCard', () => {
     expect(await screen.findByText(/144 %/)).toBeInTheDocument();
     expect(screen.getByText(/105 %/)).toBeInTheDocument();
     expect(screen.getByText('Tax Multiplier:')).toBeInTheDocument();
+  });
+
+  it('prefills the pillar 3a field from the default scenario with a hint', async () => {
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([
+      pillar3Scenario({
+        id: 's1',
+        name: 'Max 3a',
+        isDefault: true,
+        inputs: pillar3ScenarioInputs({ annualContribution: 7258 }),
+      }),
+    ]);
+    renderWithProviders(<CalculatorCard year={2025} inputs={null} />);
+
+    expect(await screen.findByDisplayValue('7258')).toBeInTheDocument();
+    expect(screen.getByText('Prefilled from scenario “Max 3a”')).toBeInTheDocument();
+  });
+
+  it('prefills the gross income from the salary with a hint', async () => {
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(salaryApi.get).mockResolvedValue(salary());
+    renderWithProviders(<CalculatorCard year={2025} inputs={null} />);
+
+    expect(await screen.findByDisplayValue('69444')).toBeInTheDocument();
+    expect(screen.getByText('Prefilled from your gross salary')).toBeInTheDocument();
+  });
+
+  it('sends untouched prefilled values in the calculate payload', async () => {
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([
+      pillar3Scenario({
+        id: 's1',
+        name: 'Max 3a',
+        isDefault: true,
+        inputs: pillar3ScenarioInputs({ annualContribution: 7258 }),
+      }),
+    ]);
+    vi.mocked(salaryApi.get).mockResolvedValue(salary());
+    vi.mocked(taxApi.upsertYear).mockResolvedValue(taxYearDetail({ year: 2025 }));
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorCard year={2025} inputs={null} />);
+
+    await screen.findByDisplayValue('7258');
+    await user.click(screen.getByRole('button', { name: /Calculate for 2025/ }));
+
+    await waitFor(() => expect(taxApi.upsertYear).toHaveBeenCalledTimes(1));
+    const [, , payload] = vi.mocked(taxApi.upsertYear).mock.calls[0];
+    expect(payload).toMatchObject({
+      pillar3aContribution: 7258,
+      grossEmploymentIncome: 69_444,
+    });
+  });
+
+  it('never overwrites inputs persisted for the year', async () => {
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([
+      pillar3Scenario({
+        id: 's1',
+        name: 'Max 3a',
+        isDefault: true,
+        inputs: pillar3ScenarioInputs({ annualContribution: 7258 }),
+      }),
+    ]);
+    vi.mocked(salaryApi.get).mockResolvedValue(salary());
+    renderWithProviders(
+      <CalculatorCard
+        year={2025}
+        inputs={taxYearInputs({ grossEmploymentIncome: 120_000, pillar3aContribution: 5000 })}
+      />,
+    );
+
+    await waitFor(() => expect(pillar3Api.getScenarios).toHaveBeenCalled());
+    await waitFor(() => expect(salaryApi.get).toHaveBeenCalled());
+
+    expect(screen.getByDisplayValue('120000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('5000')).toBeInTheDocument();
+    expect(screen.queryByText(/Prefilled from/)).not.toBeInTheDocument();
+  });
+
+  it('sets the pillar 3a field via the scenario picker', async () => {
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([
+      pillar3Scenario({
+        id: 's1',
+        name: 'Max 3a',
+        isDefault: true,
+        inputs: pillar3ScenarioInputs({ annualContribution: 7258 }),
+      }),
+      pillar3Scenario({
+        id: 's2',
+        name: 'Halber Beitrag',
+        inputs: pillar3ScenarioInputs({ annualContribution: 3600 }),
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorCard year={2025} inputs={taxYearInputs()} />);
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Apply a 3a scenario …' }),
+    );
+    await user.click(await screen.findByRole('option', { name: /Halber Beitrag/ }));
+
+    expect(screen.getByDisplayValue('3600')).toBeInTheDocument();
   });
 });

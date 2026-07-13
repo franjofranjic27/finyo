@@ -68,6 +68,7 @@
       "total": "Total",
       "sourcePortfolio": "Portfolio",
       "sourceManual": "manual",
+      "sourcePillar3": "Pillar 3a",
       "empty": "No buckets yet — create your first wealth bucket",
       "confirmDelete": "Remove bucket “{{name}}”?",
       "deleteLabel": "Remove bucket"
@@ -80,9 +81,11 @@
       "source": "Source",
       "sourceManual": "Maintained manually",
       "sourcePortfolio": "From portfolio (asset classes)",
+      "sourcePillar3": "Pillar 3a (default scenario)",
       "manualBalance": "Balance",
       "assetClasses": "Asset classes",
       "assetClassesHint": "Each asset class can be assigned to only one bucket",
+      "pillar3Hint": "The balance is taken live from your default pillar 3a scenario",
       "monthlyRate": "Monthly deposit",
       "submitCreate": "Add",
       "submitEdit": "Save"
@@ -299,6 +302,11 @@
     "deleteScenario": "Delete scenario",
     "confirmDeleteScenario": "Delete scenario \"{{name}}\"?",
     "scenarioNoCalculation": "This scenario has no calculation yet — the saved inputs are incomplete.",
+    "prefill": {
+      "fromScenario": "Prefilled from scenario “{{name}}”",
+      "fromSalary": "Prefilled from your gross salary",
+      "pickScenario": "Apply a 3a scenario …"
+    },
     "status": {
       "planned": "Planned",
       "current": "Current",
@@ -388,6 +396,7 @@
     "payoutTax": "Estimated Payout Tax",
     "netValue": "Net Value After Payout Tax",
     "grossIncomeForSaving": "Gross Income (CHF, for tax saving)",
+    "prefilledFromProfile": "Prefilled from your profile",
     "balanceGrowth": "Balance Growth over {{years}} Years",
     "contributionCap": "You could contribute <strong>{{remaining}}</strong> more to reach the maximum of <strong>{{max}}</strong>, saving an additional <strong>{{saving}}</strong> in taxes.",
     "vsSavingsTitle": "Compared to taxable savings account",

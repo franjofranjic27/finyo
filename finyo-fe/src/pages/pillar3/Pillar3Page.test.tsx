@@ -3,6 +3,8 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Pillar3Page } from './Pillar3Page';
 import { pillar3Api } from '@/api/pillar3';
+import { profileApi } from '@/api/profile';
+import { emptyUserProfile } from '@/test/fixtures/profile';
 import { renderWithProviders } from '@/test/test-utils';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -33,9 +35,17 @@ vi.mock('@/api/pillar3', () => ({
   },
 }));
 
+vi.mock('@/api/profile', () => ({
+  PROFILE_QUERY_KEY: ['profile'],
+  profileApi: {
+    get: vi.fn(),
+  },
+}));
+
 beforeEach(() => {
   vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
   vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
+  vi.mocked(profileApi.get).mockResolvedValue(emptyUserProfile());
 });
 
 describe('Pillar3Page', () => {

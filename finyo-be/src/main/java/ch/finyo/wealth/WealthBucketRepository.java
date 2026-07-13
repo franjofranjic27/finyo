@@ -15,4 +15,8 @@ public interface WealthBucketRepository extends JpaRepository<WealthBucket, UUID
     boolean existsByUserIdAndName(String userId, String name);
 
     boolean existsByUserIdAndNameAndIdNot(String userId, String name, UUID id);
+
+    boolean existsByUserIdAndSource(String userId, WealthSource source);
+
+    boolean existsByUserIdAndSourceAndIdNot(String userId, WealthSource source, UUID id);
 }

@@ -18,6 +18,7 @@ import { taxApi } from '@/api/tax';
 import type { Pillar3Result, TaxCivilStatus } from '@/api/tax';
 import { pillar3Api } from '@/api/pillar3';
 import type { Pillar3Product, Pillar3Scenario, Pillar3ScenarioInputs } from '@/api/pillar3';
+import { PROFILE_QUERY_KEY, profileApi } from '@/api/profile';
 import { formatCHF } from '@/lib/formatters';
 import {
   chartAxisProps,
@@ -44,6 +45,8 @@ const CIVIL_STATUS_OPTIONS: { value: TaxCivilStatus; labelKey: string }[] = [
   { value: 'SINGLE_PARENT', labelKey: 'tax.civilStatus.singleParent' },
 ];
 
+const DEFAULT_YEARS = '30';
+
 export function CalculatorTab() {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -53,7 +56,8 @@ export function CalculatorTab() {
   const [balance, setBalance] = useState('');
   const [contribution, setContribution] = useState('7258');
   const [returnPct, setReturnPct] = useState('5.0');
-  const [years, setYears] = useState('30');
+  const [years, setYears] = useState(DEFAULT_YEARS);
+  const [yearsTouched, setYearsTouched] = useState(false);
   const [income, setIncome] = useState('');
   const [canton, setCanton] = useState('SG');
   const [civilStatus, setCivilStatus] = useState<TaxCivilStatus>('SINGLE');
@@ -75,6 +79,26 @@ export function CalculatorTab() {
     enabled: !!token,
   });
 
+  const { data: profile } = useQuery({
+    queryKey: PROFILE_QUERY_KEY,
+    queryFn: () => profileApi.get(token),
+    enabled: !!token,
+  });
+
+  // Horizon prefill from the profile's retirement projection: derived, so it
+  // applies only while the field still holds its untouched default and never
+  // replaces a user-typed or scenario-loaded value.
+  const profileYears =
+    !yearsTouched && years === DEFAULT_YEARS && profile?.yearsToRetirement != null
+      ? String(profile.yearsToRetirement)
+      : null;
+  const yearsValue = profileYears ?? years;
+
+  const changeYears = (value: string) => {
+    setYears(value);
+    setYearsTouched(true);
+  };
+
   // A deleted scenario resolves to null and falls back to the fresh result.
   const selectedScenario = scenarios?.find((s) => s.id === selectedScenarioId) ?? null;
   const hasDefault = scenarios?.some((s) => s.isDefault) ?? false;
@@ -83,7 +107,7 @@ export function CalculatorTab() {
     currentBalance: Number.parseFloat(balance) || 0,
     annualContribution: Number.parseFloat(contribution) || 0,
     assumedAnnualReturnPercent: Number.parseFloat(returnPct) || 5,
-    yearsToRetirement: Number.parseInt(years) || 30,
+    yearsToRetirement: Number.parseInt(yearsValue) || 30,
     grossEmploymentIncome: income ? Number.parseFloat(income) : null,
     civilStatus: income ? civilStatus : null,
     cantonCode: income ? canton : null,
@@ -108,7 +132,7 @@ export function CalculatorTab() {
     setBalance(String(inputs.currentBalance));
     setContribution(String(inputs.annualContribution));
     setReturnPct(String(scenario.effectiveReturnPercent));
-    setYears(String(inputs.yearsToRetirement));
+    changeYears(String(inputs.yearsToRetirement));
     setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
     if (inputs.cantonCode) setCanton(inputs.cantonCode);
     if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
@@ -125,7 +149,7 @@ export function CalculatorTab() {
   const displayedResult = selectedScenario ? selectedScenario.calculation : result;
   const displayedYears = selectedScenario
     ? selectedScenario.inputs.yearsToRetirement
-    : Number.parseInt(years);
+    : Number.parseInt(yearsValue);
 
   return (
     <div className="space-y-6">
@@ -157,7 +181,10 @@ export function CalculatorTab() {
             </div>
             <div className="space-y-2">
               <Label>{t('pillar3.yearsToRetirement')}</Label>
-              <Input type="number" value={years} onChange={(e) => setYears(e.target.value)} min={1} max={50} />
+              <Input type="number" value={yearsValue} onChange={(e) => changeYears(e.target.value)} min={1} max={50} />
+              {profileYears != null && (
+                <p className="text-xs text-muted-foreground">{t('pillar3.prefilledFromProfile')}</p>
+              )}
             </div>
             <div className="space-y-2 col-span-2 md:col-span-1">
               <Label>{t('pillar3.grossIncomeForSaving')}</Label>

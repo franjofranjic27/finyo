@@ -68,6 +68,7 @@
       "total": "Total",
       "sourcePortfolio": "Portfolio",
       "sourceManual": "manuell",
+      "sourcePillar3": "Säule 3a",
       "empty": "Noch keine Töpfe erfasst — lege deinen ersten Vermögenstopf an",
       "confirmDelete": "Topf «{{name}}» entfernen?",
       "deleteLabel": "Topf entfernen"
@@ -80,9 +81,11 @@
       "source": "Quelle",
       "sourceManual": "Manuell gepflegt",
       "sourcePortfolio": "Aus Portfolio (Anlageklassen)",
+      "sourcePillar3": "Säule 3a (Standard-Szenario)",
       "manualBalance": "Saldo",
       "assetClasses": "Anlageklassen",
       "assetClassesHint": "Jede Anlageklasse kann nur einem Topf zugeordnet werden",
+      "pillar3Hint": "Saldo wird live aus deinem Standard-Szenario der Säule 3a übernommen",
       "monthlyRate": "Monatliche Einzahlung",
       "submitCreate": "Hinzufügen",
       "submitEdit": "Speichern"
@@ -299,6 +302,11 @@
     "deleteScenario": "Szenario löschen",
     "confirmDeleteScenario": "Szenario «{{name}}» löschen?",
     "scenarioNoCalculation": "Für dieses Szenario liegt noch keine Berechnung vor – die gespeicherten Eingaben sind unvollständig.",
+    "prefill": {
+      "fromScenario": "Aus Szenario ‹{{name}}› übernommen",
+      "fromSalary": "Aus deinem Bruttolohn übernommen",
+      "pickScenario": "3a-Szenario übernehmen …"
+    },
     "status": {
       "planned": "Geplant",
       "current": "Aktuell",
@@ -388,6 +396,7 @@
     "payoutTax": "Geschätzte Bezugssteuer",
     "netValue": "Nettowert nach Bezugssteuer",
     "grossIncomeForSaving": "Bruttoeinkommen (CHF, für Steuerersparnis)",
+    "prefilledFromProfile": "Aus deinem Profil übernommen",
     "balanceGrowth": "Guthabenentwicklung über {{years}} Jahre",
     "contributionCap": "Du könntest <strong>{{remaining}}</strong> zusätzlich einzahlen, um das Maximum von <strong>{{max}}</strong> zu erreichen und weitere <strong>{{saving}}</strong> Steuern zu sparen.",
     "vsSavingsTitle": "Im Vergleich zu einem steuerpflichtigen Sparkonto",

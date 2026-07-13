@@ -24,6 +24,17 @@ public class Pillar3ScenarioService {
     private final Pillar3ProductRepository productRepository;
     private final Pillar3CalculationService pillar3CalculationService;
 
+    /**
+     * Thin read port for other modules (currently the wealth overview): the
+     * default scenario's current balance, without the projection recomputation
+     * that {@link #list} performs per scenario.
+     */
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> getDefaultCurrentBalance(String userId) {
+        return scenarioRepository.findByUserIdAndIsDefaultTrue(userId)
+                .map(Pillar3Scenario::getCurrentBalance);
+    }
+
     @Transactional(readOnly = true)
     public List<Pillar3ScenarioResponse> list(String userId) {
         log.debug("Fetching pillar3 scenarios for user={}", userId);
