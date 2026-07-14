@@ -118,6 +118,13 @@ export const pillar3Api = {
       token,
     ),
 
+  updateScenario: (token: string, scenarioId: string, scenario: Pillar3ScenarioRequest) =>
+    apiRequest<Pillar3Scenario>(
+      `/pillar3/scenarios/${scenarioId}`,
+      { method: 'PUT', body: JSON.stringify(scenario) },
+      token,
+    ),
+
   setDefaultScenario: (token: string, scenarioId: string) =>
     apiRequest<Pillar3Scenario>(
       `/pillar3/scenarios/${scenarioId}/default`,

@@ -257,6 +257,13 @@ export const taxApi = {
       token,
     ),
 
+  updateScenario: (token: string, year: number, scenarioId: string, scenario: TaxScenarioRequest) =>
+    apiRequest<TaxScenario>(
+      `/tax/years/${year}/scenarios/${scenarioId}`,
+      { method: 'PUT', body: JSON.stringify(scenario) },
+      token,
+    ),
+
   setDefaultScenario: (token: string, year: number, scenarioId: string) =>
     apiRequest<TaxScenario>(
       `/tax/years/${year}/scenarios/${scenarioId}/default`,

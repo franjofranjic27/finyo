@@ -38,6 +38,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -66,6 +67,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
@@ -95,6 +97,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -124,6 +127,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={onClose}
         onSaved={vi.fn()}
       />,
@@ -141,6 +145,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
@@ -163,6 +168,7 @@ describe('ScenarioSavePanel', () => {
       <ScenarioSavePanel
         inputs={inputs}
         hasDefault
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -178,5 +184,38 @@ describe('ScenarioSavePanel', () => {
     expect(await screen.findByText('Switch failed')).toBeInTheDocument();
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['pillar3-scenarios'] });
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('forces the first scenario to be the default and shows the hint', async () => {
+    vi.mocked(pillar3Api.createScenario).mockResolvedValue(
+      pillar3Scenario({ id: 's1', name: 'First', isDefault: true }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScenarioSavePanel
+        inputs={inputs}
+        hasDefault={false}
+        isFirst
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Set as default scenario')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('The first scenario automatically becomes the default.'),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Name'), 'First');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(pillar3Api.createScenario).toHaveBeenCalledWith('test-token', {
+        ...inputs,
+        name: 'First',
+        isDefault: true,
+      }),
+    );
+    expect(pillar3Api.setDefaultScenario).not.toHaveBeenCalled();
   });
 });
