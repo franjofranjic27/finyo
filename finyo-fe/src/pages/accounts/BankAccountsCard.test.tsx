@@ -28,6 +28,7 @@ vi.mock('@/api/accounts', async (importOriginal) => {
       getAll: vi.fn(),
       getById: vi.fn(),
       create: vi.fn(),
+      importAccounts: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
       getCards: vi.fn(),
@@ -192,5 +193,86 @@ describe('BankAccountsCard', () => {
     renderCard([]);
 
     expect(screen.getByText('No accounts yet')).toBeInTheDocument();
+  });
+
+  describe('CSV import', () => {
+    function csvFile(content: string): File {
+      return new File([content], 'accounts.csv', { type: 'text/csv' });
+    }
+
+    beforeEach(() => {
+      vi.mocked(accountsApi.importAccounts).mockResolvedValue({
+        created: 1,
+        updated: 1,
+        failed: 0,
+        errors: [],
+      });
+    });
+
+    it('imports the parsed rows, shows the result and refreshes accounts and cards', async () => {
+      const user = userEvent.setup();
+      const { queryClient } = renderCard();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const file = csvFile([
+        'Name;Typ;Bereich;Währung;IBAN;BIC;Vertragsnummer;Gebühren;Auflösen',
+        'Privatkonto;Kontokorrent;Privat;CHF;CH93 0076 2011 6238 5295 7;RAIFCH22;81375-0005;CHF 5 / Monat;',
+        'Altes Sparkonto;Sparkonto;;;;;;;ja',
+      ].join('\n'));
+      await user.upload(screen.getByLabelText('Import CSV'), file);
+
+      await waitFor(() =>
+        expect(accountsApi.importAccounts).toHaveBeenCalledWith('test-token', [
+          {
+            name: 'Privatkonto',
+            type: 'CHECKING',
+            scope: 'PRIVATE',
+            currency: 'CHF',
+            iban: 'CH93 0076 2011 6238 5295 7',
+            bic: 'RAIFCH22',
+            contractNumber: '81375-0005',
+            feeNote: 'CHF 5 / Monat',
+          },
+          { name: 'Altes Sparkonto', type: 'SAVINGS', currency: 'CHF', toClose: true },
+        ]),
+      );
+      expect(await screen.findByText('1 created, 1 updated, 0 failed')).toBeInTheDocument();
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['accounts'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['cards'] });
+    });
+
+    it('lists backend row errors from the bulk result', async () => {
+      vi.mocked(accountsApi.importAccounts).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        failed: 1,
+        errors: ['row 2: invalid IBAN checksum'],
+      });
+      const user = userEvent.setup();
+      renderCard();
+
+      await user.upload(
+        screen.getByLabelText('Import CSV'),
+        csvFile('Privatkonto;Kontokorrent\nSparkonto;Sparkonto;;;CH00 0000'),
+      );
+
+      expect(await screen.findByText('1 created, 0 updated, 1 failed')).toBeInTheDocument();
+      expect(screen.getByText('row 2: invalid IBAN checksum')).toBeInTheDocument();
+    });
+
+    it('shows the no-rows message and skips the import when nothing parses', async () => {
+      const user = userEvent.setup();
+      renderCard();
+
+      await user.upload(
+        screen.getByLabelText('Import CSV'),
+        csvFile(';Sparkonto\nOhne Typ;Wertschriften'),
+      );
+
+      expect(
+        await screen.findByText('No valid rows found in the CSV file.'),
+      ).toBeInTheDocument();
+      expect(accountsApi.importAccounts).not.toHaveBeenCalled();
+    });
   });
 });

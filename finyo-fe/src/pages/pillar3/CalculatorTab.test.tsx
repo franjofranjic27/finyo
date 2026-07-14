@@ -40,6 +40,7 @@ vi.mock('@/api/pillar3', () => ({
     getProducts: vi.fn(),
     getScenarios: vi.fn(),
     createScenario: vi.fn(),
+    updateScenario: vi.fn(),
     setDefaultScenario: vi.fn(),
     deleteScenario: vi.fn(),
   },
@@ -256,12 +257,17 @@ describe('CalculatorTab', () => {
     expect(screen.queryByText('Prefilled from your profile')).not.toBeInTheDocument();
   });
 
-  it('saves the current form state as a scenario via the inline panel', async () => {
+  it('saves the current form state as the forced-default first scenario', async () => {
     vi.mocked(pillar3Api.createScenario).mockResolvedValue(savedScenario);
     const user = userEvent.setup();
     renderWithProviders(<CalculatorTab />);
 
     await user.click(screen.getByRole('button', { name: 'Save scenario' }));
+    // The very first scenario is forced to be the default: hint, no checkbox.
+    expect(screen.queryByLabelText('Set as default scenario')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('The first scenario automatically becomes the default.'),
+    ).toBeInTheDocument();
     await user.type(screen.getByLabelText('Name'), 'My plan');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -277,8 +283,62 @@ describe('CalculatorTab', () => {
         taxYear: new Date().getFullYear(),
         productId: null,
         name: 'My plan',
-        isDefault: false,
+        isDefault: true,
       }),
     );
+  });
+
+  it('preselects the default scenario once and fills the form', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([
+      { ...savedScenario, isDefault: true },
+    ]);
+    renderWithProviders(<CalculatorTab />);
+
+    expect(await screen.findByText("CHF 111'000.00")).toBeInTheDocument();
+    expect(screen.getByDisplayValue('20000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('6000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /My plan/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('updates the selected scenario in place with the current form values', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([savedScenario]);
+    vi.mocked(pillar3Api.updateScenario).mockResolvedValue(savedScenario);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(await screen.findByRole('button', { name: /My plan/ }));
+    const balanceInput = await screen.findByDisplayValue('20000');
+    await user.clear(balanceInput);
+    await user.type(balanceInput, '25000');
+
+    await user.click(screen.getByRole('button', { name: 'Update scenario' }));
+
+    await waitFor(() => expect(pillar3Api.updateScenario).toHaveBeenCalledTimes(1));
+    const [token, scenarioId, payload] = vi.mocked(pillar3Api.updateScenario).mock.calls[0];
+    expect(token).toBe('test-token');
+    expect(scenarioId).toBe('s1');
+    expect(payload).toMatchObject({
+      name: 'My plan',
+      currentBalance: 25_000,
+      annualContribution: 6000,
+      yearsToRetirement: 25,
+    });
+    expect(pillar3Api.createScenario).not.toHaveBeenCalled();
+  });
+
+  it('renders the rename control in the header for a selected scenario', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([savedScenario]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(await screen.findByRole('button', { name: /My plan/ }));
+
+    expect(screen.getByRole('button', { name: 'Rename scenario' })).toBeInTheDocument();
+    // The name shows in the chip bar and again in the calculator header
+    expect(screen.getAllByText('My plan').length).toBeGreaterThan(1);
   });
 });

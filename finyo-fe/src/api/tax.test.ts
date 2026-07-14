@@ -196,6 +196,19 @@ describe('taxApi', () => {
     );
   });
 
+  it('updateScenario PUTs the scenario to its id path', () => {
+    const scenario: TaxScenarioRequest = {
+      ...yearInputs,
+      name: 'With max 3a',
+    };
+    taxApi.updateScenario(TOKEN, 2025, 's1', scenario);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/tax/years/2025/scenarios/s1',
+      { method: 'PUT', body: JSON.stringify(scenario) },
+      TOKEN,
+    );
+  });
+
   it('setDefaultScenario PATCHes the default path without a body', () => {
     taxApi.setDefaultScenario(TOKEN, 2025, 's1');
     expect(apiRequestMock).toHaveBeenCalledWith(

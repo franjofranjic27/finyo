@@ -39,6 +39,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -68,6 +69,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
@@ -98,6 +100,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -128,6 +131,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={onClose}
         onSaved={vi.fn()}
       />,
@@ -146,6 +150,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault={false}
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
@@ -169,6 +174,7 @@ describe('ScenarioSavePanel', () => {
         year={2025}
         inputs={inputs}
         hasDefault
+        isFirst={false}
         onClose={vi.fn()}
         onSaved={onSaved}
       />,
@@ -184,5 +190,41 @@ describe('ScenarioSavePanel', () => {
     expect(await screen.findByText('Switch failed')).toBeInTheDocument();
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tax', 'scenarios', '2025'] });
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('forces the first scenario to be the default and shows the hint', async () => {
+    vi.mocked(taxApi.createScenario).mockResolvedValue(
+      taxScenario({ id: 's1', name: 'First', isDefault: true }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScenarioSavePanel
+        year={2025}
+        inputs={inputs}
+        hasDefault={false}
+        isFirst
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByLabelText('Set as default scenario for 2025'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('The first scenario automatically becomes the default.'),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Name'), 'First');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(taxApi.createScenario).toHaveBeenCalledWith('test-token', 2025, {
+        ...inputs,
+        name: 'First',
+        isDefault: true,
+      }),
+    );
+    expect(taxApi.setDefaultScenario).not.toHaveBeenCalled();
   });
 });

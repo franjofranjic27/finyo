@@ -30,20 +30,25 @@ import static org.mockito.Mockito.inOrder;
  * are mocked; the calculation result is a canned TaxResultResponse so these
  * tests only verify the ORCHESTRATION logic of TaxScenarioService:
  *
- *   1. Create semantics — every POST is a new immutable snapshot carrying the
- *      caller's userId; the tax_year row is created lazily when absent; a
- *      second default for the same year is rejected with IllegalStateException
- *      (mapped to 409) BEFORE anything is written.
- *   2. Default switching — the previous default is cleared (saveAndFlush)
+ *   1. Create semantics — every POST is a new row carrying the caller's
+ *      userId; the tax_year row is created lazily when absent; the FIRST
+ *      scenario of a year is forced to be the default regardless of the
+ *      request flag; a second default for the same year is rejected with
+ *      IllegalStateException (mapped to 409) BEFORE anything is written.
+ *   2. Update semantics — PUT overwrites name and ALL tax inputs of an owned
+ *      scenario and recomputes the calculation, but NEVER touches the default
+ *      flag (the request flag is ignored in both directions); an absent year
+ *      is a 404, never lazily created.
+ *   3. Default switching — the previous default is cleared (saveAndFlush)
  *      strictly BEFORE the new default is saved, otherwise the partial unique
  *      index ux_tax_scenario_default_per_year would be violated; setting the
  *      current default again is a no-op.
- *   3. Ownership — scenarios of another user or hanging under another tax
+ *   4. Ownership — scenarios of another user or hanging under another tax
  *      year surface as ResourceNotFoundException (mapped to 404), never as
  *      writes or deletes.
- *   4. Listing — repository order (newest first) is preserved, an absent year
+ *   5. Listing — repository order (newest first) is preserved, an absent year
  *      yields an empty list, and the embedded calculation is only computed
- *      when the snapshot's inputs are complete.
+ *      when the scenario's inputs are complete.
  */
 @ExtendWith(MockitoExtension.class)
 class TaxScenarioServiceTest {
@@ -140,6 +145,7 @@ class TaxScenarioServiceTest {
     @Test
     void create_saves_new_scenario_with_userId_and_returns_calculation() {
         given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.existsByTaxYearIdAndUserId(YEAR_ID, USER_ID)).willReturn(true);
         stubScenarioSaveAssignsId();
         given(taxCalculationService.calculate(any(TaxInputRequest.class)))
                 .willReturn(cannedResult("12345.67"));
@@ -198,6 +204,7 @@ class TaxScenarioServiceTest {
     @Test
     void create_throws_IllegalStateException_when_year_already_has_a_default() {
         given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.existsByTaxYearIdAndUserId(YEAR_ID, USER_ID)).willReturn(true);
         given(taxScenarioRepository.existsByTaxYearIdAndUserIdAndIsDefaultTrue(YEAR_ID, USER_ID))
                 .willReturn(true);
         TaxScenarioRequest request = completeRequest("Second default", true);
@@ -212,6 +219,7 @@ class TaxScenarioServiceTest {
     @Test
     void create_with_isDefault_false_succeeds_even_when_a_default_exists() {
         given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.existsByTaxYearIdAndUserId(YEAR_ID, USER_ID)).willReturn(true);
         stubScenarioSaveAssignsId();
 
         TaxScenarioResponse result = service.create(YEAR, incompleteRequest("Non-default", false), USER_ID);
@@ -225,6 +233,30 @@ class TaxScenarioServiceTest {
     }
 
     @Test
+    void create_forces_default_for_the_first_scenario_of_a_year_even_without_the_flag() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.existsByTaxYearIdAndUserId(YEAR_ID, USER_ID)).willReturn(false);
+        stubScenarioSaveAssignsId();
+
+        TaxScenarioResponse result = service.create(YEAR, incompleteRequest("First", false), USER_ID);
+
+        assertThat(result.isDefault()).isTrue();
+        then(taxScenarioRepository).should().saveAndFlush(argThat(TaxScenario::isDefault));
+    }
+
+    @Test
+    void create_does_not_force_default_when_the_year_already_has_scenarios() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.existsByTaxYearIdAndUserId(YEAR_ID, USER_ID)).willReturn(true);
+        stubScenarioSaveAssignsId();
+
+        TaxScenarioResponse result = service.create(YEAR, incompleteRequest("Second", false), USER_ID);
+
+        assertThat(result.isDefault()).isFalse();
+        then(taxScenarioRepository).should().saveAndFlush(argThat(saved -> !saved.isDefault()));
+    }
+
+    @Test
     void create_returns_null_calculation_when_inputs_incomplete() {
         given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
         stubScenarioSaveAssignsId();
@@ -233,6 +265,92 @@ class TaxScenarioServiceTest {
 
         assertThat(result.calculation()).isNull();
         then(taxCalculationService).shouldHaveNoInteractions();
+    }
+
+    // =========================================================================
+    // update()
+    // =========================================================================
+
+    @Test
+    void update_overwrites_name_and_inputs_and_recomputes_the_calculation() {
+        TaxScenario existing = incompleteScenario(SCENARIO_ID, "Old name", false);
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID)).willReturn(Optional.of(existing));
+        given(taxScenarioRepository.save(any(TaxScenario.class))).willAnswer(inv -> inv.getArgument(0));
+        given(taxCalculationService.calculate(any(TaxInputRequest.class)))
+                .willReturn(cannedResult("9999.99"));
+
+        TaxScenarioResponse result = service.update(YEAR, SCENARIO_ID, completeRequest("New name", false), USER_ID);
+
+        assertThat(result.id()).isEqualTo(SCENARIO_ID);
+        assertThat(result.name()).isEqualTo("New name");
+        assertThat(result.calculation().grandTotal()).isEqualByComparingTo("9999.99");
+        // Identity is kept, name and inputs are overwritten
+        then(taxScenarioRepository).should().save(argThat(saved ->
+                SCENARIO_ID.equals(saved.getId())
+                        && USER_ID.equals(saved.getUserId())
+                        && YEAR_ID.equals(saved.getTaxYearId())
+                        && "New name".equals(saved.getName())
+                        && "SG".equals(saved.getCantonCode())
+                        && new BigDecimal("100000").compareTo(saved.getGrossEmploymentIncome()) == 0
+                        && new BigDecimal("7000").compareTo(saved.getPillar3aContribution()) == 0));
+        then(taxCalculationService).should().calculate(argThat(input ->
+                input.taxYear() == YEAR && "SG".equals(input.cantonCode())));
+    }
+
+    @Test
+    void update_preserves_the_default_flag_of_a_default_scenario_despite_a_false_request_flag() {
+        TaxScenario existingDefault = incompleteScenario(SCENARIO_ID, "Default", true);
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID))
+                .willReturn(Optional.of(existingDefault));
+        given(taxScenarioRepository.save(any(TaxScenario.class))).willAnswer(inv -> inv.getArgument(0));
+
+        TaxScenarioResponse result = service.update(YEAR, SCENARIO_ID, incompleteRequest("Still default", false), USER_ID);
+
+        assertThat(result.isDefault()).isTrue();
+        then(taxScenarioRepository).should().save(argThat(TaxScenario::isDefault));
+    }
+
+    @Test
+    void update_does_not_promote_a_non_default_scenario_despite_a_true_request_flag() {
+        TaxScenario existingNonDefault = incompleteScenario(SCENARIO_ID, "Non-default", false);
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID))
+                .willReturn(Optional.of(existingNonDefault));
+        given(taxScenarioRepository.save(any(TaxScenario.class))).willAnswer(inv -> inv.getArgument(0));
+
+        TaxScenarioResponse result = service.update(YEAR, SCENARIO_ID, incompleteRequest("Sneaky default", true), USER_ID);
+
+        // The request flag is ignored — no second default may ever be written
+        // (the partial unique index would otherwise be violated)
+        assertThat(result.isDefault()).isFalse();
+        then(taxScenarioRepository).should().save(argThat(saved -> !saved.isDefault()));
+    }
+
+    @Test
+    void update_throws_ResourceNotFoundException_when_year_absent_and_never_creates_it() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.empty());
+        TaxScenarioRequest request = incompleteRequest("Orphan", false);
+
+        assertThatThrownBy(() -> service.update(YEAR, SCENARIO_ID, request, USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Tax year");
+        // Unlike create(), update must NOT lazily create the year
+        then(taxYearRepository).should(never()).save(any());
+        then(taxScenarioRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void update_throws_ResourceNotFoundException_for_a_foreign_scenario() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(year()));
+        given(taxScenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID)).willReturn(Optional.empty());
+        TaxScenarioRequest request = incompleteRequest("Hijack", false);
+
+        assertThatThrownBy(() -> service.update(YEAR, SCENARIO_ID, request, USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Tax scenario");
+        then(taxScenarioRepository).should(never()).save(any());
     }
 
     // =========================================================================

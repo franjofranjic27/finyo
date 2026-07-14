@@ -12,10 +12,11 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Input snapshot of a pillar 3a projection — each save creates a new row. The
- * inputs themselves are immutable; only the default flag (and thus updatedAt)
- * is mutable. The linked product is referenced by id only: when it is deleted
- * the FK sets productId to NULL and the stored return percent takes over.
+ * Saved pillar 3a projection scenario. Name and inputs are editable via the
+ * update endpoint; the default flag is switched exclusively via its own
+ * endpoint (PATCH /{id}/default), never through an update. The linked product
+ * is referenced by id only: when it is deleted the FK sets productId to NULL
+ * and the stored return percent takes over.
  */
 @Entity
 @Table(name = "pillar3_scenario")

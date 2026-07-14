@@ -30,12 +30,21 @@ public class TaxScenarioService {
                 .orElseGet(List::of);
     }
 
+    /**
+     * Creates a new scenario for the given year. The first scenario of a year
+     * is always persisted as the default, regardless of the request flag, so a
+     * year with scenarios always has one. Afterwards the default is only
+     * assigned on explicit request or switched via {@link #setDefault}.
+     */
     @Transactional
     public TaxScenarioResponse create(int year, TaxScenarioRequest request, String userId) {
         log.info("Creating tax scenario '{}' for year={} user={}", request.name(), year, userId);
         TaxYear taxYear = taxYearRepository.findByUserIdAndYear(userId, year)
                 .orElseGet(() -> createMinimalYear(year, userId));
 
+        boolean firstScenarioOfYear =
+                !taxScenarioRepository.existsByTaxYearIdAndUserId(taxYear.getId(), userId);
+        boolean makeDefault = firstScenarioOfYear || request.isDefault();
         if (request.isDefault()
                 && taxScenarioRepository.existsByTaxYearIdAndUserIdAndIsDefaultTrue(taxYear.getId(), userId)) {
             throw new IllegalStateException("Tax year %d already has a default scenario".formatted(year));
@@ -49,7 +58,7 @@ public class TaxScenarioService {
                     .userId(userId)
                     .taxYearId(taxYear.getId())
                     .name(request.name())
-                    .isDefault(request.isDefault())
+                    .isDefault(makeDefault)
                     .cantonCode(request.cantonCode())
                     .bfsNumber(request.bfsNumber())
                     .civilStatus(request.civilStatus())
@@ -71,6 +80,39 @@ public class TaxScenarioService {
             throw new IllegalStateException(
                     "Tax year %d already has a default scenario".formatted(year), e);
         }
+    }
+
+    /**
+     * Overwrites name and all tax inputs of an owned scenario and recomputes
+     * the embedded calculation. The default flag is deliberately preserved —
+     * it is only changed via {@link #setDefault}. Unlike {@link #create}, an
+     * absent tax year is a 404, never lazily created.
+     */
+    @Transactional
+    public TaxScenarioResponse update(int year, UUID scenarioId, TaxScenarioRequest request, String userId) {
+        log.info("Updating tax scenario id={} for year={} user={}", scenarioId, year, userId);
+        TaxYear taxYear = loadYear(year, userId);
+        TaxScenario existing = loadScenario(taxYear, scenarioId, userId);
+
+        TaxScenario saved = taxScenarioRepository.save(existing.toBuilder()
+                .name(request.name())
+                .cantonCode(request.cantonCode())
+                .bfsNumber(request.bfsNumber())
+                .civilStatus(request.civilStatus())
+                .numberOfChildren(request.numberOfChildren())
+                .churchAffiliation(request.churchAffiliation())
+                .grossEmploymentIncome(request.grossEmploymentIncome())
+                .selfEmploymentIncome(request.selfEmploymentIncome())
+                .investmentIncome(request.investmentIncome())
+                .rentalIncome(request.rentalIncome())
+                .deductionProfessionalExpenses(request.deductionProfessionalExpenses())
+                .deductionInsurancePremiums(request.deductionInsurancePremiums())
+                .deductionCharitableDonations(request.deductionCharitableDonations())
+                .deductionDebtInterest(request.deductionDebtInterest())
+                .pillar3aContribution(request.pillar3aContribution())
+                .netWealth(request.netWealth())
+                .build());
+        return toResponse(saved, year);
     }
 
     @Transactional

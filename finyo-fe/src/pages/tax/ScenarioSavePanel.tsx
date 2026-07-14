@@ -10,6 +10,8 @@ interface ScenarioSavePanelProps {
   inputs: TaxYearInputs;
   /** Whether a default scenario already exists for the year. */
   hasDefault: boolean;
+  /** The year's very first scenario is always saved as the default. */
+  isFirst: boolean;
   onClose: () => void;
   onSaved: (scenario: TaxScenario) => void;
 }
@@ -19,6 +21,7 @@ export function ScenarioSavePanel({
   year,
   inputs,
   hasDefault,
+  isFirst,
   onClose,
   onSaved,
 }: Readonly<ScenarioSavePanelProps>) {
@@ -45,6 +48,8 @@ export function ScenarioSavePanel({
       nameLabel={t('tax.scenarioName')}
       nameInputId="scenario-name"
       defaultCheckboxLabel={t('tax.setAsDefaultFor', { year })}
+      forceDefault={isFirst}
+      forcedDefaultHint={t('tax.firstScenarioDefault')}
       queryKey={['tax', 'scenarios', String(year)]}
       saveScenario={saveScenario}
       onClose={onClose}

@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,16 +36,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * assertions.
  *
  * Focus areas:
- *   1. Full lifecycle: create ×2 → list (newest first, embedded calculation) →
- *      atomic default switching (must survive the partial unique index) →
+ *   1. Full lifecycle: create ×2 (the user's FIRST scenario is forced to be
+ *      the default) → list (newest first, embedded calculation) → atomic
+ *      default switching (must survive the partial unique index) →
  *      idempotent re-default → delete.
- *   2. A second default snapshot for the same user → 409 ProblemDetail.
- *   3. Multi-tenant isolation: foreign scenarios are invisible and immutable.
- *   4. Race surface: a default inserted behind the API's back still blocks a
+ *   2. Updates: PUT overwrites name and inputs and recomputes, but never
+ *      touches the default flag — the request flag is ignored in both
+ *      directions; unknown scenario or productId → 404.
+ *   3. A second default snapshot for the same user → 409 ProblemDetail.
+ *   4. Multi-tenant isolation: foreign scenarios are invisible and immutable.
+ *   5. Race surface: a default inserted behind the API's back still blocks a
  *      second default.
- *   5. Product link: the linked product overrides the stored snapshot percent;
+ *   6. Product link: the linked product overrides the stored snapshot percent;
  *      deleting the product (ON DELETE SET NULL) degrades to the snapshot.
- *   6. Bean validation → 400; missing authentication → 401.
+ *   7. Bean validation → 400; missing authentication → 401.
  */
 class Pillar3ScenarioIT extends BaseIntegrationTest {
 
@@ -183,6 +188,104 @@ class Pillar3ScenarioIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$[0].isDefault", is(false)));
     }
 
+    @Test
+    void first_scenario_of_a_user_becomes_the_default_even_without_the_flag() throws Exception {
+        // Forced default: this feeds the wealth PILLAR3 bucket immediately
+        mockMvc.perform(post("/api/v1/pillar3/scenarios").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("First", false)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isDefault", is(true)));
+
+        // Once scenarios exist, the flag is honoured as sent
+        mockMvc.perform(post("/api/v1/pillar3/scenarios").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Second", false)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isDefault", is(false)));
+    }
+
+    // =========================================================================
+    // SECTION 1b — UPDATE
+    // =========================================================================
+
+    @Test
+    void updating_a_scenario_overwrites_inputs_recomputes_and_preserves_the_default_flag() throws Exception {
+        // First scenario → forced default; second → non-default
+        UUID defaultId = postScenario(scenarioBody("Original", false));
+        UUID nonDefaultId = postScenario(scenarioBody("Other", false));
+
+        // PUT on the default with isDefault=false: name and inputs are
+        // overwritten, the projection is recomputed, the flag survives
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", defaultId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Renamed", false, 6.0, 25, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(defaultId.toString())))
+                .andExpect(jsonPath("$.name", is("Renamed")))
+                .andExpect(jsonPath("$.isDefault", is(true)))
+                .andExpect(jsonPath("$.inputs.assumedAnnualReturnPercent", is(6.0)))
+                .andExpect(jsonPath("$.effectiveReturnPercent", is(6.0)))
+                .andExpect(jsonPath("$.calculation.yearlyProjection.length()", is(25)));
+
+        // PUT on a non-default with isDefault=true: the flag is ignored, so the
+        // partial unique index is NOT violated and no second default appears
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", nonDefaultId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Other renamed", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Other renamed")))
+                .andExpect(jsonPath("$.isDefault", is(false)));
+
+        Pillar3Scenario reloadedDefault = scenarioRepository.findById(defaultId).orElseThrow();
+        assertThat(reloadedDefault.isDefault()).isTrue();
+        assertThat(reloadedDefault.getName()).isEqualTo("Renamed");
+        assertThat(reloadedDefault.getAssumedAnnualReturnPercent()).isEqualByComparingTo("6.0");
+        assertThat(scenarioRepository.findById(nonDefaultId).orElseThrow().isDefault()).isFalse();
+    }
+
+    @Test
+    void updating_a_scenario_can_link_and_unlink_a_product() throws Exception {
+        Pillar3Product product = saveProduct("45", "0.40");
+        UUID scenarioId = postScenario(scenarioBody("Unlinked", false));
+
+        // Linking the product switches the effective return to its net rate
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", scenarioId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Linked now", false, 5.0, 10, product.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.product.id", is(product.getId().toString())))
+                .andExpect(jsonPath("$.effectiveReturnPercent", is(2.85)));
+
+        // Unlinking falls back to the stored snapshot percent
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", scenarioId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Unlinked again", false, 5.0, 10, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.product", nullValue()))
+                .andExpect(jsonPath("$.effectiveReturnPercent", is(5.0)));
+    }
+
+    @Test
+    void updating_an_unknown_scenario_or_with_an_unknown_productId_returns_404() throws Exception {
+        UUID scenarioId = postScenario(scenarioBody("Existing", false));
+
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", UUID.randomUUID()).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Ghost", false)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title", is("Resource Not Found")));
+
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", scenarioId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Ghost product", false, 3.5, 10, UUID.randomUUID())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title", is("Resource Not Found")));
+
+        // The rejected update must not have touched the scenario
+        assertThat(scenarioRepository.findById(scenarioId).orElseThrow().getName()).isEqualTo("Existing");
+    }
+
     // =========================================================================
     // SECTION 2 — DEFAULT UNIQUENESS CONFLICT
     // =========================================================================
@@ -214,12 +317,18 @@ class Pillar3ScenarioIT extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    void other_user_cannot_see_default_or_delete_a_foreign_scenario() throws Exception {
+    void other_user_cannot_see_update_default_or_delete_a_foreign_scenario() throws Exception {
         UUID ownersScenarioId = postScenario(scenarioBody("Owner's scenario", false));
 
         mockMvc.perform(get("/api/v1/pillar3/scenarios").with(asOtherUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(0)));
+
+        mockMvc.perform(put("/api/v1/pillar3/scenarios/{id}", ownersScenarioId)
+                        .with(asOtherUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Hijacked", false)))
+                .andExpect(status().isNotFound());
 
         mockMvc.perform(patch("/api/v1/pillar3/scenarios/{id}/default", ownersScenarioId)
                         .with(asOtherUser()))
@@ -229,10 +338,12 @@ class Pillar3ScenarioIT extends BaseIntegrationTest {
                         .with(asOtherUser()))
                 .andExpect(status().isNotFound());
 
-        // The owner's scenario must be completely untouched
+        // The owner's scenario must be completely untouched (as the owner's
+        // first scenario it was forced to be the default)
         Pillar3Scenario reloaded = scenarioRepository.findById(ownersScenarioId).orElseThrow();
         assertThat(reloaded.getUserId()).isEqualTo(TEST_USER_ID);
-        assertThat(reloaded.isDefault()).isFalse();
+        assertThat(reloaded.getName()).isEqualTo("Owner's scenario");
+        assertThat(reloaded.isDefault()).isTrue();
     }
 
     // =========================================================================

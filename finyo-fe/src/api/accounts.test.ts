@@ -39,6 +39,15 @@ describe('accountsApi', () => {
     );
   });
 
+  it('importAccounts POSTs the items wrapped in a bulk payload', () => {
+    accountsApi.importAccounts(TOKEN, [newAccount]);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/accounts/bulk',
+      { method: 'POST', body: JSON.stringify({ items: [newAccount] }) },
+      TOKEN,
+    );
+  });
+
   it('update PUTs the partial account to the id path', () => {
     accountsApi.update(TOKEN, 'a1', { name: 'Renamed' });
     expect(apiRequestMock).toHaveBeenCalledWith(

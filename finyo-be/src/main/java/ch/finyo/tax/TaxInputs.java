@@ -12,8 +12,8 @@ import java.math.BigDecimal;
 
 /**
  * Tax calculation inputs shared by {@link TaxYear} (the live, editable year)
- * and {@link TaxScenario} (an immutable snapshot of those inputs). Both tables
- * use the same column names for these fields.
+ * and {@link TaxScenario} (a saved, editable scenario of those inputs). Both
+ * tables use the same column names for these fields.
  */
 @MappedSuperclass
 @Getter

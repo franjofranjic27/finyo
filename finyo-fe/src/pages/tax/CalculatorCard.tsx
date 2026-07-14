@@ -11,11 +11,19 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { ScenarioInlineRename } from '@/components/scenarios/ScenarioInlineRename';
 import { useAuth } from '@/auth/useAuth';
 import { pillar3Api } from '@/api/pillar3';
 import { salaryApi } from '@/api/salary';
 import { taxApi } from '@/api/tax';
-import type { ChurchAffiliation, TaxCivilStatus, TaxCommune, TaxYearInputs } from '@/api/tax';
+import type {
+  ChurchAffiliation,
+  TaxCivilStatus,
+  TaxCommune,
+  TaxScenario,
+  TaxYearInputs,
+} from '@/api/tax';
+import { useWealthOverview } from '@/hooks/financeQueries';
 import { formatCHF } from '@/lib/formatters';
 
 const CANTONS = [
@@ -72,8 +80,16 @@ function resolveChurchMultiplier(
 interface CalculatorCardProps {
   year: number;
   inputs: TaxYearInputs | null;
+  /**
+   * The scenario whose inputs fill the form. While set, the save button
+   * updates this scenario in place and all derived prefills are suppressed
+   * so an update never absorbs cross-module values silently.
+   */
+  selectedScenario?: TaxScenario | null;
   /** Called after a successful recalculation (the page clears its scenario selection). */
   onCalculated?: () => void;
+  /** Called after the selected scenario was updated (the page shows the saved flash). */
+  onScenarioUpdated?: () => void;
   /**
    * When set, a save-scenario button is rendered next to the calculate button.
    * The current form is persisted first (same upsert as calculate) and the
@@ -90,7 +106,9 @@ interface CalculatorCardProps {
 export function CalculatorCard({
   year,
   inputs,
+  selectedScenario,
   onCalculated,
+  onScenarioUpdated,
   onSaveScenarioRequested,
   actionsExtra,
   footer,
@@ -128,6 +146,7 @@ export function CalculatorCard({
   // Editing a field marks it touched, which removes the prefill and its hint.
   const [pillar3aTouched, setPillar3aTouched] = useState(false);
   const [grossIncomeTouched, setGrossIncomeTouched] = useState(false);
+  const [netWealthTouched, setNetWealthTouched] = useState(false);
   const [pickedScenarioId, setPickedScenarioId] = useState('');
 
   const { data: communes } = useQuery({
@@ -148,8 +167,10 @@ export function CalculatorCard({
     enabled: !!token,
   });
 
+  const { data: wealth } = useWealthOverview();
+
   const scenarioPrefill =
-    !pillar3aTouched && !pillar3a && inputs?.pillar3aContribution == null
+    !pillar3aTouched && !pillar3a && inputs?.pillar3aContribution == null && !selectedScenario
       ? scenarios?.find((scenario) => scenario.isDefault)
       : undefined;
   const pillar3aValue = scenarioPrefill
@@ -158,27 +179,48 @@ export function CalculatorCard({
 
   const salaryPrefill =
     !grossIncomeTouched && !grossIncome && inputs?.grossEmploymentIncome == null
-    && salary != null && salary.result.grossYearly > 0
+    && !selectedScenario && salary != null && salary.result.grossYearly > 0
       ? String(salary.result.grossYearly)
       : null;
   const grossIncomeValue = salaryPrefill ?? grossIncome;
 
+  // Wealth without 3a buckets: pillar 3a assets are not taxable net wealth.
+  const taxableWealth =
+    wealth != null
+      ? wealth.total
+        - wealth.buckets
+          .filter((bucket) => bucket.source === 'PILLAR3')
+          .reduce((sum, bucket) => sum + bucket.balance, 0)
+      : null;
+  const wealthPrefill =
+    !netWealthTouched && !netWealth && inputs?.netWealth == null
+    && !selectedScenario && taxableWealth != null && taxableWealth > 0
+      ? String(Math.round(taxableWealth))
+      : null;
+  const netWealthValue = wealthPrefill ?? netWealth;
+
   const selectedCommune = communes?.find((c) => String(c.bfsNumber) === bfsNumber) ?? null;
   const churchMultiplier = resolveChurchMultiplier(selectedCommune, church);
+
+  // Fields controlled by the form; stored inputs are spread first so values
+  // without form controls (self-employment, rental, deductions) survive.
+  const formValues = () => ({
+    cantonCode: canton,
+    bfsNumber: bfsNumber ? Number(bfsNumber) : null,
+    civilStatus,
+    churchAffiliation: church,
+    numberOfChildren: Number.parseInt(children) || 0,
+    grossEmploymentIncome: Number.parseFloat(grossIncomeValue) || 0,
+    investmentIncome: investmentIncome ? Number.parseFloat(investmentIncome) : null,
+    pillar3aContribution: pillar3aValue ? Number.parseFloat(pillar3aValue) : null,
+    netWealth: netWealthValue ? Number.parseFloat(netWealthValue) : null,
+  });
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: () => {
       const payload: TaxYearInputs = {
         ...(inputs ?? EMPTY_INPUTS),
-        cantonCode: canton,
-        bfsNumber: bfsNumber ? Number(bfsNumber) : null,
-        civilStatus,
-        churchAffiliation: church,
-        numberOfChildren: Number.parseInt(children) || 0,
-        grossEmploymentIncome: Number.parseFloat(grossIncomeValue) || 0,
-        investmentIncome: investmentIncome ? Number.parseFloat(investmentIncome) : null,
-        pillar3aContribution: pillar3aValue ? Number.parseFloat(pillar3aValue) : null,
-        netWealth: netWealth ? Number.parseFloat(netWealth) : null,
+        ...formValues(),
       };
       return taxApi.upsertYear(token, year, payload);
     },
@@ -186,6 +228,20 @@ export function CalculatorCard({
       queryClient.setQueryData(['tax', 'year', String(year)], detail);
       queryClient.invalidateQueries({ queryKey: ['tax', 'years'] });
       onCalculated?.();
+    },
+  });
+
+  // Updates the selected scenario in place — the year itself stays untouched.
+  const updateScenario = useMutation({
+    mutationFn: (scenario: TaxScenario) =>
+      taxApi.updateScenario(token, year, scenario.id, {
+        ...scenario.inputs,
+        name: scenario.name,
+        ...formValues(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tax', 'scenarios', String(year)] });
+      onScenarioUpdated?.();
     },
   });
 
@@ -198,6 +254,21 @@ export function CalculatorCard({
     <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base">{t('tax.title')}</CardTitle>
+        {selectedScenario && (
+          <ScenarioInlineRename
+            name={selectedScenario.name}
+            isDefault={selectedScenario.isDefault}
+            renameLabel={t('tax.renameScenario')}
+            queryKey={['tax', 'scenarios', String(year)]}
+            // Renaming sends the stored inputs, never the live form state.
+            onRename={(name) =>
+              taxApi.updateScenario(token, year, selectedScenario.id, {
+                ...selectedScenario.inputs,
+                name,
+              })
+            }
+          />
+        )}
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -293,7 +364,7 @@ export function CalculatorCard({
             )}
             {scenarios && scenarios.length > 0 && (
               <Select
-                value={pickedScenarioId || undefined}
+                value={pickedScenarioId || scenarioPrefill?.id || undefined}
                 onValueChange={(id) => {
                   setPickedScenarioId(id);
                   const scenario = scenarios.find((s) => s.id === id);
@@ -319,7 +390,17 @@ export function CalculatorCard({
           </div>
           <div className="space-y-2">
             <Label>{t('tax.netWealth')} (CHF)</Label>
-            <Input type="number" value={netWealth} onChange={(e) => setNetWealth(e.target.value)} />
+            <Input
+              type="number"
+              value={netWealthValue}
+              onChange={(e) => {
+                setNetWealth(e.target.value);
+                setNetWealthTouched(true);
+              }}
+            />
+            {wealthPrefill != null && (
+              <p className="text-xs text-muted-foreground">{t('tax.prefill.fromWealth')}</p>
+            )}
           </div>
         </div>
 
@@ -348,21 +429,35 @@ export function CalculatorCard({
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculateForYear', { year })}
             </Button>
-            {onSaveScenarioRequested && (
+            {selectedScenario ? (
               <Button
                 variant="outline"
-                disabled={!grossIncomeValue || isPending}
-                onClick={() =>
-                  mutate(undefined, { onSuccess: () => onSaveScenarioRequested() })
-                }
+                disabled={!grossIncomeValue || isPending || updateScenario.isPending}
+                onClick={() => updateScenario.mutate(selectedScenario)}
               >
                 <Save className="mr-2 h-4 w-4" />
-                {t('tax.saveScenario')}
+                {updateScenario.isPending ? t('common.loading') : t('tax.updateScenario')}
               </Button>
+            ) : (
+              onSaveScenarioRequested && (
+                <Button
+                  variant="outline"
+                  disabled={!grossIncomeValue || isPending}
+                  onClick={() =>
+                    mutate(undefined, { onSuccess: () => onSaveScenarioRequested() })
+                  }
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {t('tax.saveScenario')}
+                </Button>
+              )
             )}
             {actionsExtra}
           </div>
           {error && <p className="text-sm text-destructive">{error.message}</p>}
+          {updateScenario.error && (
+            <p className="text-sm text-destructive">{updateScenario.error.message}</p>
+          )}
         </div>
         {footer}
       </CardContent>

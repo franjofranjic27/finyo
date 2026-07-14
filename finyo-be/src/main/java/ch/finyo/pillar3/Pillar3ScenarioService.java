@@ -44,6 +44,14 @@ public class Pillar3ScenarioService {
                 .toList();
     }
 
+    /**
+     * Creates a new scenario. The user's first scenario is always persisted as
+     * the default, regardless of the request flag — this makes the wealth
+     * PILLAR3 bucket (WealthOverviewService reads the default scenario's
+     * balance via {@link #getDefaultCurrentBalance}) non-empty as soon as the
+     * user saves any scenario. Afterwards the default is only assigned on
+     * explicit request or switched via {@link #setDefault}.
+     */
     @Transactional
     public Pillar3ScenarioResponse create(Pillar3ScenarioRequest request, String userId) {
         log.info("Creating pillar3 scenario '{}' for user={}", request.name(), userId);
@@ -51,6 +59,8 @@ public class Pillar3ScenarioService {
             throw ResourceNotFoundException.of("Pillar3Product", request.productId());
         }
 
+        boolean firstScenarioOfUser = !scenarioRepository.existsByUserId(userId);
+        boolean makeDefault = firstScenarioOfUser || request.isDefault();
         if (request.isDefault() && scenarioRepository.existsByUserIdAndIsDefaultTrue(userId)) {
             throw new IllegalStateException("User already has a default pillar 3a scenario");
         }
@@ -62,7 +72,7 @@ public class Pillar3ScenarioService {
             Pillar3Scenario saved = scenarioRepository.saveAndFlush(Pillar3Scenario.builder()
                     .userId(userId)
                     .name(request.name())
-                    .isDefault(request.isDefault())
+                    .isDefault(makeDefault)
                     .currentBalance(request.currentBalance())
                     .annualContribution(request.annualContribution())
                     .assumedAnnualReturnPercent(BigDecimal.valueOf(request.assumedAnnualReturnPercent()))
@@ -77,6 +87,34 @@ public class Pillar3ScenarioService {
         } catch (DataIntegrityViolationException e) {
             throw new IllegalStateException("User already has a default pillar 3a scenario", e);
         }
+    }
+
+    /**
+     * Overwrites name and all inputs of an owned scenario and recomputes the
+     * projection with the effective product return. The default flag is
+     * deliberately preserved — it is only changed via {@link #setDefault}.
+     */
+    @Transactional
+    public Pillar3ScenarioResponse update(UUID scenarioId, Pillar3ScenarioRequest request, String userId) {
+        log.info("Updating pillar3 scenario id={} for user={}", scenarioId, userId);
+        Pillar3Scenario existing = loadScenario(scenarioId, userId);
+        if (request.productId() != null && !productRepository.existsById(request.productId())) {
+            throw ResourceNotFoundException.of("Pillar3Product", request.productId());
+        }
+
+        Pillar3Scenario saved = scenarioRepository.save(existing.toBuilder()
+                .name(request.name())
+                .currentBalance(request.currentBalance())
+                .annualContribution(request.annualContribution())
+                .assumedAnnualReturnPercent(BigDecimal.valueOf(request.assumedAnnualReturnPercent()))
+                .yearsToRetirement(request.yearsToRetirement())
+                .grossEmploymentIncome(request.grossEmploymentIncome())
+                .civilStatus(request.civilStatus())
+                .cantonCode(request.cantonCode())
+                .taxYear(request.taxYear())
+                .productId(request.productId())
+                .build());
+        return toResponse(saved);
     }
 
     @Transactional

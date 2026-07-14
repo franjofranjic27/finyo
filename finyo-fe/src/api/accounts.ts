@@ -1,4 +1,10 @@
-import type { Account, CreateAccountRequest, PaymentCard, PaymentCardInput } from '@/types';
+import type {
+  Account,
+  AccountBulkResult,
+  CreateAccountRequest,
+  PaymentCard,
+  PaymentCardInput,
+} from '@/types';
 import { apiRequest } from './client';
 
 export const accountsApi = {
@@ -8,6 +14,13 @@ export const accountsApi = {
 
   create: (token: string, data: CreateAccountRequest) =>
     apiRequest<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  importAccounts: (token: string, items: CreateAccountRequest[]) =>
+    apiRequest<AccountBulkResult>(
+      '/accounts/bulk',
+      { method: 'POST', body: JSON.stringify({ items }) },
+      token,
+    ),
 
   update: (token: string, id: string, data: Partial<CreateAccountRequest>) =>
     apiRequest<Account>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }, token),

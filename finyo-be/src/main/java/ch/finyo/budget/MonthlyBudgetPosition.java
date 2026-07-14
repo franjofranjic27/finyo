@@ -10,24 +10,31 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/** A named allocation pot of the monthly budget plan (e.g. savings, pillar 3a). */
 @Entity
-@Table(name = "monthly_budget")
+@Table(name = "monthly_budget_position")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MonthlyBudget {
+public class MonthlyBudgetPosition {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private String userId;
 
-    @Column(name = "net_income", precision = 19, scale = 4, nullable = false)
-    private BigDecimal netIncome;
+    @Column(length = 100, nullable = false)
+    private String name;
+
+    @Column(precision = 19, scale = 4, nullable = false)
+    private BigDecimal amount;
+
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)

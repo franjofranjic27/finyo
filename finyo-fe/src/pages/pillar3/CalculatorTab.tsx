@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart, Area, Tooltip, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Legend,
 } from 'recharts';
@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScenarioInlineRename } from '@/components/scenarios/ScenarioInlineRename';
 import { useAuth } from '@/auth/useAuth';
 import { taxApi } from '@/api/tax';
 import type { Pillar3Result, TaxCivilStatus } from '@/api/tax';
@@ -51,6 +52,7 @@ export function CalculatorTab() {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
+  const queryClient = useQueryClient();
 
   const currentYear = new Date().getFullYear();
   const [balance, setBalance] = useState('');
@@ -65,6 +67,9 @@ export function CalculatorTab() {
 
   // Null = no scenario chip active, show the fresh calculation result.
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+  // One-shot guard: the default scenario is preselected only when scenarios
+  // and products first load, so a deliberate deselection is never overridden.
+  const [defaultApplied, setDefaultApplied] = useState(false);
   const [savePanelOpen, setSavePanelOpen] = useState(false);
 
   const { data: products } = useQuery({
@@ -127,24 +132,56 @@ export function CalculatorTab() {
     setReturnPct(String(product.netReturnPct));
   };
 
-  const applyScenario = (scenario: Pillar3Scenario) => {
-    const { inputs } = scenario;
-    setBalance(String(inputs.currentBalance));
-    setContribution(String(inputs.annualContribution));
-    setReturnPct(String(scenario.effectiveReturnPercent));
-    changeYears(String(inputs.yearsToRetirement));
-    setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
-    if (inputs.cantonCode) setCanton(inputs.cantonCode);
-    if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
-    // The product may have been deleted since the scenario was saved.
-    setSelectedProduct(products?.find((p) => p.id === inputs.productId) ?? null);
-  };
+  const applyScenario = useCallback(
+    (scenario: Pillar3Scenario) => {
+      const { inputs } = scenario;
+      setBalance(String(inputs.currentBalance));
+      setContribution(String(inputs.annualContribution));
+      setReturnPct(String(scenario.effectiveReturnPercent));
+      setYears(String(inputs.yearsToRetirement));
+      setYearsTouched(true);
+      setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
+      if (inputs.cantonCode) setCanton(inputs.cantonCode);
+      if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
+      // The product may have been deleted since the scenario was saved.
+      setSelectedProduct(products?.find((p) => p.id === inputs.productId) ?? null);
+    },
+    [products],
+  );
+
+  // Preselect the default scenario once both lists are loaded (the product
+  // resolution in applyScenario needs the catalog). Scheduled via a timer
+  // because effects must not set state synchronously; the one-shot guard is
+  // set in the same callback, so a deliberate deselection stays untouched.
+  useEffect(() => {
+    if (defaultApplied || !scenarios || !products) return undefined;
+    const timer = setTimeout(() => {
+      setDefaultApplied(true);
+      const preselect = scenarios.find((s) => s.isDefault);
+      if (!preselect) return;
+      setSelectedScenarioId(preselect.id);
+      applyScenario(preselect);
+    });
+    return () => clearTimeout(timer);
+  }, [defaultApplied, scenarios, products, applyScenario]);
 
   const selectScenario = (scenarioId: string | null) => {
     setSelectedScenarioId(scenarioId);
     const scenario = scenarioId ? scenarios?.find((s) => s.id === scenarioId) : null;
     if (scenario) applyScenario(scenario);
   };
+
+  // Updates the selected scenario in place with the current form inputs.
+  const updateScenario = useMutation({
+    mutationFn: (scenario: Pillar3Scenario) =>
+      pillar3Api.updateScenario(token, scenario.id, {
+        ...scenarioInputs,
+        name: scenario.name,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pillar3-scenarios'] });
+    },
+  });
 
   const displayedResult = selectedScenario ? selectedScenario.calculation : result;
   const displayedYears = selectedScenario
@@ -156,6 +193,21 @@ export function CalculatorTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('pillar3.title')}</CardTitle>
+          {selectedScenario && (
+            <ScenarioInlineRename
+              name={selectedScenario.name}
+              isDefault={selectedScenario.isDefault}
+              renameLabel={t('pillar3.scenarios.rename')}
+              queryKey={['pillar3-scenarios']}
+              // Renaming sends the stored inputs, never the live form state.
+              onRename={(name) =>
+                pillar3Api.updateScenario(token, selectedScenario.id, {
+                  ...selectedScenario.inputs,
+                  name,
+                })
+              }
+            />
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -248,15 +300,31 @@ export function CalculatorTab() {
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculate')}
             </Button>
-            <Button variant="outline" onClick={() => setSavePanelOpen(true)}>
-              {t('pillar3.scenarios.save')}
-            </Button>
+            {selectedScenario ? (
+              <Button
+                variant="outline"
+                disabled={updateScenario.isPending}
+                onClick={() => updateScenario.mutate(selectedScenario)}
+              >
+                {updateScenario.isPending
+                  ? t('common.loading')
+                  : t('pillar3.scenarios.update')}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setSavePanelOpen(true)}>
+                {t('pillar3.scenarios.save')}
+              </Button>
+            )}
           </div>
+          {updateScenario.error && (
+            <p className="mt-2 text-sm text-destructive">{updateScenario.error.message}</p>
+          )}
 
           {savePanelOpen && (
             <ScenarioSavePanel
               inputs={scenarioInputs}
               hasDefault={hasDefault}
+              isFirst={(scenarios ?? []).length === 0}
               onClose={() => setSavePanelOpen(false)}
               onSaved={(scenario) => {
                 setSavePanelOpen(false);
@@ -278,13 +346,7 @@ export function CalculatorTab() {
       {displayedResult && (
         <div className="space-y-4">
           {selectedScenario && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">
-                {selectedScenario.isDefault && (
-                  <span aria-hidden="true" className="mr-1 text-amber-500">★</span>
-                )}
-                {selectedScenario.name}
-              </p>
+            <div className="flex items-center justify-end">
               <ScenarioActionsMenu
                 scenario={selectedScenario}
                 onDeleted={() => setSelectedScenarioId(null)}

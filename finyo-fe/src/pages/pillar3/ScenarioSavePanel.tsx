@@ -9,6 +9,8 @@ interface ScenarioSavePanelProps {
   inputs: Pillar3ScenarioInputs;
   /** Whether a default scenario already exists. */
   hasDefault: boolean;
+  /** The very first scenario is always saved as the default. */
+  isFirst: boolean;
   onClose: () => void;
   onSaved?: (scenario: Pillar3Scenario) => void;
 }
@@ -17,6 +19,7 @@ interface ScenarioSavePanelProps {
 export function ScenarioSavePanel({
   inputs,
   hasDefault,
+  isFirst,
   onClose,
   onSaved,
 }: Readonly<ScenarioSavePanelProps>) {
@@ -43,6 +46,8 @@ export function ScenarioSavePanel({
       nameLabel={t('pillar3.scenarios.name')}
       nameInputId="pillar3-scenario-name"
       defaultCheckboxLabel={t('pillar3.scenarios.setAsDefault')}
+      forceDefault={isFirst}
+      forcedDefaultHint={t('pillar3.scenarios.firstScenarioDefault')}
       queryKey={['pillar3-scenarios']}
       saveScenario={saveScenario}
       onClose={onClose}

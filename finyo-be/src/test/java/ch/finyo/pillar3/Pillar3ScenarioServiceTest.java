@@ -34,17 +34,22 @@ import static org.mockito.Mockito.inOrder;
  * are mocked; the calculation result is a canned Pillar3ResultResponse so these
  * tests only verify the ORCHESTRATION logic of Pillar3ScenarioService:
  *
- *   1. Create semantics — every POST is a new immutable snapshot carrying the
- *      caller's userId; an unknown productId is rejected with
+ *   1. Create semantics — every POST is a new row carrying the caller's
+ *      userId; the user's FIRST scenario is forced to be the default
+ *      regardless of the request flag; an unknown productId is rejected with
  *      ResourceNotFoundException (mapped to 404); a second default for the
  *      same user is rejected with IllegalStateException (mapped to 409)
  *      BEFORE anything is written, and a concurrent insert surfacing as
  *      DataIntegrityViolationException is translated to the same 409.
- *   2. Default switching — the previous default is cleared (saveAndFlush)
+ *   2. Update semantics — PUT overwrites name and ALL inputs of an owned
+ *      scenario and recomputes the projection, but NEVER touches the default
+ *      flag (the request flag is ignored in both directions); an unknown
+ *      productId is rejected like in create().
+ *   3. Default switching — the previous default is cleared (saveAndFlush)
  *      strictly BEFORE the new default is saved, otherwise the partial unique
  *      index ux_pillar3_scenario_default_per_user would be violated; setting
  *      the current default again is a no-op.
- *   3. Effective return — a linked product overrides the stored snapshot
+ *   4. Effective return — a linked product overrides the stored snapshot
  *      percent with the Pillar3ReturnModel net rate; a deleted product (empty
  *      Optional) falls back to the snapshot percent.
  */
@@ -134,6 +139,7 @@ class Pillar3ScenarioServiceTest {
 
     @Test
     void create_saves_new_scenario_with_userId_and_returns_calculation() {
+        given(scenarioRepository.existsByUserId(USER_ID)).willReturn(true);
         stubScenarioSaveAssignsId();
         stubCannedCalculation();
 
@@ -164,6 +170,7 @@ class Pillar3ScenarioServiceTest {
 
     @Test
     void create_throws_IllegalStateException_when_user_already_has_a_default() {
+        given(scenarioRepository.existsByUserId(USER_ID)).willReturn(true);
         given(scenarioRepository.existsByUserIdAndIsDefaultTrue(USER_ID)).willReturn(true);
         Pillar3ScenarioRequest request = request("Second default", true, null);
 
@@ -186,6 +193,120 @@ class Pillar3ScenarioServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already has a default")
                 .hasCauseInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void create_forces_default_for_the_users_first_scenario_even_without_the_flag() {
+        given(scenarioRepository.existsByUserId(USER_ID)).willReturn(false);
+        stubScenarioSaveAssignsId();
+        stubCannedCalculation();
+
+        Pillar3ScenarioResponse result = service.create(request("First", false, null), USER_ID);
+
+        // The forced default feeds the wealth PILLAR3 bucket immediately
+        assertThat(result.isDefault()).isTrue();
+        then(scenarioRepository).should().saveAndFlush(argThat(Pillar3Scenario::isDefault));
+    }
+
+    @Test
+    void create_does_not_force_default_when_the_user_already_has_scenarios() {
+        given(scenarioRepository.existsByUserId(USER_ID)).willReturn(true);
+        stubScenarioSaveAssignsId();
+        stubCannedCalculation();
+
+        Pillar3ScenarioResponse result = service.create(request("Second", false, null), USER_ID);
+
+        assertThat(result.isDefault()).isFalse();
+        then(scenarioRepository).should().saveAndFlush(argThat(saved -> !saved.isDefault()));
+    }
+
+    // =========================================================================
+    // update()
+    // =========================================================================
+
+    @Test
+    void update_overwrites_name_and_inputs_and_recomputes_the_projection() {
+        Pillar3Scenario existing = scenario(SCENARIO_ID, "Old name", false);
+        given(scenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID)).willReturn(Optional.of(existing));
+        given(scenarioRepository.save(any(Pillar3Scenario.class))).willAnswer(inv -> inv.getArgument(0));
+        stubCannedCalculation();
+        Pillar3ScenarioRequest request = new Pillar3ScenarioRequest("New name", false,
+                new BigDecimal("25000"), new BigDecimal("5000"), 4.25, 15,
+                new BigDecimal("120000"), TaxCivilStatus.MARRIED, "ZH", 2026, null);
+
+        Pillar3ScenarioResponse result = service.update(SCENARIO_ID, request, USER_ID);
+
+        assertThat(result.id()).isEqualTo(SCENARIO_ID);
+        assertThat(result.name()).isEqualTo("New name");
+        assertThat(result.calculation().projectedBalanceAtRetirement()).isEqualByComparingTo("200000.00");
+        // Identity is kept, name and inputs are overwritten — including the
+        // double → BigDecimal conversion of the return percent
+        then(scenarioRepository).should().save(argThat(saved ->
+                SCENARIO_ID.equals(saved.getId())
+                        && USER_ID.equals(saved.getUserId())
+                        && "New name".equals(saved.getName())
+                        && new BigDecimal("25000").compareTo(saved.getCurrentBalance()) == 0
+                        && new BigDecimal("5000").compareTo(saved.getAnnualContribution()) == 0
+                        && new BigDecimal("4.25").compareTo(saved.getAssumedAnnualReturnPercent()) == 0
+                        && saved.getYearsToRetirement() == 15
+                        && saved.getCivilStatus() == TaxCivilStatus.MARRIED
+                        && "ZH".equals(saved.getCantonCode())));
+        then(pillar3CalculationService).should().calculate(argThat(input ->
+                input.assumedAnnualReturnPercent() == 4.25 && input.yearsToRetirement() == 15));
+    }
+
+    @Test
+    void update_preserves_the_default_flag_of_a_default_scenario_despite_a_false_request_flag() {
+        Pillar3Scenario existingDefault = scenario(SCENARIO_ID, "Default", true);
+        given(scenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID))
+                .willReturn(Optional.of(existingDefault));
+        given(scenarioRepository.save(any(Pillar3Scenario.class))).willAnswer(inv -> inv.getArgument(0));
+        stubCannedCalculation();
+
+        Pillar3ScenarioResponse result = service.update(SCENARIO_ID, request("Still default", false, null), USER_ID);
+
+        assertThat(result.isDefault()).isTrue();
+        then(scenarioRepository).should().save(argThat(Pillar3Scenario::isDefault));
+    }
+
+    @Test
+    void update_does_not_promote_a_non_default_scenario_despite_a_true_request_flag() {
+        Pillar3Scenario existingNonDefault = scenario(SCENARIO_ID, "Non-default", false);
+        given(scenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID))
+                .willReturn(Optional.of(existingNonDefault));
+        given(scenarioRepository.save(any(Pillar3Scenario.class))).willAnswer(inv -> inv.getArgument(0));
+        stubCannedCalculation();
+
+        Pillar3ScenarioResponse result = service.update(SCENARIO_ID, request("Sneaky default", true, null), USER_ID);
+
+        // The request flag is ignored — no second default may ever be written
+        // (the partial unique index would otherwise be violated)
+        assertThat(result.isDefault()).isFalse();
+        then(scenarioRepository).should().save(argThat(saved -> !saved.isDefault()));
+    }
+
+    @Test
+    void update_throws_ResourceNotFoundException_for_a_foreign_scenario() {
+        given(scenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID)).willReturn(Optional.empty());
+        Pillar3ScenarioRequest request = request("Hijack", false, null);
+
+        assertThatThrownBy(() -> service.update(SCENARIO_ID, request, USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Pillar3 scenario");
+        then(scenarioRepository).should(never()).save(any());
+    }
+
+    @Test
+    void update_throws_ResourceNotFoundException_for_unknown_productId() {
+        Pillar3Scenario existing = scenario(SCENARIO_ID, "Linked", false);
+        given(scenarioRepository.findByIdAndUserId(SCENARIO_ID, USER_ID)).willReturn(Optional.of(existing));
+        given(productRepository.existsById(PRODUCT_ID)).willReturn(false);
+        Pillar3ScenarioRequest request = request("Ghost product", false, PRODUCT_ID);
+
+        assertThatThrownBy(() -> service.update(SCENARIO_ID, request, USER_ID))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Pillar3Product");
+        then(scenarioRepository).should(never()).save(any());
     }
 
     // =========================================================================

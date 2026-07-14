@@ -1,32 +1,169 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Car, Pencil, PiggyBank, ReceiptText, RefreshCw, ShieldCheck, TrendingUp, Wallet,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, Pencil, PiggyBank, Plus, Trash2, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { MonthlyBudget } from '@/api/budget';
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { useAuth } from '@/auth/useAuth';
+import { budgetApi } from '@/api/budget';
+import type { BudgetPosition, FixedCost, FixedCostList, MonthlyBudget } from '@/api/budget';
 import { formatCHF, formatPercent } from '@/lib/formatters';
+import { BudgetPositionDialog } from './BudgetPositionDialog';
 import { MonthlyBudgetDialog } from './MonthlyBudgetDialog';
 
-interface FlowRow {
-  key: 'netIncome' | 'savings' | 'investing' | 'pillar3a' | 'taxReserve' | 'fixedCosts' | 'workCosts';
-  icon: LucideIcon;
-  value: number;
-  direction: 'in' | 'out';
+const BASE_ROW_CLASSES = 'flex items-center gap-3 py-2.5 text-sm';
+const ROW_CLASSES = `${BASE_ROW_CLASSES} border-b border-border last:border-0`;
+const ICON_CHIP_CLASSES =
+  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary';
+
+interface FixedCostGroup {
+  /** `null` marks the uncategorized group, which is always rendered last. */
+  category: string | null;
+  items: FixedCost[];
+  totalPerMonth: number;
 }
 
-function buildRows(budget: MonthlyBudget): FlowRow[] {
-  return [
-    { key: 'netIncome', icon: Wallet, value: budget.netIncome, direction: 'in' },
-    { key: 'savings', icon: PiggyBank, value: budget.savings, direction: 'out' },
-    { key: 'investing', icon: TrendingUp, value: budget.investing, direction: 'out' },
-    { key: 'pillar3a', icon: ShieldCheck, value: budget.pillar3a, direction: 'out' },
-    { key: 'taxReserve', icon: ReceiptText, value: budget.taxReserve, direction: 'out' },
-    { key: 'fixedCosts', icon: RefreshCw, value: budget.fixedCostsPerMonth, direction: 'out' },
-    { key: 'workCosts', icon: Car, value: budget.workCosts, direction: 'out' },
-  ];
+/** Groups by category, sorted by monthly total descending; uncategorized last. */
+function groupFixedCosts(items: FixedCost[]): FixedCostGroup[] {
+  const byCategory = new Map<string | null, FixedCost[]>();
+  for (const item of items) {
+    const key = item.category ?? null;
+    byCategory.set(key, [...(byCategory.get(key) ?? []), item]);
+  }
+
+  const groups = [...byCategory.entries()].map(([category, groupItems]) => ({
+    category,
+    items: groupItems,
+    totalPerMonth: groupItems.reduce((sum, item) => sum + item.amountPerMonth, 0),
+  }));
+
+  return groups.sort((a, b) => {
+    if (a.category === null) return 1;
+    if (b.category === null) return -1;
+    return b.totalPerMonth - a.totalPerMonth;
+  });
+}
+
+function NetIncomeRow({ budget, onEdit }: Readonly<{ budget: MonthlyBudget; onEdit: () => void }>) {
+  const { t } = useTranslation();
+
+  return (
+    <div className={ROW_CLASSES}>
+      <span className={ICON_CHIP_CLASSES}>
+        <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">{t('budget.monthly.netIncome')}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {t('budget.monthly.netIncomeHint')}
+        </span>
+      </span>
+      <span className="ml-auto flex items-center gap-1">
+        <span className="font-semibold tabular-nums text-emerald-500">
+          +{formatCHF(budget.netIncome)}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground"
+          aria-label={t('budget.monthly.edit')}
+          onClick={onEdit}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </span>
+    </div>
+  );
+}
+
+function PositionRow({ position, onEdit, onDelete, deleting }: Readonly<{
+  position: BudgetPosition;
+  onEdit: (position: BudgetPosition) => void;
+  onDelete: (position: BudgetPosition) => void;
+  deleting: boolean;
+}>) {
+  const { t } = useTranslation();
+
+  return (
+    <div className={`group ${ROW_CLASSES}`}>
+      <span className={ICON_CHIP_CLASSES}>
+        <PiggyBank className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">{position.name}</span>
+      </span>
+      <span className="ml-auto flex items-center gap-1">
+        <span className="font-semibold tabular-nums text-red-500">
+          −{formatCHF(position.amount)}
+        </span>
+        <span className="inline-flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground"
+            aria-label={t('budget.monthly.positionDialogTitleEdit')}
+            onClick={() => onEdit(position)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-red-500"
+            aria-label={t('budget.monthly.deletePosition')}
+            disabled={deleting}
+            onClick={() => onDelete(position)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function FixedCostGroupRow({ group }: Readonly<{ group: FixedCostGroup }>) {
+  const { t } = useTranslation();
+
+  return (
+    <Collapsible className="border-b border-border last:border-0">
+      <CollapsibleTrigger className={`group w-full text-left ${BASE_ROW_CLASSES}`}>
+        <span className={ICON_CHIP_CLASSES}>
+          <ChevronRight
+            className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden="true"
+          />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate font-semibold">
+            {group.category ?? t('budget.monthly.noCategory')}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {t('budget.monthly.groupItems', { count: group.items.length })}
+          </span>
+        </span>
+        <span className="ml-auto font-semibold tabular-nums text-red-500">
+          −{formatCHF(group.totalPerMonth)}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="pb-2 pl-10">
+          {group.items.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between py-1 text-xs text-muted-foreground"
+            >
+              <span className="min-w-0 truncate">{item.name}</span>
+              <span className="tabular-nums">−{formatCHF(item.amountPerMonth)}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
 function AvailableTile({ budget }: Readonly<{ budget: MonthlyBudget }>) {
@@ -64,9 +201,33 @@ function AvailableTile({ budget }: Readonly<{ budget: MonthlyBudget }>) {
   );
 }
 
-export function MonthlyBudgetCard({ budget }: Readonly<{ budget: MonthlyBudget }>) {
+export function MonthlyBudgetCard({ budget, fixedCosts }: Readonly<{
+  budget: MonthlyBudget;
+  fixedCosts: FixedCostList;
+}>) {
   const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
+  const { accessToken } = useAuth();
+  const token = accessToken ?? '';
+  const queryClient = useQueryClient();
+
+  const [editingNetIncome, setEditingNetIncome] = useState(false);
+  // `position: null` → create; `position: BudgetPosition` → edit; mount fresh per open.
+  const [positionDialog, setPositionDialog] = useState<{ position: BudgetPosition | null } | null>(
+    null,
+  );
+
+  const deletePosition = useMutation({
+    mutationFn: (id: string) => budgetApi.deleteBudgetPosition(token, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['monthly-budget'] });
+    },
+  });
+
+  const confirmDelete = (position: BudgetPosition) => {
+    if (globalThis.confirm(t('budget.monthly.confirmDeletePosition', { name: position.name }))) {
+      deletePosition.mutate(position.id);
+    }
+  };
 
   return (
     <Card>
@@ -75,42 +236,45 @@ export function MonthlyBudgetCard({ budget }: Readonly<{ budget: MonthlyBudget }
           <CardTitle className="text-base">{t('budget.monthly.title')}</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">{t('budget.monthly.subtitle')}</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-          <Pencil className="mr-1 h-4 w-4" />
-          {t('budget.monthly.edit')}
+        <Button variant="ghost" size="sm" onClick={() => setPositionDialog({ position: null })}>
+          <Plus className="mr-1 h-4 w-4" />
+          {t('budget.monthly.addPosition')}
         </Button>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col">
-          {buildRows(budget).map(({ key, icon: Icon, value, direction }) => (
-            <div
-              key={key}
-              className="flex items-center gap-3 border-b border-border py-2.5 text-sm last:border-0"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary">
-                <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-semibold">{t(`budget.monthly.${key}`)}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {t(`budget.monthly.${key}Hint`)}
-                </span>
-              </span>
-              <span
-                className={`ml-auto font-semibold tabular-nums ${
-                  direction === 'in' ? 'text-emerald-500' : 'text-red-500'
-                }`}
-              >
-                {direction === 'in' ? '+' : '−'}
-                {formatCHF(value)}
-              </span>
-            </div>
+          <NetIncomeRow budget={budget} onEdit={() => setEditingNetIncome(true)} />
+          {budget.positions.length === 0 ? (
+            <p className="border-b border-border py-3 text-center text-xs text-muted-foreground last:border-0">
+              {t('budget.monthly.noPositions')}
+            </p>
+          ) : (
+            budget.positions.map((position) => (
+              <PositionRow
+                key={position.id}
+                position={position}
+                onEdit={(selected) => setPositionDialog({ position: selected })}
+                onDelete={confirmDelete}
+                deleting={deletePosition.isPending}
+              />
+            ))
+          )}
+          {groupFixedCosts(fixedCosts.items).map((group) => (
+            <FixedCostGroupRow key={group.category ?? '__uncategorized__'} group={group} />
           ))}
         </div>
         <AvailableTile budget={budget} />
       </CardContent>
 
-      {editing && <MonthlyBudgetDialog budget={budget} onClose={() => setEditing(false)} />}
+      {editingNetIncome && (
+        <MonthlyBudgetDialog budget={budget} onClose={() => setEditingNetIncome(false)} />
+      )}
+      {positionDialog && (
+        <BudgetPositionDialog
+          position={positionDialog.position}
+          onClose={() => setPositionDialog(null)}
+        />
+      )}
     </Card>
   );
 }

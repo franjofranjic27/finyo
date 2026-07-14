@@ -142,8 +142,10 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
 
-  // Null = no scenario chip active, show the year's own current calculation.
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+  // Undefined = no interaction yet → the default scenario (if any) is shown;
+  // null = explicitly deselected (the year's own calculation) and never
+  // re-overridden by a refetch; string = an explicitly selected scenario.
+  const [selection, setSelection] = useState<string | null | undefined>(undefined);
   const [savePanelOpen, setSavePanelOpen] = useState(false);
   // Counter instead of a boolean so a save while the flash is still visible
   // restarts the timeout (the effect re-runs on every increment).
@@ -162,9 +164,13 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
     enabled: !!token,
   });
 
+  const defaultScenario = scenarios?.find((s) => s.isDefault) ?? null;
+  // Derived instead of set in an effect: before any interaction the default
+  // scenario is preselected as soon as the list is loaded.
+  const selectedScenarioId =
+    selection === undefined ? (defaultScenario?.id ?? null) : selection;
   // A deleted scenario resolves to null and falls back to the year's result.
   const selectedScenario = scenarios?.find((s) => s.id === selectedScenarioId) ?? null;
-  const defaultScenario = scenarios?.find((s) => s.isDefault) ?? null;
 
   return (
     <>
@@ -173,11 +179,16 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
           {t('tax.noYearData', { year })}
         </p>
       )}
+      {/* Keyed by the selection so the whole form remounts with the scenario's
+          (or the year's) inputs when a chip is toggled. */}
       <CalculatorCard
+        key={selectedScenarioId ?? 'year'}
         year={year}
-        inputs={detail?.inputs ?? null}
+        inputs={selectedScenario ? selectedScenario.inputs : (detail?.inputs ?? null)}
+        selectedScenario={selectedScenario}
         className="print:hidden"
-        onCalculated={() => setSelectedScenarioId(null)}
+        onCalculated={() => setSelection(null)}
+        onScenarioUpdated={() => setSavedFlashCount((count) => count + 1)}
         // Persists the current form first so the panel never snapshots stale
         // inputs; the panel below reads detail.inputs from the updated query.
         onSaveScenarioRequested={() => setSavePanelOpen(true)}
@@ -194,10 +205,11 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
               year={year}
               inputs={detail.inputs}
               hasDefault={defaultScenario != null}
+              isFirst={(scenarios ?? []).length === 0}
               onClose={() => setSavePanelOpen(false)}
               onSaved={(scenario) => {
                 setSavePanelOpen(false);
-                setSelectedScenarioId(scenario.id);
+                setSelection(scenario.id);
                 setSavedFlashCount((count) => count + 1);
               }}
             />
@@ -208,7 +220,7 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
         <ScenarioBar
           scenarios={scenarios ?? []}
           selectedScenarioId={selectedScenarioId}
-          onSelect={setSelectedScenarioId}
+          onSelect={setSelection}
           onAdd={() => setSavePanelOpen(true)}
           addDisabled={!detail.inputs}
           className="print:hidden"
@@ -225,7 +237,7 @@ function TaxYearContent({ year, detail }: Readonly<TaxYearContentProps>) {
               <ScenarioActionsMenu
                 year={year}
                 scenario={selectedScenario}
-                onDeleted={() => setSelectedScenarioId(null)}
+                onDeleted={() => setSelection(null)}
               />
             )
           }

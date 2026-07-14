@@ -47,6 +47,19 @@ public class Pillar3ScenarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(pillar3ScenarioService.create(request, userId));
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update name and inputs of a scenario",
+            description = "isDefault in the request is ignored; use PATCH /{id}/default to change the default.")
+    @ApiResponse(responseCode = "200", description = "Scenario updated")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    @ApiResponse(responseCode = "404", description = "Scenario or linked product not found")
+    public ResponseEntity<Pillar3ScenarioResponse> update(@PathVariable UUID id,
+                                                          @Valid @RequestBody Pillar3ScenarioRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("PUT /api/v1/pillar3/scenarios/{} user={}", id, userId);
+        return ResponseEntity.ok(pillar3ScenarioService.update(id, request, userId));
+    }
+
     @PatchMapping("/{id}/default")
     @Operation(summary = "Mark a scenario as the caller's default")
     @ApiResponse(responseCode = "200", description = "Default scenario updated")

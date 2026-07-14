@@ -5,10 +5,12 @@ import { Check, Copy, Pencil, Plus, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CsvImportButton } from '@/components/CsvImportButton';
 import { useAuth } from '@/auth/useAuth';
 import { accountsApi, formatIban } from '@/api/accounts';
 import type { Account } from '@/types';
 import { AccountDialog } from './AccountDialog';
+import { parseAccountsCsv } from './accountsCsv';
 import { ACCOUNT_SCOPES, scopeLabelKey } from './scopeLabel';
 
 const COLUMN_COUNT = 8;
@@ -171,10 +173,19 @@ export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>
           <CardTitle className="text-base">{t('accounts.list.title')}</CardTitle>
           <CardDescription className="text-xs">{t('accounts.list.subtitle')}</CardDescription>
         </div>
-        <Button variant="ghost" size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          {t('accounts.list.add')}
-        </Button>
+        <div className="flex items-start gap-1">
+          <CsvImportButton
+            i18nPrefix="accounts.list"
+            parse={parseAccountsCsv}
+            importItems={accountsApi.importAccounts}
+            // account names are denormalised into the cards list — an IBAN match may rename
+            invalidateKeys={[['accounts'], ['cards']]}
+          />
+          <Button variant="ghost" size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            {t('accounts.list.add')}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {accounts.length === 0 ? (

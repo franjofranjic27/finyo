@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,14 +35,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * and the seeded SG rate tables (V10/V11/V17) back the assertions.
  *
  * Focus areas:
- *   1. Full lifecycle: create ×2 → list (newest first, embedded calculation) →
- *      atomic default switching (must survive the partial unique index) →
- *      idempotent re-default → deleting the default.
- *   2. A second default snapshot for the same year → 409 ProblemDetail.
- *   3. Lazy tax_year creation on the first scenario of a year.
- *   4. Multi-tenant isolation: foreign scenarios are invisible and immutable.
- *   5. DB-level ON DELETE CASCADE of scenarios when a year is deleted.
- *   6. Bean/path validation → 400.
+ *   1. Full lifecycle: create ×2 (the FIRST scenario of a year is forced to be
+ *      the default) → list (newest first, embedded calculation) → atomic
+ *      default switching (must survive the partial unique index) → idempotent
+ *      re-default → deleting the default.
+ *   2. Updates: PUT overwrites name and inputs and recomputes, but never
+ *      touches the default flag — the request flag is ignored in both
+ *      directions; unknown scenario/year → 404.
+ *   3. A second default snapshot for the same year → 409 ProblemDetail.
+ *   4. Lazy tax_year creation on the first scenario of a year.
+ *   5. Multi-tenant isolation: foreign scenarios are invisible and immutable.
+ *   6. DB-level ON DELETE CASCADE of scenarios when a year is deleted.
+ *   7. Bean/path validation → 400.
  */
 class TaxScenarioIT extends BaseIntegrationTest {
 
@@ -114,7 +120,9 @@ class TaxScenarioIT extends BaseIntegrationTest {
 
     @Test
     void full_lifecycle_create_list_switch_default_idempotency_and_delete() throws Exception {
-        // --- 1. POST creates the first snapshot with a live calculation ------
+        // --- 1. POST creates the first snapshot with a live calculation; the
+        //        FIRST scenario of a year is forced to be the default even
+        //        though the request says isDefault=false ----------------------
         mockMvc.perform(post("/api/v1/tax/years/2025/scenarios").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(scenarioBody("Base", false)))
@@ -122,52 +130,43 @@ class TaxScenarioIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.id", notNullValue()))
                 .andExpect(jsonPath("$.taxYear", is(2025)))
                 .andExpect(jsonPath("$.name", is("Base")))
-                .andExpect(jsonPath("$.isDefault", is(false)))
+                .andExpect(jsonPath("$.isDefault", is(true)))
                 .andExpect(jsonPath("$.createdAt", notNullValue()))
                 .andExpect(jsonPath("$.calculation.grandTotal", notNullValue()))
                 .andExpect(jsonPath("$.inputs.grossEmploymentIncome", notNullValue()));
 
-        // --- 2. A second POST is a NEW row, never an update ------------------
+        // --- 2. A second POST is a NEW row, never an update; the default is
+        //        no longer forced once the year has scenarios ------------------
         UUID max3aId = postScenario(2025, scenarioBody("Max 3a", false));
 
         // --- 3. GET lists both, newest first ----------------------------------
-        String listJson = mockMvc.perform(get("/api/v1/tax/years/2025/scenarios").with(asUser()))
+        mockMvc.perform(get("/api/v1/tax/years/2025/scenarios").with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(2)))
                 .andExpect(jsonPath("$[0].name", is("Max 3a")))
                 .andExpect(jsonPath("$[1].name", is("Base")))
                 .andExpect(jsonPath("$[0].isDefault", is(false)))
-                .andExpect(jsonPath("$[1].isDefault", is(false)))
-                .andExpect(jsonPath("$[0].calculation.grandTotal", notNullValue()))
-                .andReturn().getResponse().getContentAsString();
-        UUID baseId = UUID.fromString(objectMapper.readTree(listJson).get(1).get("id").asText());
+                .andExpect(jsonPath("$[1].isDefault", is(true)))
+                .andExpect(jsonPath("$[0].calculation.grandTotal", notNullValue()));
 
-        // --- 4. PATCH default on "Base" ---------------------------------------
-        mockMvc.perform(patch("/api/v1/tax/years/2025/scenarios/{id}/default", baseId).with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(baseId.toString())))
-                .andExpect(jsonPath("$.isDefault", is(true)));
-        mockMvc.perform(get("/api/v1/tax/years/2025/scenarios").with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].isDefault", is(false)))
-                .andExpect(jsonPath("$[1].isDefault", is(true)));
-
-        // --- 5. PATCH default on "Max 3a" switches atomically ------------------
+        // --- 4. PATCH default on "Max 3a" switches atomically ------------------
         // (clear-then-set must survive the partial unique index at DB level)
         mockMvc.perform(patch("/api/v1/tax/years/2025/scenarios/{id}/default", max3aId).with(asUser()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(max3aId.toString())))
                 .andExpect(jsonPath("$.isDefault", is(true)));
         mockMvc.perform(get("/api/v1/tax/years/2025/scenarios").with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].isDefault", is(true)))
                 .andExpect(jsonPath("$[1].isDefault", is(false)));
 
-        // --- 6. PATCH default on the current default is idempotent -------------
+        // --- 5. PATCH default on the current default is idempotent -------------
         mockMvc.perform(patch("/api/v1/tax/years/2025/scenarios/{id}/default", max3aId).with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isDefault", is(true)));
 
-        // --- 7. Deleting the default is allowed → 204 ---------------------------
+        // --- 6. Deleting the default is allowed → 204; the remaining scenario
+        //        is NOT re-promoted --------------------------------------------
         mockMvc.perform(delete("/api/v1/tax/years/2025/scenarios/{id}", max3aId).with(asUser()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/v1/tax/years/2025/scenarios").with(asUser()))
@@ -175,6 +174,83 @@ class TaxScenarioIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].name", is("Base")))
                 .andExpect(jsonPath("$[0].isDefault", is(false)));
+    }
+
+    // =========================================================================
+    // SECTION 1b — UPDATE
+    // =========================================================================
+
+    @Test
+    void updating_a_scenario_overwrites_inputs_recomputes_and_preserves_the_default_flag() throws Exception {
+        // First scenario → forced default; second → non-default
+        String createdJson = mockMvc.perform(post("/api/v1/tax/years/2025/scenarios").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Original", false)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID defaultId = UUID.fromString(objectMapper.readTree(createdJson).get("id").asText());
+        BigDecimal grandTotalAt100k = objectMapper.readTree(createdJson)
+                .get("calculation").get("grandTotal").decimalValue();
+        UUID nonDefaultId = postScenario(2025, scenarioBody("Other", false));
+
+        // PUT on the default with isDefault=false: name and inputs are
+        // overwritten, the calculation is recomputed, the flag survives
+        String updatedJson = mockMvc.perform(put("/api/v1/tax/years/2025/scenarios/{id}", defaultId)
+                        .with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Renamed",
+                                "isDefault", false,
+                                "cantonCode", "SG",
+                                "bfsNumber", 3203,
+                                "civilStatus", "SINGLE",
+                                "numberOfChildren", 0,
+                                "churchAffiliation", "NONE",
+                                "grossEmploymentIncome", 150_000,
+                                "pillar3aContribution", 7000))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(defaultId.toString())))
+                .andExpect(jsonPath("$.name", is("Renamed")))
+                .andExpect(jsonPath("$.isDefault", is(true)))
+                .andExpect(jsonPath("$.inputs.grossEmploymentIncome", is(150000)))
+                .andExpect(jsonPath("$.calculation.grandTotal", notNullValue()))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(objectMapper.readTree(updatedJson).get("calculation").get("grandTotal").decimalValue())
+                .as("150k income must yield a different recomputed tax than the original 100k")
+                .isNotEqualByComparingTo(grandTotalAt100k);
+
+        // PUT on a non-default with isDefault=true: the flag is ignored, so the
+        // partial unique index is NOT violated and no second default appears
+        mockMvc.perform(put("/api/v1/tax/years/2025/scenarios/{id}", nonDefaultId).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scenarioBody("Other renamed", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Other renamed")))
+                .andExpect(jsonPath("$.isDefault", is(false)));
+
+        TaxScenario reloadedDefault = taxScenarioRepository.findById(defaultId).orElseThrow();
+        assertThat(reloadedDefault.isDefault()).isTrue();
+        assertThat(reloadedDefault.getName()).isEqualTo("Renamed");
+        assertThat(taxScenarioRepository.findById(nonDefaultId).orElseThrow().isDefault()).isFalse();
+    }
+
+    @Test
+    void updating_an_unknown_scenario_or_an_absent_year_returns_404() throws Exception {
+        postScenario(2025, scenarioBody("Existing", false));
+
+        mockMvc.perform(put("/api/v1/tax/years/2025/scenarios/{id}", UUID.randomUUID()).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(minimalScenarioBody("Ghost")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title", is("Resource Not Found")));
+
+        // Unlike POST, PUT must NOT lazily create a missing tax year
+        mockMvc.perform(put("/api/v1/tax/years/2027/scenarios/{id}", UUID.randomUUID()).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(minimalScenarioBody("Ghost year")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/tax/years/2027").with(asUser()))
+                .andExpect(status().isNotFound());
     }
 
     // =========================================================================
@@ -212,11 +288,13 @@ class TaxScenarioIT extends BaseIntegrationTest {
         mockMvc.perform(get("/api/v1/tax/years/2026").with(asUser()))
                 .andExpect(status().isNotFound());
 
+        // The first scenario of the fresh year is forced to be the default
         mockMvc.perform(post("/api/v1/tax/years/2026/scenarios").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(minimalScenarioBody("Early draft")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.taxYear", is(2026)))
+                .andExpect(jsonPath("$.isDefault", is(true)))
                 .andExpect(jsonPath("$.calculation", nullValue()));
 
         // The minimal year now exists for the caller, starting in OPEN
@@ -238,7 +316,7 @@ class TaxScenarioIT extends BaseIntegrationTest {
     // =========================================================================
 
     @Test
-    void other_user_cannot_see_default_or_delete_a_foreign_scenario() throws Exception {
+    void other_user_cannot_see_update_default_or_delete_a_foreign_scenario() throws Exception {
         UUID ownersScenarioId = postScenario(2025, scenarioBody("Owner's scenario", false));
         // The attacker owns their OWN 2025 year, so loadYear() succeeds for them —
         // the scenario lookup itself must still enforce ownership.
@@ -252,6 +330,12 @@ class TaxScenarioIT extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(0)));
 
+        mockMvc.perform(put("/api/v1/tax/years/2025/scenarios/{id}", ownersScenarioId)
+                        .with(asOtherUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(minimalScenarioBody("Hijacked")))
+                .andExpect(status().isNotFound());
+
         mockMvc.perform(patch("/api/v1/tax/years/2025/scenarios/{id}/default", ownersScenarioId)
                         .with(asOtherUser()))
                 .andExpect(status().isNotFound());
@@ -260,10 +344,12 @@ class TaxScenarioIT extends BaseIntegrationTest {
                         .with(asOtherUser()))
                 .andExpect(status().isNotFound());
 
-        // The owner's scenario must be completely untouched
+        // The owner's scenario must be completely untouched (as the owner's
+        // first scenario of the year it was forced to be the default)
         TaxScenario reloaded = taxScenarioRepository.findById(ownersScenarioId).orElseThrow();
         assertThat(reloaded.getUserId()).isEqualTo(TEST_USER_ID);
-        assertThat(reloaded.isDefault()).isFalse();
+        assertThat(reloaded.getName()).isEqualTo("Owner's scenario");
+        assertThat(reloaded.isDefault()).isTrue();
     }
 
     // =========================================================================

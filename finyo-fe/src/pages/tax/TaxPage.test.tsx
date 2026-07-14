@@ -5,13 +5,16 @@ import { TaxPage } from './TaxPage';
 import { pillar3Api } from '@/api/pillar3';
 import { salaryApi } from '@/api/salary';
 import { taxApi } from '@/api/tax';
+import { wealthApi } from '@/api/wealth';
 import { salary } from '@/test/fixtures/salary';
 import {
   taxResult,
   taxScenario,
   taxYearDetail,
+  taxYearInputs,
   taxYearSummary,
 } from '@/test/fixtures/tax';
+import { wealthOverview } from '@/test/fixtures/wealth';
 import { renderWithProviders } from '@/test/test-utils';
 
 vi.mock('@/auth/useAuth', () => ({
@@ -42,6 +45,7 @@ vi.mock('@/api/tax', () => ({
     deleteDeadline: vi.fn(),
     getScenarios: vi.fn(),
     createScenario: vi.fn(),
+    updateScenario: vi.fn(),
     setDefaultScenario: vi.fn(),
     deleteScenario: vi.fn(),
   },
@@ -59,6 +63,12 @@ vi.mock('@/api/salary', () => ({
   },
 }));
 
+vi.mock('@/api/wealth', () => ({
+  wealthApi: {
+    getOverview: vi.fn(),
+  },
+}));
+
 // Neutral defaults so the calculator's cross-module prefill stays inactive.
 beforeEach(() => {
   vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
@@ -67,6 +77,9 @@ beforeEach(() => {
     ...stored,
     result: { ...stored.result, grossYearly: 0 },
   });
+  vi.mocked(wealthApi.getOverview).mockResolvedValue(
+    wealthOverview({ buckets: [], total: 0 }),
+  );
 });
 
 function renderTaxPage(route: string) {
@@ -194,7 +207,10 @@ describe('TaxPage', () => {
 
     renderTaxPage('/tax/2024');
 
-    expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
+    // The default scenario is preselected once the list loads.
+    expect(
+      await screen.findByText('Tax Breakdown — Canton SG 2024 · Status quo ★'),
+    ).toBeInTheDocument();
 
     await user.click(await screen.findByRole('button', { name: /Without 3a/ }));
 
@@ -209,6 +225,55 @@ describe('TaxPage', () => {
     await user.click(screen.getByRole('button', { name: /Without 3a/ }));
     expect(await screen.findByText('Tax Breakdown — Canton SG 2024')).toBeInTheDocument();
     expect(screen.getByText("CHF 12'000.00")).toBeInTheDocument();
+  });
+
+  it('preselects the default scenario once, fills the form and honours a deselect', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({
+        year: 2024,
+        inputs: taxYearInputs({ grossEmploymentIncome: 100_000 }),
+        calculation: taxResult({ taxYear: 2024, grandTotal: 12_000 }),
+      }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([
+      taxScenario({
+        id: 's1',
+        name: 'Status quo',
+        isDefault: true,
+        inputs: taxYearInputs({ grossEmploymentIncome: 120_000 }),
+        calculation: taxResult({ taxYear: 2024, grandTotal: 17_842 }),
+      }),
+    ]);
+    const user = userEvent.setup();
+
+    const { queryClient } = renderTaxPage('/tax/2024');
+
+    // Preselected chip and the calculator filled with the scenario's inputs
+    const chip = await screen.findByRole('button', { name: /Status quo/ });
+    await waitFor(() => expect(chip).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByDisplayValue('120000')).toBeInTheDocument();
+
+    // Deselecting restores the year's own inputs and result
+    await user.click(chip);
+    expect(await screen.findByDisplayValue('100000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Status quo/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    // One-shot: a refetch of the scenario list must not re-apply the default
+    const fetchesBefore = vi.mocked(taxApi.getScenarios).mock.calls.length;
+    await queryClient.invalidateQueries({ queryKey: ['tax', 'scenarios', '2024'] });
+    await waitFor(() =>
+      expect(vi.mocked(taxApi.getScenarios).mock.calls.length).toBeGreaterThan(fetchesBefore),
+    );
+    expect(screen.getByRole('button', { name: /Status quo/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByDisplayValue('100000')).toBeInTheDocument();
   });
 
   it('clears the selection when the selected scenario is deleted', async () => {
@@ -289,6 +354,30 @@ describe('TaxPage', () => {
     await user.click(await screen.findByRole('button', { name: /New scenario/ }));
 
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    // The very first scenario is forced to be the default: hint, no checkbox.
+    expect(
+      screen.queryByLabelText('Set as default scenario for 2024'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('The first scenario automatically becomes the default.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the default checkbox in the save panel once a scenario exists', async () => {
+    vi.mocked(taxApi.getYears).mockResolvedValue([]);
+    vi.mocked(taxApi.getYear).mockResolvedValue(
+      taxYearDetail({ year: 2024, calculation: taxResult({ taxYear: 2024 }) }),
+    );
+    vi.mocked(taxApi.getCommunes).mockResolvedValue([]);
+    vi.mocked(taxApi.getScenarios).mockResolvedValue([
+      taxScenario({ id: 's2', name: 'Without 3a' }),
+    ]);
+    const user = userEvent.setup();
+
+    renderTaxPage('/tax/2024');
+
+    await user.click(await screen.findByRole('button', { name: /New scenario/ }));
+
     expect(screen.getByLabelText('Set as default scenario for 2024')).toBeInTheDocument();
   });
 

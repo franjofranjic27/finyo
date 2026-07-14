@@ -4,6 +4,7 @@ import type {
   Pillar3CompareRequest,
   Pillar3ImportRequest,
   Pillar3ProductInput,
+  Pillar3ScenarioRequest,
 } from './pillar3';
 import { apiRequest } from './client';
 
@@ -53,6 +54,27 @@ describe('pillar3Api', () => {
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/pillar3/products/compare',
       { method: 'POST', body: JSON.stringify(request) },
+      TOKEN,
+    );
+  });
+
+  it('updateScenario PUTs the scenario to its id path', () => {
+    const scenario: Pillar3ScenarioRequest = {
+      currentBalance: 10_000,
+      annualContribution: 7258,
+      assumedAnnualReturnPercent: 3.0,
+      yearsToRetirement: 30,
+      grossEmploymentIncome: null,
+      civilStatus: null,
+      cantonCode: null,
+      taxYear: 2026,
+      productId: null,
+      name: 'My plan',
+    };
+    pillar3Api.updateScenario(TOKEN, 's1', scenario);
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/pillar3/scenarios/s1',
+      { method: 'PUT', body: JSON.stringify(scenario) },
       TOKEN,
     );
   });
