@@ -15,4 +15,6 @@ public interface TaxScenarioRepository extends JpaRepository<TaxScenario, UUID> 
     Optional<TaxScenario> findByTaxYearIdAndUserIdAndIsDefaultTrue(UUID taxYearId, String userId);
 
     boolean existsByTaxYearIdAndUserIdAndIsDefaultTrue(UUID taxYearId, String userId);
+
+    boolean existsByTaxYearIdAndUserId(UUID taxYearId, String userId);
 }

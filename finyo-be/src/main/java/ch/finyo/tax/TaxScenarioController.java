@@ -49,6 +49,20 @@ public class TaxScenarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(taxScenarioService.create(year, request, userId));
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Update name and inputs of a scenario",
+            description = "isDefault in the request is ignored; use PATCH /{id}/default to change the default.")
+    @ApiResponse(responseCode = "200", description = "Scenario updated")
+    @ApiResponse(responseCode = "400", description = "Validation failed")
+    @ApiResponse(responseCode = "404", description = "Tax year or scenario not found")
+    public ResponseEntity<TaxScenarioResponse> update(@PathVariable @Min(2020) @Max(2030) int year,
+                                                      @PathVariable UUID id,
+                                                      @Valid @RequestBody TaxScenarioRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("PUT /api/v1/tax/years/{}/scenarios/{} user={}", year, id, userId);
+        return ResponseEntity.ok(taxScenarioService.update(year, id, request, userId));
+    }
+
     @PatchMapping("/{id}/default")
     @Operation(summary = "Mark a scenario as the default of its tax year")
     @ApiResponse(responseCode = "200", description = "Default scenario updated")

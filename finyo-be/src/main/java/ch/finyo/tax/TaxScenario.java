@@ -11,8 +11,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Input snapshot of a tax year — each save creates a new row. The tax inputs
- * themselves are immutable; only the default flag (and thus updatedAt) is mutable.
+ * Saved scenario of a tax year. Name and tax inputs are editable via the
+ * update endpoint; the default flag is switched exclusively via its own
+ * endpoint (PATCH /{id}/default), never through an update.
  */
 @Entity
 @Table(name = "tax_scenario")
