@@ -80,6 +80,7 @@
   ],
   "users": [
     {
+      "id": "5d5c3dd6-5f6a-4f23-b318-eef264bc7220",
       "username": "admin",
       "email": "admin@finyo.local",
       "emailVerified": true,
@@ -99,6 +100,7 @@
       ]
     },
     {
+      "id": "29bd481b-e019-4feb-a648-5015e8cdf1fa",
       "username": "user",
       "email": "user@finyo.local",
       "emailVerified": true,
