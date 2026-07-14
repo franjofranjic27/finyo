@@ -66,6 +66,20 @@ finyo:
     graph-base-url: ${GRAPH_API_BASE_URL:https://graph.microsoft.com/v1.0}
     # The 10 MB multipart cap does not apply to Graph downloads — cap them here.
     max-file-size-bytes: ${GRAPH_MAX_FILE_SIZE_BYTES:10485760}
+    sync-interval: ${GRAPH_SYNC_INTERVAL:PT15M}
+  documents:
+    # The folder tells us the year and the type before anyone looks inside the
+    # file: .../STE-2025/Lohnausweise/x.pdf. Folder names are matched case- and
+    # umlaut-insensitively ("Säule 3a" == "saeule3a").
+    # Single backslashes: a YAML plain scalar does not process escapes, so "\\d"
+    # would reach Pattern as a literal backslash and never match a folder name.
+    tax-year-pattern: ${DOCUMENTS_TAX_YEAR_PATTERN:STE-(20\d\d)}
+    folder-types:
+      lohnausweise: SALARY_CERTIFICATE
+      krankenkasse: HEALTH_INSURANCE
+      wertschriften: SECURITIES_STATEMENT
+      saeule3a: PILLAR_3A
+      veranlagung: ASSESSMENT
   cors:
     # Comma-separated; deployments append their public origin via env
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173}
