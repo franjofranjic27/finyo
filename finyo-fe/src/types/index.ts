@@ -1,5 +1,12 @@
 // Account types
-export type AccountType = 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'INVESTMENT' | 'CASH' | 'OTHER';
+export type AccountType =
+  | 'CHECKING'
+  | 'SAVINGS'
+  | 'CREDIT_CARD'
+  | 'INVESTMENT'
+  | 'VORSORGE'
+  | 'CASH'
+  | 'OTHER';
 
 /** Grouping of accounts and cards (mirrors the backend enum). */
 export type AccountScope = 'PRIVATE' | 'BUSINESS';
@@ -26,7 +33,8 @@ export interface CreateAccountRequest {
   name: string;
   type: AccountType;
   currency: string;
-  initialBalance: string;
+  /** Optional — the backend defaults to zero on create and keeps the stored value on update. */
+  initialBalance?: string;
   color?: string;
   iban?: string;
   bic?: string;
@@ -34,6 +42,14 @@ export interface CreateAccountRequest {
   feeNote?: string;
   scope?: AccountScope;
   toClose?: boolean;
+}
+
+/** Result of the bulk import — rows are matched by normalized IBAN, else by normalized name (upsert). */
+export interface AccountBulkResult {
+  created: number;
+  updated: number;
+  failed: number;
+  errors: string[];
 }
 
 export interface PaymentCard {

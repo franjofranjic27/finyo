@@ -17,7 +17,7 @@ import type { Account, AccountScope, AccountType, CreateAccountRequest } from '@
 import { ACCOUNT_SCOPES, scopeLabelKey } from './scopeLabel';
 
 const ACCOUNT_TYPES: readonly AccountType[] = [
-  'CHECKING', 'SAVINGS', 'CREDIT_CARD', 'INVESTMENT', 'CASH', 'OTHER',
+  'CHECKING', 'SAVINGS', 'CREDIT_CARD', 'INVESTMENT', 'VORSORGE', 'CASH', 'OTHER',
 ];
 
 interface AccountDialogProps {

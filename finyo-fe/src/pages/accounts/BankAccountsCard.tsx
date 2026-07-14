@@ -1,14 +1,15 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, Pencil, Plus, X } from 'lucide-react';
+import { Check, Copy, Pencil, Plus, Upload, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/auth/useAuth';
 import { accountsApi, formatIban } from '@/api/accounts';
-import type { Account } from '@/types';
+import type { Account, CreateAccountRequest } from '@/types';
 import { AccountDialog } from './AccountDialog';
+import { parseAccountsCsv } from './accountsCsv';
 import { ACCOUNT_SCOPES, scopeLabelKey } from './scopeLabel';
 
 const COLUMN_COUNT = 8;
@@ -125,6 +126,86 @@ function AccountRow({ account, onEdit, onRemove, removing }: Readonly<{
   );
 }
 
+function CsvImportButton() {
+  const { t } = useTranslation();
+  const { accessToken } = useAuth();
+  const token = accessToken ?? '';
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [summary, setSummary] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<string[]>([]);
+
+  const importAccounts = useMutation({
+    mutationFn: (items: CreateAccountRequest[]) => accountsApi.importAccounts(token, items),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      // account names are denormalised into the cards list — an IBAN match may rename
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      setSummary(t('accounts.list.csvResult', {
+        created: result.created,
+        updated: result.updated,
+        failed: result.failed,
+      }));
+      setRowErrors(result.errors);
+    },
+  });
+
+  const importFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const items = parseAccountsCsv(String(reader.result ?? ''));
+      setRowErrors([]);
+      if (items.length === 0) {
+        setSummary(t('accounts.list.csvNoRows'));
+        return;
+      }
+      setSummary(null);
+      importAccounts.mutate(items);
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="sr-only"
+        aria-label={t('accounts.list.csvImport')}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) importFile(file);
+          // Allow re-importing the same file after a fix.
+          e.target.value = '';
+        }}
+      />
+      <Button
+        variant="ghost"
+        size="sm"
+        title={t('accounts.list.csvHint')}
+        onClick={() => inputRef.current?.click()}
+        disabled={importAccounts.isPending}
+      >
+        <Upload className="mr-1 h-4 w-4" />
+        {importAccounts.isPending ? t('common.loading') : t('accounts.list.csvImport')}
+      </Button>
+      {summary && <p className="text-xs text-muted-foreground">{summary}</p>}
+      {importAccounts.error && (
+        <p className="text-xs text-destructive">{importAccounts.error.message}</p>
+      )}
+      {rowErrors.length > 0 && (
+        <ul className="text-xs text-destructive">
+          {rowErrors.map((error) => (
+            <li key={error}>{error}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -171,10 +252,13 @@ export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>
           <CardTitle className="text-base">{t('accounts.list.title')}</CardTitle>
           <CardDescription className="text-xs">{t('accounts.list.subtitle')}</CardDescription>
         </div>
-        <Button variant="ghost" size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          {t('accounts.list.add')}
-        </Button>
+        <div className="flex items-start gap-1">
+          <CsvImportButton />
+          <Button variant="ghost" size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            {t('accounts.list.add')}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {accounts.length === 0 ? (
