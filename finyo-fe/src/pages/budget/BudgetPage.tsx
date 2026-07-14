@@ -73,7 +73,7 @@ export function BudgetPage() {
               <div className="lg:col-span-2">
                 <FixedCostsCard list={fixedCosts.data} />
               </div>
-              <MonthlyBudgetCard budget={monthlyBudget.data} />
+              <MonthlyBudgetCard budget={monthlyBudget.data} fixedCosts={fixedCosts.data} />
             </div>
           )}
         </div>

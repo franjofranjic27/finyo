@@ -35,26 +35,30 @@ export interface FixedCostBulkResult {
   errors: string[];
 }
 
+/** A named allocation pot of the monthly budget plan (e.g. savings, pillar 3a). */
+export interface BudgetPosition {
+  id: string;
+  name: string;
+  amount: number;
+  sortOrder: number;
+}
+
 export interface MonthlyBudget {
   netIncome: number;
-  savings: number;
-  investing: number;
-  pillar3a: number;
-  taxReserve: number;
-  workCosts: number;
+  positions: BudgetPosition[];
   /** Derived from the fixed-cost table — not editable here */
   fixedCostsPerMonth: number;
-  /** netIncome minus all allocations and fixed costs; may be negative */
+  /** netIncome minus all positions and fixed costs; may be negative */
   available: number;
 }
 
 export interface MonthlyBudgetInput {
   netIncome: number;
-  savings: number;
-  investing: number;
-  pillar3a: number;
-  taxReserve: number;
-  workCosts: number;
+}
+
+export interface BudgetPositionInput {
+  name: string;
+  amount: number;
 }
 
 export const budgetApi = {
@@ -86,6 +90,28 @@ export const budgetApi = {
     apiRequest<MonthlyBudget>(
       '/monthly-budget',
       { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  // Position mutations return the full rebuilt budget plan.
+  createBudgetPosition: (token: string, data: BudgetPositionInput) =>
+    apiRequest<MonthlyBudget>(
+      '/monthly-budget/positions',
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+
+  updateBudgetPosition: (token: string, id: string, data: BudgetPositionInput) =>
+    apiRequest<MonthlyBudget>(
+      `/monthly-budget/positions/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      token,
+    ),
+
+  deleteBudgetPosition: (token: string, id: string) =>
+    apiRequest<MonthlyBudget>(
+      `/monthly-budget/positions/${id}`,
+      { method: 'DELETE' },
       token,
     ),
 };

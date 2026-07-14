@@ -1,4 +1,4 @@
-import type { FixedCost, FixedCostList, MonthlyBudget } from '@/api/budget';
+import type { BudgetPosition, FixedCost, FixedCostList, MonthlyBudget } from '@/api/budget';
 
 export function fixedCost(overrides: Partial<FixedCost> & { id: string }): FixedCost {
   return {
@@ -32,14 +32,25 @@ export function fixedCostList(overrides: Partial<FixedCostList> = {}): FixedCost
   };
 }
 
+export function budgetPosition(overrides: Partial<BudgetPosition> & { id: string }): BudgetPosition {
+  return {
+    name: 'Sparen',
+    amount: 800,
+    sortOrder: 0,
+    ...overrides,
+  };
+}
+
 export function monthlyBudget(overrides: Partial<MonthlyBudget> = {}): MonthlyBudget {
   return {
     netIncome: 5268.9,
-    savings: 800,
-    investing: 600,
-    pillar3a: 600,
-    taxReserve: 800,
-    workCosts: 230,
+    positions: [
+      budgetPosition({ id: 'bp1', name: 'Sparen', amount: 800, sortOrder: 0 }),
+      budgetPosition({ id: 'bp2', name: 'Investieren', amount: 600, sortOrder: 1 }),
+      budgetPosition({ id: 'bp3', name: 'Säule 3a', amount: 600, sortOrder: 2 }),
+      budgetPosition({ id: 'bp4', name: 'Steuerrückstellung', amount: 800, sortOrder: 3 }),
+      budgetPosition({ id: 'bp5', name: 'Arbeitskosten', amount: 230, sortOrder: 4 }),
+    ],
     fixedCostsPerMonth: 314.55,
     available: 1924.35,
     ...overrides,

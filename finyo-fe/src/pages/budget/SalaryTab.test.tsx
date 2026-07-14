@@ -208,7 +208,7 @@ describe('SalaryTab', () => {
     ).toBeInTheDocument();
   });
 
-  it('applies the net salary to the monthly budget preserving the other fields', async () => {
+  it('applies the net salary as the monthly budget net income', async () => {
     const user = userEvent.setup();
     const { queryClient } = renderWithProviders(<SalaryTab />);
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -222,11 +222,6 @@ describe('SalaryTab', () => {
     await waitFor(() =>
       expect(budgetApi.updateMonthlyBudget).toHaveBeenCalledWith('test-token', {
         netIncome: 5284.1,
-        savings: 800,
-        investing: 600,
-        pillar3a: 600,
-        taxReserve: 800,
-        workCosts: 230,
       }),
     );
     await waitFor(() =>
@@ -242,7 +237,6 @@ describe('SalaryTab', () => {
     const applyButton = await screen.findByRole('button', {
       name: 'Apply net as monthly budget income',
     });
-    await waitFor(() => expect(budgetApi.getMonthlyBudget).toHaveBeenCalled());
     expect(applyButton).toBeDisabled();
     expect(screen.queryByText(/Social insurance/)).not.toBeInTheDocument();
   });

@@ -18,7 +18,6 @@ import type {
   Salary, SalaryDeduction, SalaryInput, SalaryInputMode, SalaryResult,
 } from '@/api/salary';
 import { budgetApi } from '@/api/budget';
-import type { MonthlyBudget } from '@/api/budget';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 
 /** Rates keep their configured precision (e.g. 0.455%), unlike the 1-dp totals. */
@@ -464,34 +463,19 @@ function ApplyNetButton({ result }: Readonly<{ result: SalaryResult }>) {
     return () => clearTimeout(timer);
   }, [applied]);
 
-  // The apply action must preserve the five allocation fields of the budget.
-  const monthlyBudget = useQuery({
-    queryKey: ['monthly-budget'],
-    queryFn: () => budgetApi.getMonthlyBudget(token),
-    enabled: !!token,
-  });
-
+  // The budget plan only carries the net income; positions live separately.
   const apply = useMutation({
-    mutationFn: (current: MonthlyBudget) =>
-      budgetApi.updateMonthlyBudget(token, {
-        netIncome: result.netMonthly,
-        savings: current.savings,
-        investing: current.investing,
-        pillar3a: current.pillar3a,
-        taxReserve: current.taxReserve,
-        workCosts: current.workCosts,
-      }),
+    mutationFn: () => budgetApi.updateMonthlyBudget(token, { netIncome: result.netMonthly }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monthly-budget'] });
       setApplied(true);
     },
   });
 
-  const current = monthlyBudget.data;
-  const disabled = !current || apply.isPending || result.grossMonthly === 0;
+  const disabled = apply.isPending || result.grossMonthly === 0;
 
   const handleApply = () => {
-    if (current) apply.mutate(current);
+    apply.mutate();
   };
 
   return (

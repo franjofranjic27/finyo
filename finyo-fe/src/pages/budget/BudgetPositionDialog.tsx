@@ -9,56 +9,75 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/auth/useAuth';
 import { budgetApi } from '@/api/budget';
-import type { MonthlyBudget, MonthlyBudgetInput } from '@/api/budget';
+import type { BudgetPosition, BudgetPositionInput } from '@/api/budget';
 
-interface MonthlyBudgetDialogProps {
-  budget: MonthlyBudget;
+interface BudgetPositionDialogProps {
+  /** `null` creates a new position, otherwise the given one is edited. */
+  position: BudgetPosition | null;
   onClose: () => void;
 }
 
-/** Edit dialog for the net income — mount fresh per open. */
-export function MonthlyBudgetDialog({ budget, onClose }: Readonly<MonthlyBudgetDialogProps>) {
+/** Create/edit dialog for a budget position — mount fresh per open. */
+export function BudgetPositionDialog({ position, onClose }: Readonly<BudgetPositionDialogProps>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
   const queryClient = useQueryClient();
 
-  const [netIncome, setNetIncome] = useState(String(budget.netIncome));
+  const [name, setName] = useState(position?.name ?? '');
+  const [amount, setAmount] = useState(position ? String(position.amount) : '');
 
   const save = useMutation({
-    mutationFn: (data: MonthlyBudgetInput) => budgetApi.updateMonthlyBudget(token, data),
+    mutationFn: (data: BudgetPositionInput) =>
+      position
+        ? budgetApi.updateBudgetPosition(token, position.id, data)
+        : budgetApi.createBudgetPosition(token, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monthly-budget'] });
       onClose();
     },
   });
 
-  const canSubmit = netIncome.trim() !== '';
+  const canSubmit = Boolean(name.trim()) && Boolean(amount);
 
   const handleSave = () => {
-    save.mutate({ netIncome: Number.parseFloat(netIncome) });
+    save.mutate({
+      name: name.trim(),
+      amount: Number.parseFloat(amount),
+    });
   };
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('budget.monthly.editTitle')}</DialogTitle>
+          <DialogTitle>
+            {position
+              ? t('budget.monthly.positionDialogTitleEdit')
+              : t('budget.monthly.positionDialogTitleAdd')}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="monthly-budget-netIncome">{t('budget.monthly.netIncome')}</Label>
+            <Label htmlFor="budget-position-name">{t('budget.monthly.positionName')}</Label>
             <Input
-              id="monthly-budget-netIncome"
+              id="budget-position-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="budget-position-amount">{t('budget.monthly.positionAmount')}</Label>
+            <Input
+              id="budget-position-amount"
               type="number"
               min={0}
               step={0.01}
-              value={netIncome}
-              onChange={(e) => setNetIncome(e.target.value)}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">{t('budget.monthly.netIncomeHint')}</p>
           </div>
-          {/* Server errors, e.g. the RFC-7807 detail on validation failures. */}
+          {/* Server errors, e.g. the RFC-7807 detail on duplicate names. */}
           {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
         </div>
         <DialogFooter>

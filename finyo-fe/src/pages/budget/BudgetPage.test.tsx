@@ -29,6 +29,9 @@ vi.mock('@/api/budget', () => ({
     deleteFixedCost: vi.fn(),
     getMonthlyBudget: vi.fn(),
     updateMonthlyBudget: vi.fn(),
+    createBudgetPosition: vi.fn(),
+    updateBudgetPosition: vi.fn(),
+    deleteBudgetPosition: vi.fn(),
   },
 }));
 
