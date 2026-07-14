@@ -1,6 +1,8 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.marketdata.spi.DataSource;
+import ch.finyo.marketdata.spi.LookupResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,24 +29,37 @@ public class PositionService {
     private final PositionRepository positionRepository;
     private final InstrumentRepository instrumentRepository;
     private final InstrumentService instrumentService;
+    private final InstrumentFactory instrumentFactory;
     private final TransactionTemplate bulkRowTransaction;
+    private final TransactionTemplate singleRowTransaction;
 
     public PositionService(PositionRepository positionRepository,
                            InstrumentRepository instrumentRepository,
                            InstrumentService instrumentService,
+                           InstrumentFactory instrumentFactory,
                            PlatformTransactionManager transactionManager) {
         this.positionRepository = positionRepository;
         this.instrumentRepository = instrumentRepository;
         this.instrumentService = instrumentService;
+        this.instrumentFactory = instrumentFactory;
         // REQUIRES_NEW per bulk row: a failing row rolls back only itself,
         // already imported rows stay committed (fault-tolerant import contract).
         this.bulkRowTransaction = new TransactionTemplate(transactionManager);
         this.bulkRowTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // A template rather than @Transactional on create(): the transaction has to start
+        // *after* the provider lookup, not around it.
+        this.singleRowTransaction = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
+    /**
+     * The provider lookup happens before the transaction opens, on purpose: it is a
+     * network call, and holding a database connection open across it would let a hanging
+     * vendor drain the pool and stall endpoints that have nothing to do with investments.
+     */
     public PositionResponse create(PositionRequest request, String userId) {
-        return doCreate(request, userId);
+        validate(request);
+        LookupResult lookup = instrumentFactory.lookup(request.isin(), request.valor());
+        return singleRowTransaction.execute(_ -> doCreate(request, lookup, userId));
     }
 
     /**
@@ -62,7 +77,9 @@ public class PositionService {
         for (int i = 0; i < rows.size(); i++) {
             PositionRequest row = rows.get(i);
             try {
-                bulkRowTransaction.executeWithoutResult(status -> doCreate(row, userId));
+                validate(row);
+                LookupResult lookup = instrumentFactory.lookup(row.isin(), row.valor());
+                bulkRowTransaction.executeWithoutResult(_ -> doCreate(row, lookup, userId));
                 imported++;
             } catch (RuntimeException e) {
                 log.warn("Bulk import row {} failed for user={}: {}", i + 1, userId, e.getMessage());
@@ -83,12 +100,15 @@ public class PositionService {
         log.info("Deleted position id={} for user={}", id, userId);
     }
 
-    /** Shared create path: runs inside create()'s @Transactional or inside a bulk row transaction. */
-    private PositionResponse doCreate(PositionRequest request, String userId) {
-        validate(request);
+    /**
+     * Shared create path, running inside a transaction. The master-data lookup has already
+     * happened outside it; only the legacy price refresh still does I/O in here, and PR 2
+     * removes it together with SixMarketDataClient.
+     */
+    private PositionResponse doCreate(PositionRequest request, LookupResult lookup, String userId) {
         log.info("Creating position isin={} valor={} for user={}", request.isin(), request.valor(), userId);
 
-        Instrument instrument = resolveOrCreateInstrument(request, userId);
+        Instrument instrument = resolveOrCreateInstrument(request, lookup, userId);
         instrument = instrumentService.refreshPriceFromSix(instrument);
         instrument = applyCurrentPriceOverride(instrument, request.currentPrice());
 
@@ -113,7 +133,7 @@ public class PositionService {
         }
     }
 
-    private Instrument resolveOrCreateInstrument(PositionRequest request, String userId) {
+    private Instrument resolveOrCreateInstrument(PositionRequest request, LookupResult lookup, String userId) {
         Optional<Instrument> existing = Optional.empty();
         if (!isBlank(request.isin())) {
             existing = instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(userId, request.isin());
@@ -121,20 +141,39 @@ public class PositionService {
         if (existing.isEmpty() && !isBlank(request.valor())) {
             existing = instrumentRepository.findFirstByUserIdAndValor(userId, request.valor());
         }
-        return existing.orElseGet(() -> createInstrument(request, userId));
+        return existing
+                .map(instrument -> enrichIfUnresolved(instrument, lookup))
+                .orElseGet(() -> createInstrument(request, lookup, userId));
     }
 
-    private Instrument createInstrument(PositionRequest request, String userId) {
+    /**
+     * An instrument created while the providers were unreachable carries no verified data
+     * at all. Without this it would keep that state forever: the next import finds it by
+     * ISIN and never asks again. So every time we touch one, we try once more.
+     *
+     * Only UNRESOLVED is retried. HEURISTIC is a settled answer — the providers were asked
+     * and none of them knew the security, which is the expected outcome for unlisted 3a
+     * funds and not worth re-asking on every single import.
+     */
+    private Instrument enrichIfUnresolved(Instrument instrument, LookupResult lookup) {
+        if (instrument.getSource() != DataSource.UNRESOLVED) {
+            return instrument;
+        }
+        return instrumentFactory.enrich(instrument, lookup)
+                .map(instrumentRepository::save)
+                .orElse(instrument);
+    }
+
+    /**
+     * Master data now comes from a provider lookup (SIX by ISIN or valor, OpenFIGI as the
+     * licensing-clean fallback) instead of being guessed from the name. When no provider
+     * knows the security — the normal case for unlisted 3a funds — {@link InstrumentFactory}
+     * falls back to the heuristic and labels the result as such.
+     */
+    private Instrument createInstrument(PositionRequest request, LookupResult lookup, String userId) {
         log.info("Auto-creating instrument isin={} valor={} for user={}", request.isin(), request.valor(), userId);
-        return instrumentRepository.save(Instrument.builder()
-                .userId(userId)
-                .name(request.name())
-                .isin(request.isin())
-                .valor(request.valor())
-                .instrumentType(InstrumentType.OTHER)
-                .assetClass(AssetClassifier.classify(request.name(), request.isin()))
-                .sortOrder(0)
-                .build());
+        return instrumentRepository.save(
+                instrumentFactory.create(lookup, request.name(), request.isin(), request.valor(), userId));
     }
 
     /** The manual price is only an override for instruments without any market price. */

@@ -1,5 +1,7 @@
 package ch.finyo.investment;
 
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.spi.DataSource;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -48,6 +50,31 @@ public class Instrument {
     @Column(name = "asset_class", nullable = false, length = 20)
     @Builder.Default
     private AssetClass assetClass = AssetClass.STOCK;
+
+    /**
+     * Trading currency. Until V33 this did not exist, which meant a USD ETF was summed
+     * into the portfolio total as if it were CHF — the total was simply wrong. FX
+     * conversion arrives in PR 4; this column is what makes it possible.
+     *
+     * <b>Nullable, and it has to be.</b> Null means "we do not know" — OpenFIGI publishes
+     * no currency at all, so an instrument resolved through it genuinely has none. A
+     * {@code NOT NULL DEFAULT 'CHF'} would make an unknown currency indistinguishable
+     * from a verified Swiss one and hand PR 4's converter a guess dressed as a fact,
+     * which is the original bug wearing a new hat.
+     */
+    @Column(length = 3)
+    private CurrencyCode currency;
+
+    /**
+     * Where the master data came from — and how much it is worth. MANUAL is the user,
+     * SIX/OPENFIGI are verified, HEURISTIC means nobody knew the security and its asset
+     * class was guessed from the name, UNRESOLVED means the providers could not be
+     * reached and it still needs another attempt.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private DataSource source = DataSource.MANUAL;
 
     /** Total expense ratio in percent, e.g. 0.20 for 0.20 %. */
     @Column(precision = 5, scale = 2)

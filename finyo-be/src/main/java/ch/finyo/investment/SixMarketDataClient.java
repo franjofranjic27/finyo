@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -29,9 +30,24 @@ public class SixMarketDataClient {
                 .build();
     }
 
+    /**
+     * The identifier is user input (ISIN/valor from a position request) and is spliced
+     * into a URL path that carries a Bearer token. A "../" would therefore send that
+     * token to a different path on the SIX host. Whitelisting rather than escaping:
+     * every legitimate ISIN, valor and ticker is alphanumeric.
+     *
+     * The same guard lives in SixQuery for the new adapter. This class is deleted in
+     * PR 2 — until then it runs on every bulk-import row, so it does not get to wait.
+     */
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z0-9]{1,20}$");
+
     @Cacheable(value = CacheConfig.CACHE_MARKET_DATA, key = "#identifier")
     public Optional<MarketDataResponse> fetchByValorOrIsin(String identifier) {
         if (identifier == null || identifier.isBlank()) {
+            return Optional.empty();
+        }
+        if (!SAFE_IDENTIFIER.matcher(identifier).matches()) {
+            log.warn("Refusing SIX lookup for an identifier that is not alphanumeric");
             return Optional.empty();
         }
 
