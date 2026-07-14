@@ -27,6 +27,7 @@ services:
       # mount only the dev realm — finyo-realm.prod.json contains ${FINYO_DOMAIN}
       # placeholders that are invalid URIs without the prod env
       - ./keycloak/finyo-realm.json:/opt/keycloak/data/import/finyo-realm.json:ro
+      - ./keycloak/themes/finyo:/opt/keycloak/themes/finyo:ro
     ports:
       - "8081:8080"
     healthcheck:

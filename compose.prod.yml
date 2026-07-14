@@ -49,6 +49,7 @@ services:
       FINYO_DOMAIN: ${FINYO_DOMAIN}
     volumes:
       - ./keycloak/finyo-realm.prod.json:/opt/keycloak/data/import/finyo-realm.json:ro
+      - ./keycloak/themes/finyo:/opt/keycloak/themes/finyo:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -10,8 +10,12 @@
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
   "accessTokenLifespan": 300,
-  "ssoSessionMaxLifespan": 1800,
+  "ssoSessionIdleTimeout": 1209600,
+  "ssoSessionMaxLifespan": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "offlineSessionMaxLifespanEnabled": false,
+  "loginTheme": "finyo",
   "requiredActions": [],
   "roles": {
     "realm": [

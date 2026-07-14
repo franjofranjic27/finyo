@@ -16,6 +16,19 @@ realm is imported on first start from `keycloak/finyo-realm.prod.json`;
 `${FINYO_DOMAIN}` placeholders in that file are resolved from the
 environment by Keycloak's importer.
 
+> **Realm changes don't reach an existing installation.** `--import-realm`
+> skips realms that already exist, so edits to `finyo-realm.prod.json` only
+> apply to fresh installs. Apply them manually in the admin console
+> (`https://<domain>/auth/admin`) — e.g. for the session/theme settings
+> introduced together with the custom login theme:
+> Realm settings → Sessions → *SSO Session Idle* = 14 days, *SSO Session
+> Max* = 30 days; Realm settings → Tokens → *Revoke Refresh Token* = On,
+> *Refresh Token Max Reuse* = 0; Realm settings → Themes → *Login theme*
+> = `finyo`.
+> The theme files themselves (`keycloak/themes/finyo`) arrive with the
+> checked-out release tag and are volume-mounted; a `compose up -d` after
+> deploy makes the theme selectable.
+
 The frontend image is environment-agnostic: at container start an nginx
 entrypoint script (`finyo-fe/docker/40-runtime-config.sh`) writes
 `/config.js` from `KEYCLOAK_URL` / `KEYCLOAK_CLIENT_ID`, which the app reads
