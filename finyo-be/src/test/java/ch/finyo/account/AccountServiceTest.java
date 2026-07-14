@@ -19,6 +19,7 @@ import static org.mockito.BDDMockito.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.times;
 
 /**
  * Pure unit tests for AccountService.
@@ -397,6 +398,138 @@ class AccountServiceTest {
         assertThatThrownBy(() -> accountService.update(id, invalid, userId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid IBAN");
+    }
+
+    // =========================================================================
+    // bulkUpsert()
+    // =========================================================================
+
+    private static final String VALID_IBAN = "CH9300762011623852957";
+
+    private Account buildAccountWithIban(String userId, String name, String iban) {
+        return Account.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .name(name)
+                .type(AccountType.CHECKING)
+                .currency("CHF")
+                .initialBalance(BigDecimal.ZERO)
+                .iban(iban)
+                .build();
+    }
+
+    private static AccountRequest itemWithIban(String name, String iban) {
+        return new AccountRequest(name, AccountType.CHECKING, "CHF", null, null,
+                iban, null, null, null, null, null);
+    }
+
+    @Test
+    void bulkUpsert_matches_by_iban_and_renames_the_existing_account() {
+        String userId = "user-bulk";
+        Account existing = buildAccountWithIban(userId, "Old Name", VALID_IBAN);
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of(existing));
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(itemWithIban("New Name", "ch93 0076 2011 6238 5295 7"))),
+                userId);
+
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+        then(accountRepository).should().save(argThat(a ->
+                existing.getId().equals(a.getId()) && "New Name".equals(a.getName())));
+    }
+
+    @Test
+    void bulkUpsert_item_with_iban_does_not_fall_back_to_name_matching() {
+        // Same name as an existing IBAN-less account, but the item carries an
+        // unknown IBAN — that must create a new account, not hijack the name match.
+        String userId = "user-bulk";
+        Account existing = buildAccount(UUID.randomUUID(), userId, "Savings");
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of(existing));
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(itemWithIban("Savings", VALID_IBAN))), userId);
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isZero();
+        then(accountRepository).should().save(argThat(a -> a.getId() == null));
+    }
+
+    @Test
+    void bulkUpsert_iban_less_item_matches_by_normalized_name() {
+        String userId = "user-bulk";
+        Account existing = buildAccount(UUID.randomUUID(), userId, "Savings");
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of(existing));
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(
+                        accountRequest("  SAVINGS ", AccountType.SAVINGS, "CHF", null, null))),
+                userId);
+
+        assertThat(result.created()).isZero();
+        assertThat(result.updated()).isEqualTo(1);
+        then(accountRepository).should().save(argThat(a ->
+                existing.getId().equals(a.getId()) && "  SAVINGS ".equals(a.getName())));
+    }
+
+    @Test
+    void bulkUpsert_reports_invalid_iban_row_and_continues_with_the_rest() {
+        String userId = "user-bulk";
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of());
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(
+                        accountRequest("Good", AccountType.CHECKING, "CHF", null, null),
+                        itemWithIban("Broken", "CH9300762011623852958"),
+                        accountRequest("Also Good", AccountType.SAVINGS, "CHF", null, null))),
+                userId);
+
+        assertThat(result.created()).isEqualTo(2);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.errors()).containsExactly("row 2: Invalid IBAN");
+        then(accountRepository).should(times(2)).save(any(Account.class));
+    }
+
+    @Test
+    void bulkUpsert_never_echoes_internals_on_unexpected_persistence_errors() {
+        String userId = "user-bulk";
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of());
+        given(accountRepository.save(any(Account.class)))
+                .willThrow(new RuntimeException("connection to db-host:5432 refused"));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(
+                        accountRequest("Main", AccountType.CHECKING, "CHF", null, null))),
+                userId);
+
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.errors()).containsExactly("row 1: persistence error");
+    }
+
+    @Test
+    void bulkUpsert_later_rows_update_accounts_created_earlier_in_the_batch() {
+        String userId = "user-bulk";
+        given(accountRepository.findByUserIdOrderByNameAsc(userId)).willReturn(List.of());
+        given(accountRepository.save(any(Account.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        AccountBulkResult result = accountService.bulkUpsert(
+                new AccountBulkRequest(List.of(
+                        accountRequest("Main", AccountType.CHECKING, "CHF", null, null),
+                        accountRequest("main", AccountType.SAVINGS, "CHF", null, null))),
+                userId);
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(result.updated()).isEqualTo(1);
     }
 
     // =========================================================================

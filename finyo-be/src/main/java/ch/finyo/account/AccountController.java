@@ -53,6 +53,24 @@ public class AccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(accountService.create(request, userId));
     }
 
+    @PostMapping("/bulk")
+    @Operation(summary = "Bulk import accounts (upsert by IBAN, else by normalized name)",
+            description = "Each item is matched against the user's existing accounts by normalized "
+                    + "IBAN when the item carries one, otherwise by normalized name (trimmed, "
+                    + "lowercased). A match updates that account — an IBAN match may rename it — "
+                    + "otherwise a new account is created. Balances are optional: a missing initial "
+                    + "balance defaults to zero on create and keeps the stored value on update. "
+                    + "Items in the same payload that resolve to the same key update last-wins. "
+                    + "A failing row (e.g. invalid IBAN checksum) is reported in the result without "
+                    + "aborting the batch.")
+    @ApiResponse(responseCode = "200", description = "Import processed; result contains per-row counts and errors")
+    @ApiResponse(responseCode = "400", description = "Payload is empty, exceeds 200 items or contains invalid items")
+    public ResponseEntity<AccountBulkResult> bulkImport(@Valid @RequestBody AccountBulkRequest request) {
+        String userId = userContextProvider.getUserId();
+        log.info("POST /api/v1/accounts/bulk user={} rows={}", userId, request.items().size());
+        return ResponseEntity.ok(accountService.bulkUpsert(request, userId));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update an account")
     @ApiResponse(responseCode = "200", description = "Account updated")

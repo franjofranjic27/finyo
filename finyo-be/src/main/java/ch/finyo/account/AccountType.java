@@ -5,6 +5,8 @@ public enum AccountType {
     SAVINGS,
     CREDIT_CARD,
     INVESTMENT,
+    /** Pillar-3a retirement account. */
+    VORSORGE,
     CASH,
     OTHER
 }
