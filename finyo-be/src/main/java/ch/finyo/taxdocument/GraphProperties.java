@@ -24,4 +24,12 @@ public record GraphProperties(
         String loginBaseUrl,
         String graphBaseUrl,
         long maxFileSizeBytes) {
+
+    /** A record's generated toString() would print the client secret. One stray log line is enough. */
+    @Override
+    public String toString() {
+        return "GraphProperties[enabled=%s, tenantId=%s, clientId=%s, clientSecret=***, loginBaseUrl=%s, "
+                .formatted(enabled, tenantId, clientId, loginBaseUrl)
+                + "graphBaseUrl=%s, maxFileSizeBytes=%s]".formatted(graphBaseUrl, maxFileSizeBytes);
+    }
 }

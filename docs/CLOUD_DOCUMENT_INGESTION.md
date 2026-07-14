@@ -144,6 +144,8 @@ Only when **all** of these hold:
 1. The folder type and the detected type agree.
 2. The folder year and the year named in the document agree.
 3. The target field in the tax year is still empty.
+4. The tax year is still `OPEN` — a filed or assessed year is never touched by a
+   background job.
 
 Otherwise the document goes to the inbox as `NEEDS_REVIEW` and waits for you.
 
@@ -161,6 +163,22 @@ of automation permanently. The folder — which you maintain deliberately — is
 better signal.
 
 ---
+
+## The library's access list is now a security boundary
+
+Anyone who can **write** into the watched folder can put a document in front of the
+importer. The guards above (folder/type/year must agree, empty fields only, an
+already filed year is left alone) keep that from quietly rewriting an existing
+figure — but the first document of a fresh year lands in an empty field, and that
+is exactly the case auto-apply is built for.
+
+So: keep the library private, and do not hand out edit rights or sharing links to it
+casually. Read-only sharing is fine. If several people share one library, give each
+their own source folder — the folder scope is enforced on folder boundaries, so
+`/Steuern/Anna` never picks up `/Steuern/Anna2`.
+
+A source always belongs to the admin who registers it; there is no way to point one
+at another user's tax year through the API.
 
 ## Operating it
 

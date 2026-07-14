@@ -107,6 +107,15 @@ public class TaxYearService {
                         .year(year)
                         .status(TaxYearStatus.OPEN)
                         .build());
+
+        // A year that is already filed or assessed is closed to automation: nobody
+        // wants a background job editing a return that has been submitted. The user
+        // can still apply a document to it deliberately.
+        if (!overwrite && taxYear.getId() != null && taxYear.getStatus() != TaxYearStatus.OPEN) {
+            log.info("Tax year={} for user={} is {}, leaving it to the user", year, userId, taxYear.getStatus());
+            return new FieldApplyResult(List.of(), List.copyOf(byTargetField.keySet()));
+        }
+
         TaxYear.TaxYearBuilder<?, ?> builder = taxYear.toBuilder();
 
         List<String> applied = new ArrayList<>();

@@ -4,17 +4,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Microsoft Graph implementation of {@link RemoteDrive}.
@@ -39,6 +44,17 @@ public class GraphRemoteDrive implements RemoteDrive {
     private static final String DELTA_FIELDS =
             "id,name,size,cTag,file,folder,deleted,parentReference,@microsoft.graph.downloadUrl";
 
+    /** Content is served from SharePoint/OneDrive storage hosts, not from the Graph host. */
+    private static final List<String> DOWNLOAD_HOST_SUFFIXES =
+            List.of(".sharepoint.com", ".sharepointonline.com", ".onedrive.com", ".live.com");
+
+    /** A hanging call must not pin a request thread forever. */
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(60);
+
+    /** Backstop against a pathological or cyclic delta feed. */
+    private static final int MAX_PAGES_PER_RUN = 200;
+
     private final RestClient graphClient;
 
     /** Deliberately carries no Authorization header — see the class comment. */
@@ -46,15 +62,47 @@ public class GraphRemoteDrive implements RemoteDrive {
 
     private final GraphTokenProvider tokenProvider;
     private final GraphProperties properties;
+    private final String graphHost;
 
     public GraphRemoteDrive(GraphTokenProvider tokenProvider, GraphProperties properties) {
         this.tokenProvider = tokenProvider;
         this.properties = properties;
+        this.graphHost = URI.create(properties.graphBaseUrl()).getHost();
         this.graphClient = RestClient.builder()
+                .requestFactory(timeoutingRequestFactory())
                 .baseUrl(properties.graphBaseUrl())
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .build();
-        this.downloadClient = RestClient.builder().build();
+        this.downloadClient = RestClient.builder()
+                .requestFactory(timeoutingRequestFactory())
+                .build();
+    }
+
+    /** A hanging Graph call must not pin a thread indefinitely. */
+    private static JdkClientHttpRequestFactory timeoutingRequestFactory() {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+        factory.setReadTimeout(READ_TIMEOUT);
+        return factory;
+    }
+
+    /**
+     * Both the delta cursor and the download URL are absolute URLs that we replay
+     * from data rather than construct. Pinning the host keeps a tampered cursor
+     * from redirecting a bearer token — or an unauthenticated fetch — at an
+     * arbitrary target.
+     */
+    private void requireTrustedHost(String url, List<String> allowedSuffixes) {
+        URI uri = URI.create(url);
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        // The configured Graph host is trusted as configured (in production that
+        // config is https). Anything else must be https on a known storage host.
+        boolean trusted = host.equalsIgnoreCase(graphHost)
+                || ("https".equalsIgnoreCase(uri.getScheme())
+                    && allowedSuffixes.stream().anyMatch(host::endsWith));
+        if (!trusted) {
+            throw new RemoteDriveException("The drive returned a URL on an untrusted host", null);
+        }
     }
 
     @Override
@@ -81,17 +129,26 @@ public class GraphRemoteDrive implements RemoteDrive {
     public byte[] download(RemoteDocument document) {
         String url = document.downloadUrl();
         if (url == null) {
-            throw new IllegalArgumentException("Document has no download URL: " + document.itemId());
+            throw new IllegalArgumentException("The drive returned no download URL for this file");
         }
-        if (document.size() > properties.maxFileSizeBytes()) {
+        // A missing size must not slip past the cap as "0 bytes".
+        if (document.size() <= 0 || document.size() > properties.maxFileSizeBytes()) {
             throw new IllegalArgumentException(
-                    "File exceeds the maximum ingestion size: " + document.size() + " bytes");
+                    "File exceeds the maximum ingestion size or reports no size at all");
         }
-        byte[] content = downloadClient.get()
-                .uri(URI.create(url))
-                .retrieve()
-                .body(byte[].class);
-        return content == null ? new byte[0] : content;
+        requireTrustedHost(url, DOWNLOAD_HOST_SUFFIXES);
+        try {
+            byte[] content = downloadClient.get()
+                    .uri(URI.create(url))
+                    .retrieve()
+                    .body(byte[].class);
+            return content == null ? new byte[0] : content;
+        } catch (RestClientException e) {
+            // Never surface the message: it embeds the full pre-authenticated
+            // download URL, which grants unauthenticated access to the document
+            // for about an hour. It would end up in logs and in failure_reason.
+            throw new RemoteDriveException("Downloading the file from the drive failed", e);
+        }
     }
 
     /**
@@ -99,6 +156,7 @@ public class GraphRemoteDrive implements RemoteDrive {
      * we can retry — the caller has to enumerate from scratch.
      */
     private String getWithToken(String absoluteUrl) {
+        requireTrustedHost(absoluteUrl, List.of());
         return executeWithRetry(() -> graphClient.get()
                 .uri(URI.create(absoluteUrl))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
@@ -126,11 +184,20 @@ public class GraphRemoteDrive implements RemoteDrive {
                 throw new DeltaResyncRequiredException("Delta cursor expired, a full resync is required");
             }
             if (e.getStatusCode() != HttpStatus.UNAUTHORIZED) {
-                throw e;
+                throw new RemoteDriveException("The drive rejected the request (HTTP %s)"
+                        .formatted(e.getStatusCode().value()), e);
             }
             log.info("Graph returned 401, refreshing the access token and retrying once");
             tokenProvider.invalidate();
-            return call.get();
+            try {
+                return call.get();
+            } catch (RestClientException retryFailure) {
+                throw new RemoteDriveException("The drive rejected the request after a token refresh", retryFailure);
+            }
+        } catch (RestClientException e) {
+            // The client's own message embeds the full request URL — for a delta
+            // cursor that is a credential-bearing URL. Never let it escape.
+            throw new RemoteDriveException("The drive could not be reached", e);
         }
     }
 

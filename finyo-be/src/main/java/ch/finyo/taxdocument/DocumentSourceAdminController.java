@@ -45,10 +45,10 @@ public class DocumentSourceAdminController {
     }
 
     @PostMapping
-    @Operation(summary = "Register a cloud folder to ingest from")
+    @Operation(summary = "Register a cloud folder to ingest from (owned by the calling admin)")
     public ResponseEntity<DocumentSourceResponse> create(@Valid @RequestBody DocumentSourceRequest request) {
-        String userId = request.userId() == null ? userContextProvider.getUserId() : request.userId();
-        log.info("POST /api/v1/admin/document-sources drive={} folder={} for user={}",
+        String userId = userContextProvider.getUserId();
+        log.info("POST /api/v1/admin/document-sources drive={} folder={} user={}",
                 request.driveId(), request.rootFolderPath(), userId);
 
         DocumentSource saved = documentSourceRepository.save(DocumentSource.builder()

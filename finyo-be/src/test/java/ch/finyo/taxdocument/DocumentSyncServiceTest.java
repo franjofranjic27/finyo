@@ -11,7 +11,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -195,7 +194,7 @@ class DocumentSyncServiceTest {
     @Test
     void keepsADocumentPendingWhenTheDriveIsUnreachable() {
         givenDriveReturns(item("/Steuern/STE-2025/Lohnausweise", "lohnausweis.pdf"));
-        given(remoteDrive.download(any())).willThrow(new RestClientException("503 Service Unavailable"));
+        given(remoteDrive.download(any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
 
         DocumentSyncService.SyncResult result = service.syncAllEnabled();
 
@@ -218,7 +217,7 @@ class DocumentSyncServiceTest {
                         .status(DocumentStatus.DISCOVERED)
                         .attemptCount(4)
                         .build()));
-        given(remoteDrive.download(any())).willThrow(new RestClientException("503 Service Unavailable"));
+        given(remoteDrive.download(any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
 
         DocumentSyncService.SyncResult result = service.syncAllEnabled();
 

@@ -42,6 +42,9 @@ public class DocumentSyncService {
     /** A lease older than this belongs to a run that died; it may be taken over. */
     private static final Duration ABANDONED_LEASE_AFTER = Duration.ofMinutes(30);
 
+    /** Backstop against a pathological or cyclic delta feed. */
+    private static final int MAX_PAGES_PER_RUN = 200;
+
     private final DocumentSourceRepository sourceRepository;
     private final DocumentRepository documentRepository;
     private final TaxDocumentService taxDocumentService;
@@ -98,6 +101,7 @@ public class DocumentSyncService {
         SyncResult result = SyncResult.empty();
         String next = cursor;
         String finalCursor = null;
+        int pages = 0;
         do {
             DeltaPage page = drive.listChanges(source.getDriveId(), next);
             for (RemoteDocument item : page.items()) {
@@ -105,6 +109,12 @@ public class DocumentSyncService {
             }
             next = page.nextLink();
             finalCursor = page.deltaLink();
+            if (++pages >= MAX_PAGES_PER_RUN && next != null) {
+                // Stop rather than spin on a pathological feed. The cursor stays
+                // unwritten, so the next run picks the enumeration up again.
+                log.warn("Source={} still had pages after {}, stopping this run", source.getId(), MAX_PAGES_PER_RUN);
+                return result;
+            }
         } while (next != null);
 
         // Only now, with every page processed, is the cursor safe to keep.
@@ -162,7 +172,7 @@ public class DocumentSyncService {
             byte[] content = drive.download(item);
             DocumentAnalysis analysis = taxDocumentService.analyze(content);
             return applyAnalysis(source, item, builder, analysis);
-        } catch (DocumentBusyException | RestClientException e) {
+        } catch (DocumentBusyException | RemoteDriveException e) {
             // Transient: the same bytes will parse on a later run. Only give up
             // after repeated failures, and never mark the document failed for a
             // busy parse slot or a flaky network.
@@ -174,7 +184,7 @@ public class DocumentSyncService {
                     .attemptCount(attempt)
                     .build());
             log.warn("Transient failure on document {} (attempt {}/{}): {}",
-                    item.filename(), attempt, MAX_ATTEMPTS, e.getMessage());
+                    item.itemId(), attempt, MAX_ATTEMPTS, e.getMessage());
             return exhausted ? SyncResult.of(0, 0, 1) : SyncResult.empty();
         } catch (DocumentProcessingException | IllegalArgumentException e) {
             // Permanent: a scan without OCR, an encrypted or corrupt file, or one
@@ -185,7 +195,7 @@ public class DocumentSyncService {
                     .failureReason(e.getMessage())
                     .attemptCount(attempts)
                     .build());
-            log.info("Document {} cannot be processed: {}", item.filename(), e.getMessage());
+            log.info("Document {} cannot be processed: {}", item.itemId(), e.getMessage());
             return SyncResult.of(0, 0, 1);
         }
     }
@@ -266,7 +276,7 @@ public class DocumentSyncService {
             return;
         }
         documentRepository.save(document.toBuilder().sourceDeletedAt(OffsetDateTime.now(ZoneOffset.UTC)).build());
-        log.info("Document {} was deleted in the drive; keeping it as an audit trail", document.getFilename());
+        log.info("Document {} was deleted in the drive; keeping it as an audit trail", document.getId());
     }
 
     /**
@@ -288,10 +298,24 @@ public class DocumentSyncService {
                 .build());
     }
 
+    /**
+     * Graph's delta feed returns the whole drive and cannot filter by path, so this
+     * check is the only thing keeping a source inside its folder — and, on a shared
+     * drive, the only thing keeping one user's documents out of another's inbox.
+     *
+     * <p>It therefore matches on a folder boundary, not on a raw prefix: plain
+     * {@code startsWith} would let the source {@code /Steuern/Anna} swallow
+     * everything under {@code /Steuern/Anna2}. SharePoint paths are
+     * case-insensitive, so the comparison is too.
+     */
     private boolean isInsideRootFolder(DocumentSource source, RemoteDocument item) {
-        // Graph's delta feed returns the whole drive and cannot filter by path,
-        // so the folder scope is enforced here.
-        return item.path().startsWith(source.getRootFolderPath());
+        String root = stripTrailingSlash(source.getRootFolderPath()).toLowerCase(Locale.ROOT);
+        String path = stripTrailingSlash(item.path()).toLowerCase(Locale.ROOT);
+        return root.isEmpty() || path.equals(root) || path.startsWith(root + "/");
+    }
+
+    private static String stripTrailingSlash(String path) {
+        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
     }
 
     private static boolean isPdf(String filename) {
