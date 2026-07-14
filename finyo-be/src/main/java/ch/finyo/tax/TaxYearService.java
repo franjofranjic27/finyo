@@ -4,12 +4,15 @@ import ch.finyo.common.ResourceNotFoundException;
 import ch.finyo.common.SwissTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -73,6 +76,97 @@ public class TaxYearService {
 
         TaxYear saved = taxYearRepository.save(builder.build());
         return toDetail(saved, userId);
+    }
+
+    /**
+     * Applies individual fields extracted from a document, merging into whatever
+     * the tax year already holds.
+     *
+     * <p>Deliberately not routed through {@link #upsert}: that one is a full
+     * replace (every input field is written unconditionally, so an absent value
+     * nulls the column). Feeding it a payload built from a single document would
+     * wipe every other field of the year.
+     *
+     * <p>With {@code overwrite = false} — the automated path — a field is only
+     * written when it is still empty. A stored value that differs from the
+     * extracted one is never silently replaced; it is reported as a conflict so
+     * the user can decide. Values that already match are a no-op, which keeps
+     * re-processing the same document idempotent.
+     *
+     * <p>Creates the tax year if it does not exist yet: the first document of a
+     * new year would otherwise have nowhere to go.
+     */
+    @Transactional
+    public FieldApplyResult applyExtractedFields(String userId,
+                                                 int year,
+                                                 Map<String, BigDecimal> byTargetField,
+                                                 boolean overwrite) {
+        TaxYear taxYear = taxYearRepository.findByUserIdAndYear(userId, year)
+                .orElseGet(() -> TaxYear.builder()
+                        .userId(userId)
+                        .year(year)
+                        .status(TaxYearStatus.OPEN)
+                        .build());
+        TaxYear.TaxYearBuilder<?, ?> builder = taxYear.toBuilder();
+
+        List<String> applied = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : byTargetField.entrySet()) {
+            String targetField = entry.getKey();
+            BigDecimal incoming = entry.getValue();
+            if (incoming == null) {
+                continue;
+            }
+            BigDecimal current = currentValue(taxYear, targetField);
+            // compareTo, not equals: BigDecimal.equals is scale-sensitive, so
+            // 52592.0 and 52592.00 would look like a conflict.
+            boolean unchanged = current != null && current.compareTo(incoming) == 0;
+            if (unchanged) {
+                applied.add(targetField);
+            } else if (current != null && !overwrite) {
+                skipped.add(targetField);
+            } else {
+                applyValue(builder, targetField, incoming);
+                applied.add(targetField);
+            }
+        }
+
+        boolean isNew = taxYear.getId() == null;
+        if (isNew || !applied.isEmpty()) {
+            taxYearRepository.save(builder.build());
+        }
+        log.info("Applied extracted fields to tax year={} for user={}: applied={} skipped={} overwrite={}",
+                year, userId, applied, skipped, overwrite);
+        return new FieldApplyResult(applied, skipped);
+    }
+
+    /**
+     * Explicit mapping over the target field names the extractors emit — no
+     * reflection, so an unknown name fails loudly at the seam instead of
+     * silently doing nothing.
+     */
+    private static @Nullable BigDecimal currentValue(TaxYear taxYear, String targetField) {
+        return switch (targetField) {
+            case "grossEmploymentIncome" -> taxYear.getGrossEmploymentIncome();
+            case "investmentIncome" -> taxYear.getInvestmentIncome();
+            case "deductionInsurancePremiums" -> taxYear.getDeductionInsurancePremiums();
+            case "pillar3aContribution" -> taxYear.getPillar3aContribution();
+            case "netWealth" -> taxYear.getNetWealth();
+            case "assessedAmount" -> taxYear.getAssessedAmount();
+            default -> throw new IllegalArgumentException("Unsupported target field: " + targetField);
+        };
+    }
+
+    private static void applyValue(TaxYear.TaxYearBuilder<?, ?> builder, String targetField, BigDecimal value) {
+        switch (targetField) {
+            case "grossEmploymentIncome" -> builder.grossEmploymentIncome(value);
+            case "investmentIncome" -> builder.investmentIncome(value);
+            case "deductionInsurancePremiums" -> builder.deductionInsurancePremiums(value);
+            case "pillar3aContribution" -> builder.pillar3aContribution(value);
+            case "netWealth" -> builder.netWealth(value);
+            case "assessedAmount" -> builder.assessedAmount(value);
+            default -> throw new IllegalArgumentException("Unsupported target field: " + targetField);
+        }
     }
 
     @Transactional
