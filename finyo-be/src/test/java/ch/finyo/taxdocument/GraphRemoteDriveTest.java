@@ -162,6 +162,53 @@ class GraphRemoteDriveTest {
                 .hasMessageContaining("maximum ingestion size");
     }
 
+    /** A missing size arrives as 0 and would otherwise sail straight past the cap. */
+    @Test
+    void refusesToDownloadAFileThatReportsNoSize() {
+        RemoteDocument unsized = new RemoteDocument(
+                "item-1", "unbekannt.pdf", "/Steuern", "ctag-1", 0L, "http://127.0.0.1/blob", false);
+
+        assertThatThrownBy(() -> drive.download(unsized))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no size");
+    }
+
+    /**
+     * The download URL is replayed from a payload, not constructed by us. Pinning the
+     * host stops a tampered delta response from turning the fetch into a request at
+     * an arbitrary target.
+     */
+    @Test
+    void refusesADownloadUrlOnAnUntrustedHost() {
+        RemoteDocument evil = new RemoteDocument(
+                "item-1", "lohnausweis.pdf", "/Steuern", "ctag-1", 100,
+                "https://attacker.example/steal", false);
+
+        assertThatThrownBy(() -> drive.download(evil))
+                .isInstanceOf(RemoteDriveException.class)
+                .hasMessageContaining("untrusted host");
+    }
+
+    /** Same reasoning for the stored cursor, which is followed *with* the bearer token. */
+    @Test
+    void refusesACursorOnAnUntrustedHost() {
+        assertThatThrownBy(() -> drive.listChanges("drive-1", "https://attacker.example/delta"))
+                .isInstanceOf(RemoteDriveException.class)
+                .hasMessageContaining("untrusted host");
+    }
+
+    /** Graph's own error text embeds the request URL — which for a download is a credential. */
+    @Test
+    void doesNotLeakTheUnderlyingUrlWhenTheDriveFails() {
+        deltaStatus = 503;
+        deltaResponse = "{\"error\":{\"code\":\"serviceNotAvailable\"}}";
+
+        assertThatThrownBy(() -> drive.listChanges("drive-1", null))
+                .isInstanceOf(RemoteDriveException.class)
+                .hasMessageNotContaining("127.0.0.1")
+                .hasMessageNotContaining("delta");
+    }
+
     @Test
     void reusesTheCachedTokenAcrossCalls() {
         deltaResponse = """

@@ -711,4 +711,35 @@ class TaxYearServiceTest {
         assertThat(result.skipped()).isEmpty();
         then(taxYearRepository).should(never()).save(any());
     }
+
+    /** No background job edits a return that has already been submitted. */
+    @Test
+    void doesNotAutomaticallyTouchAYearThatIsNoLongerOpen() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields().toBuilder()
+                        .status(TaxYearStatus.FILED)
+                        .build()));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.applied()).isEmpty();
+        assertThat(result.skipped()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should(never()).save(any());
+    }
+
+    /** The user may still apply a document to a filed year deliberately. */
+    @Test
+    void stillAppliesToAFiledYearWhenTheUserAsksForIt() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields().toBuilder()
+                        .status(TaxYearStatus.FILED)
+                        .build()));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), true);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should().save(any());
+    }
 }

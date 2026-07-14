@@ -304,6 +304,39 @@ class DocumentSyncServiceTest {
         assertThat(saved.getFailureReason()).isNull();
     }
 
+    /**
+     * The folder scope is the only thing separating two sources on one drive — the
+     * delta feed always returns the whole thing. A plain prefix match would let the
+     * source /Steuern/Anna swallow every document under /Steuern/Anna2, store them
+     * under the wrong user and auto-apply them into the wrong tax return.
+     */
+    @Test
+    void doesNotTreatASiblingFolderWithASharedPrefixAsInside() {
+        given(sourceRepository.findByEnabledTrue()).willReturn(List.of(source()));
+        given(remoteDrive.listChanges(anyString(), any())).willReturn(new DeltaPage(
+                List.of(item("/SteuernAnderer/STE-2025/Lohnausweise", "fremd.pdf")),
+                null,
+                "delta-1"));
+
+        service.syncAllEnabled();
+
+        verify(remoteDrive, never()).download(any());
+        verify(documentRepository, never()).save(any());
+    }
+
+    /** SharePoint paths are case-insensitive; the scope check must be too. */
+    @Test
+    void matchesTheRootFolderRegardlessOfCase() {
+        givenDriveReturns(item("/steuern/STE-2025/Lohnausweise", "lohnausweis.pdf"));
+        givenAnalysis(TaxDocumentType.SALARY_CERTIFICATE, 2025);
+        given(taxYearService.applyExtractedFields(anyString(), anyInt(), anyMap(), eq(false)))
+                .willReturn(new FieldApplyResult(List.of("grossEmploymentIncome"), List.of()));
+
+        service.syncAllEnabled();
+
+        assertThat(savedDocument().getStatus()).isEqualTo(DocumentStatus.AUTO_APPLIED);
+    }
+
     @Test
     void ignoresFilesOutsideTheConfiguredFolderAndNonPdfs() {
         given(sourceRepository.findByEnabledTrue()).willReturn(List.of(source()));
