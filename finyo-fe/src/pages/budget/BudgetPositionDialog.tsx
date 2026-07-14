@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { SaveDialogFooter } from '@/components/SaveDialogFooter';
 import { useAuth } from '@/auth/useAuth';
 import { budgetApi } from '@/api/budget';
 import type { BudgetPosition, BudgetPositionInput } from '@/api/budget';
@@ -80,14 +80,12 @@ export function BudgetPositionDialog({ position, onClose }: Readonly<BudgetPosit
           {/* Server errors, e.g. the RFC-7807 detail on duplicate names. */}
           {save.error && <p className="text-sm text-destructive">{save.error.message}</p>}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSave} disabled={!canSubmit || save.isPending}>
-            {save.isPending ? t('common.loading') : t('common.save')}
-          </Button>
-        </DialogFooter>
+        <SaveDialogFooter
+          onClose={onClose}
+          onSave={handleSave}
+          canSubmit={canSubmit}
+          pending={save.isPending}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Upload, X } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CsvImportButton } from '@/components/CsvImportButton';
 import { useAuth } from '@/auth/useAuth';
 import { budgetApi } from '@/api/budget';
-import type { FixedCost, FixedCostInput, FixedCostList, PaymentInterval } from '@/api/budget';
+import type { FixedCost, FixedCostList, PaymentInterval } from '@/api/budget';
 import { formatCHF } from '@/lib/formatters';
 import { FixedCostDialog } from './FixedCostDialog';
 import { parseFixedCostsCsv } from './fixedCostsCsv';
@@ -73,85 +74,6 @@ function FixedCostRow({ item, onEdit, onDelete, deleting }: Readonly<{
   );
 }
 
-function CsvImportButton() {
-  const { t } = useTranslation();
-  const { accessToken } = useAuth();
-  const token = accessToken ?? '';
-  const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const [summary, setSummary] = useState<string | null>(null);
-  const [rowErrors, setRowErrors] = useState<string[]>([]);
-
-  const importFixedCosts = useMutation({
-    mutationFn: (items: FixedCostInput[]) => budgetApi.importFixedCosts(token, items),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['fixed-costs'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-budget'] });
-      setSummary(t('budget.fixedCosts.csvResult', {
-        created: result.created,
-        updated: result.updated,
-        failed: result.failed,
-      }));
-      setRowErrors(result.errors);
-    },
-  });
-
-  const importFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const items = parseFixedCostsCsv(String(reader.result ?? ''));
-      setRowErrors([]);
-      if (items.length === 0) {
-        setSummary(t('budget.fixedCosts.csvNoRows'));
-        return;
-      }
-      setSummary(null);
-      importFixedCosts.mutate(items);
-    };
-    reader.readAsText(file);
-  };
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="sr-only"
-        aria-label={t('budget.fixedCosts.csvImport')}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) importFile(file);
-          // Allow re-importing the same file after a fix.
-          e.target.value = '';
-        }}
-      />
-      <Button
-        variant="ghost"
-        size="sm"
-        title={t('budget.fixedCosts.csvHint')}
-        onClick={() => inputRef.current?.click()}
-        disabled={importFixedCosts.isPending}
-      >
-        <Upload className="mr-1 h-4 w-4" />
-        {importFixedCosts.isPending ? t('common.loading') : t('budget.fixedCosts.csvImport')}
-      </Button>
-      {summary && <p className="text-xs text-muted-foreground">{summary}</p>}
-      {importFixedCosts.error && (
-        <p className="text-xs text-destructive">{importFixedCosts.error.message}</p>
-      )}
-      {rowErrors.length > 0 && (
-        <ul className="text-xs text-destructive">
-          {rowErrors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 export function FixedCostsCard({ list }: Readonly<{ list: FixedCostList }>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -183,7 +105,12 @@ export function FixedCostsCard({ list }: Readonly<{ list: FixedCostList }>) {
           <p className="mt-1 text-xs text-muted-foreground">{t('budget.fixedCosts.subtitle')}</p>
         </div>
         <div className="flex items-start gap-1">
-          <CsvImportButton />
+          <CsvImportButton
+            i18nPrefix="budget.fixedCosts"
+            parse={parseFixedCostsCsv}
+            importItems={budgetApi.importFixedCosts}
+            invalidateKeys={[['fixed-costs'], ['monthly-budget']]}
+          />
           <Button variant="ghost" size="sm" onClick={() => setDialog({ item: null })}>
             <Plus className="mr-1 h-4 w-4" />
             {t('budget.fixedCosts.add')}
