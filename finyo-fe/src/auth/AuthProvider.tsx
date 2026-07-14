@@ -1,4 +1,5 @@
 import React from 'react';
+import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
 import { getRuntimeConfig } from '../runtime-config';
 
@@ -14,6 +15,9 @@ const oidcConfig = {
   post_logout_redirect_uri: globalThis.location.origin,
   scope: 'openid profile email',
   automaticSilentRenew: true,
+  // persist the session across tab closes and browser restarts
+  // (oidc-client-ts defaults to sessionStorage)
+  userStore: new WebStorageStateStore({ store: globalThis.localStorage }),
   // strip ?code=…&state=… from the URL after the redirect from Keycloak
   onSigninCallback: () => {
     globalThis.history.replaceState({}, document.title, globalThis.location.pathname);
