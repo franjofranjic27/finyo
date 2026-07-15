@@ -186,6 +186,11 @@ class InstrumentFactory {
      * absent from it entirely, and anything else comes back as OTHER. There the name
      * heuristic is still better than asserting STOCK, so it gets the last word.
      */
+    /** The asset class a resolved reference would map to — used by the add-position preview. */
+    static AssetClass assetClassFor(SecurityReference reference) {
+        return toAssetClass(reference.type(), reference.name(), reference.isin());
+    }
+
     private static AssetClass toAssetClass(SecurityType type, String name, String isin) {
         return switch (type) {
             case EQUITY -> AssetClass.STOCK;

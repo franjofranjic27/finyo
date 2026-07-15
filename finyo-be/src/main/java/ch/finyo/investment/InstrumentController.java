@@ -33,6 +33,21 @@ public class InstrumentController {
         return ResponseEntity.ok(instrumentService.getAll(userId));
     }
 
+    @GetMapping("/lookup")
+    @Operation(summary = "Preview an instrument by ISIN or valor",
+            description = "Resolves master data (name, ticker, currency, asset class) from the provider "
+                    + "chain without creating anything, for the add-position form's live lookup. "
+                    + "status is FOUND (listed), NOT_FOUND (unknown — e.g. an unlisted 3a fund) or "
+                    + "UNAVAILABLE (providers unreachable).")
+    @ApiResponse(responseCode = "200", description = "Lookup result returned")
+    public ResponseEntity<InstrumentLookupResponse> lookup(@RequestParam(required = false) String isin,
+                                                           @RequestParam(required = false) String valor) {
+        // Read-only market data; no userId needed for the lookup itself, but the endpoint stays
+        // behind the same authentication as the rest of /instruments.
+        log.info("GET /api/v1/instruments/lookup isin={} valor={}", isin, valor);
+        return ResponseEntity.ok(instrumentService.lookup(isin, valor));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get instrument by ID")
     @ApiResponse(responseCode = "200", description = "Instrument found")

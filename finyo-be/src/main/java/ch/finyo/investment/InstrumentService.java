@@ -1,13 +1,13 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SourceResult;
+import ch.finyo.marketdata.spi.SecurityReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +19,26 @@ public class InstrumentService {
     private static final String RESOURCE_NAME = "Instrument";
 
     private final InstrumentRepository instrumentRepository;
+    private final InstrumentFactory instrumentFactory;
+
+    /**
+     * Previews what the providers know about an ISIN or valor, without creating anything, for the
+     * add-position form's live lookup. A read against the provider chain (Postgres-cached), so
+     * repeated keystrokes on the same identifier do not hammer the vendors.
+     */
+    public InstrumentLookupResponse lookup(String isin, String valor) {
+        SourceResult<SecurityReference> result = instrumentFactory.lookup(isin, valor);
+        return switch (result) {
+            case SourceResult.Found<SecurityReference>(SecurityReference ref) -> new InstrumentLookupResponse(
+                    InstrumentLookupResponse.Status.FOUND,
+                    ref.name(),
+                    ref.ticker(),
+                    ref.currency() == null ? null : ref.currency().value(),
+                    InstrumentFactory.assetClassFor(ref));
+            case SourceResult.NotFound<SecurityReference> _ -> InstrumentLookupResponse.notFound();
+            case SourceResult.Unavailable<SecurityReference> _ -> InstrumentLookupResponse.unavailable();
+        };
+    }
 
     public List<InstrumentResponse> getAll(String userId) {
         log.debug("Fetching all instruments for user={}", userId);

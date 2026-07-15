@@ -2,7 +2,10 @@ package ch.finyo.investment;
 
 import ch.finyo.BaseIntegrationTest;
 import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.CachedSecurityReference;
+import ch.finyo.marketdata.SecurityReferenceRepository;
 import ch.finyo.marketdata.spi.DataSource;
+import ch.finyo.marketdata.spi.SecurityType;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,9 +46,13 @@ class InstrumentIT extends BaseIntegrationTest {
     @Autowired
     private InstrumentRepository instrumentRepository;
 
+    @Autowired
+    private SecurityReferenceRepository securityReferenceRepository;
+
     @BeforeEach
     void cleanTable() {
         instrumentRepository.deleteAll();
+        securityReferenceRepository.deleteAll();
     }
 
     private String instrumentBody(String name) {
@@ -184,5 +191,85 @@ class InstrumentIT extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/v1/instruments/{id}", owned.getId()).with(asOtherUser()))
                 .andExpect(status().isNotFound());
+    }
+
+    // =========================================================================
+    // GET /api/v1/instruments/lookup — the add-position preview
+    // =========================================================================
+    //
+    // The test profile runs with reference-providers: [] — no adapter bean exists
+    // and no HTTP call can happen. So the SecurityLookup answers from the Postgres
+    // cache alone: an unknown identifier is a deterministic NOT_FOUND, and a FOUND
+    // result requires a security_reference row to be seeded first. That makes every
+    // case below reproducible without a network.
+
+    @Test
+    void lookup_reports_NOT_FOUND_for_an_identifier_no_provider_and_no_cache_row_knows() throws Exception {
+        mockMvc.perform(get("/api/v1/instruments/lookup").param("isin", "CH9999999999").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("NOT_FOUND")))
+                .andExpect(jsonPath("$.name").doesNotExist())
+                .andExpect(jsonPath("$.currency").doesNotExist())
+                .andExpect(jsonPath("$.assetClass").doesNotExist());
+    }
+
+    @Test
+    void lookup_reports_FOUND_from_the_cache_when_a_reference_row_exists() throws Exception {
+        // A cached reference lets the lookup answer FOUND with no provider in the chain.
+        // The mapped response must carry the master data and the derived asset class.
+        securityReferenceRepository.save(CachedSecurityReference.builder()
+                .isin("IE00B4L5Y983")
+                .valor("24476758")
+                .ticker("SWDA")
+                .name("iShares Core MSCI World")
+                .type(SecurityType.ETF)
+                .currency(new CurrencyCode("USD"))
+                .issuer("BlackRock")
+                .source(DataSource.OPENFIGI)
+                .retrievedAt(OffsetDateTime.of(2026, 7, 14, 10, 30, 0, 0, ZoneOffset.UTC))
+                .build());
+
+        mockMvc.perform(get("/api/v1/instruments/lookup").param("isin", "IE00B4L5Y983").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("FOUND")))
+                .andExpect(jsonPath("$.name", is("iShares Core MSCI World")))
+                .andExpect(jsonPath("$.ticker", is("SWDA")))
+                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.assetClass", is("ETF")));
+    }
+
+    @Test
+    void lookup_reports_NOT_FOUND_when_neither_isin_nor_valor_is_supplied() throws Exception {
+        // No identifier at all — nothing to resolve, so the form gets a clean NOT_FOUND
+        // rather than an error.
+        mockMvc.perform(get("/api/v1/instruments/lookup").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("NOT_FOUND")));
+    }
+
+    @Test
+    void lookup_reports_NOT_FOUND_for_a_malformed_isin_rather_than_a_client_error() throws Exception {
+        // A half-typed ISIN is the normal state of a live-lookup field. InstrumentFactory
+        // swallows the malformed identifier and yields NOT_FOUND, so the form is never
+        // handed a 400/500 mid-keystroke.
+        mockMvc.perform(get("/api/v1/instruments/lookup").param("isin", "abc").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("NOT_FOUND")));
+    }
+
+    @Test
+    void lookup_requires_authentication() throws Exception {
+        mockMvc.perform(get("/api/v1/instruments/lookup").param("isin", "IE00B4L5Y983"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void lookup_is_not_swallowed_by_the_id_path_variable_mapping() throws Exception {
+        // /lookup must be matched by its own handler and not routed to GET /{id} as
+        // getById("lookup") — that would try to parse "lookup" as a UUID and 400. A 200
+        // with a lookup-shaped body proves the static segment wins over the variable one.
+        mockMvc.perform(get("/api/v1/instruments/lookup").param("isin", "CH9999999999").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").exists());
     }
 }
