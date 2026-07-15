@@ -441,7 +441,7 @@ class DocumentInboxIT extends BaseIntegrationTest {
         }
 
         @Override
-        public byte[] download(RemoteDocument document) {
+        public byte[] download(String driveId, RemoteDocument document) {
             downloadCount++;
             return contentByItemId.get(document.itemId());
         }

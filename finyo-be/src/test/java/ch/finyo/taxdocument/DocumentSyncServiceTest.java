@@ -130,7 +130,7 @@ class DocumentSyncServiceTest {
     @Test
     void sendsAnUnrecognizedDocumentToReviewInsteadOfFailingIt() {
         givenDriveReturns(item("/Steuern/STE-2025/Lohnausweise", "raetsel.pdf"));
-        given(remoteDrive.download(any())).willReturn(new byte[]{1});
+        given(remoteDrive.download(any(), any())).willReturn(new byte[]{1});
         given(taxDocumentService.analyze(any()))
                 .willReturn(new DocumentAnalysis(
                         new ClassificationResponse(TaxDocumentType.UNKNOWN, 0.0), null));
@@ -159,7 +159,7 @@ class DocumentSyncServiceTest {
     @Test
     void marksAScanAsPermanentlyFailed() {
         givenDriveReturns(item("/Steuern/STE-2025/Lohnausweise", "scan.pdf"));
-        given(remoteDrive.download(any())).willReturn(new byte[]{1});
+        given(remoteDrive.download(any(), any())).willReturn(new byte[]{1});
         given(taxDocumentService.analyze(any()))
                 .willThrow(new DocumentProcessingException("The PDF contains no extractable text"));
 
@@ -179,7 +179,7 @@ class DocumentSyncServiceTest {
     @Test
     void keepsADocumentPendingWhenTheParserIsBusy() {
         givenDriveReturns(item("/Steuern/STE-2025/Lohnausweise", "lohnausweis.pdf"));
-        given(remoteDrive.download(any())).willReturn(new byte[]{1});
+        given(remoteDrive.download(any(), any())).willReturn(new byte[]{1});
         given(taxDocumentService.analyze(any())).willThrow(new DocumentBusyException("Server is busy"));
 
         DocumentSyncService.SyncResult result = service.syncAllEnabled();
@@ -194,7 +194,7 @@ class DocumentSyncServiceTest {
     @Test
     void keepsADocumentPendingWhenTheDriveIsUnreachable() {
         givenDriveReturns(item("/Steuern/STE-2025/Lohnausweise", "lohnausweis.pdf"));
-        given(remoteDrive.download(any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
+        given(remoteDrive.download(any(), any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
 
         DocumentSyncService.SyncResult result = service.syncAllEnabled();
 
@@ -217,7 +217,7 @@ class DocumentSyncServiceTest {
                         .status(DocumentStatus.DISCOVERED)
                         .attemptCount(4)
                         .build()));
-        given(remoteDrive.download(any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
+        given(remoteDrive.download(any(), any())).willThrow(new RemoteDriveException("The drive could not be reached", null));
 
         DocumentSyncService.SyncResult result = service.syncAllEnabled();
 
@@ -245,7 +245,7 @@ class DocumentSyncServiceTest {
 
         service.syncAllEnabled();
 
-        verify(remoteDrive, never()).download(any());
+        verify(remoteDrive, never()).download(any(), any());
         verify(taxDocumentService, never()).analyze(any());
         verify(documentRepository, never()).save(any());
     }
@@ -320,7 +320,7 @@ class DocumentSyncServiceTest {
 
         service.syncAllEnabled();
 
-        verify(remoteDrive, never()).download(any());
+        verify(remoteDrive, never()).download(any(), any());
         verify(documentRepository, never()).save(any());
     }
 
@@ -347,7 +347,7 @@ class DocumentSyncServiceTest {
 
         service.syncAllEnabled();
 
-        verify(remoteDrive, never()).download(any());
+        verify(remoteDrive, never()).download(any(), any());
         verify(documentRepository, never()).save(any());
     }
 
@@ -420,7 +420,7 @@ class DocumentSyncServiceTest {
     }
 
     private void givenAnalysis(TaxDocumentType type, int taxYear) {
-        given(remoteDrive.download(any())).willReturn(new byte[]{1});
+        given(remoteDrive.download(any(), any())).willReturn(new byte[]{1});
         given(taxDocumentService.analyze(any())).willReturn(new DocumentAnalysis(
                 new ClassificationResponse(type, 0.8),
                 new TaxDocumentExtractionResponse<>(

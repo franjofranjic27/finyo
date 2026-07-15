@@ -15,6 +15,6 @@ public interface RemoteDrive {
      */
     DeltaPage listChanges(String driveId, @Nullable String cursor);
 
-    /** Follows the item's pre-authenticated download URL. */
-    byte[] download(RemoteDocument document);
+    /** Fetches the file's content, resolving its download URL if needed. */
+    byte[] download(String driveId, RemoteDocument document);
 }

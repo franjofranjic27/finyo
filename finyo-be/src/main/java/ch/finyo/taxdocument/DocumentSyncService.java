@@ -169,7 +169,7 @@ public class DocumentSyncService {
 
         int attempts = existing == null ? 0 : existing.getAttemptCount();
         try {
-            byte[] content = drive.download(item);
+            byte[] content = drive.download(source.getDriveId(), item);
             DocumentAnalysis analysis = taxDocumentService.analyze(content);
             return applyAnalysis(source, item, builder, analysis);
         } catch (DocumentBusyException | RemoteDriveException e) {

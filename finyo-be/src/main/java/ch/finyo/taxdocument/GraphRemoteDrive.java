@@ -28,10 +28,11 @@ import java.util.Locale;
  * <ul>
  *   <li>The delta feed cannot be filtered by path — it returns the whole drive,
  *       folders and non-PDFs included. Narrowing to a folder happens client-side.
- *   <li>{@code /items/{id}/content} answers 302 with a pre-authenticated storage
- *       URL. Following that redirect while still sending the bearer token makes
- *       the storage backend reject the request, so the download URL is taken from
- *       the delta payload and fetched with a separate, header-less client.
+ *   <li>Downloading a file takes two steps. The delta feed does not carry
+ *       {@code @microsoft.graph.downloadUrl} (and it cannot be {@code $select}ed),
+ *       so the URL is resolved with a per-item metadata GET and then fetched with a
+ *       separate, header-less client — the pre-authenticated storage URL rejects a
+ *       request that still carries the Graph bearer token.
  * </ul>
  */
 @Slf4j
@@ -41,8 +42,10 @@ public class GraphRemoteDrive implements RemoteDrive {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
+    // The download URL is intentionally absent here: Graph never returns it from
+    // delta and silently drops it from $select, so it is resolved per item instead.
     private static final String DELTA_FIELDS =
-            "id,name,size,cTag,file,folder,deleted,parentReference,@microsoft.graph.downloadUrl";
+            "id,name,size,cTag,file,folder,deleted,parentReference";
 
     /** Content is served from SharePoint/OneDrive storage hosts, not from the Graph host. */
     private static final List<String> DOWNLOAD_HOST_SUFFIXES =
@@ -126,15 +129,16 @@ public class GraphRemoteDrive implements RemoteDrive {
     }
 
     @Override
-    public byte[] download(RemoteDocument document) {
-        String url = document.downloadUrl();
-        if (url == null) {
-            throw new IllegalArgumentException("The drive returned no download URL for this file");
-        }
-        // A missing size must not slip past the cap as "0 bytes".
+    public byte[] download(String driveId, RemoteDocument document) {
+        // A missing size must not slip past the cap as "0 bytes". Checked before
+        // resolving the URL, so an oversized file costs no metadata call either.
         if (document.size() <= 0 || document.size() > properties.maxFileSizeBytes()) {
             throw new IllegalArgumentException(
                     "File exceeds the maximum ingestion size or reports no size at all");
+        }
+        String url = document.downloadUrl();
+        if (url == null) {
+            url = resolveDownloadUrl(driveId, document.itemId());
         }
         requireTrustedHost(url, DOWNLOAD_HOST_SUFFIXES);
         try {
@@ -149,6 +153,23 @@ public class GraphRemoteDrive implements RemoteDrive {
             // for about an hour. It would end up in logs and in failure_reason.
             throw new RemoteDriveException("Downloading the file from the drive failed", e);
         }
+    }
+
+    /**
+     * The download URL is a per-item metadata annotation. It is not on the delta
+     * feed and cannot be {@code $select}ed, so a plain item GET (no {@code $select},
+     * which would drop the annotation) is the way to obtain it.
+     */
+    private String resolveDownloadUrl(String driveId, String itemId) {
+        String body = getWithToken(uri -> uri
+                .path("/drives/{driveId}/items/{itemId}")
+                .build(driveId, itemId));
+        JsonNode item = MAPPER.readTree(body == null ? "{}" : body);
+        String url = text(item, "@microsoft.graph.downloadUrl");
+        if (url == null) {
+            throw new RemoteDriveException("The drive returned no download URL for this file", null);
+        }
+        return url;
     }
 
     /**

@@ -54,6 +54,13 @@ class GraphRemoteDriveTest {
             respond(exchange, 200, "%PDF-1.4 payload");
         });
 
+        // Per-item metadata GET that carries the download URL (delta never does).
+        server.createContext("/drives/drive-1/items/item-1", exchange ->
+                respond(exchange, 200, """
+                        {"id":"item-1","name":"lohnausweis.pdf","size":16,
+                         "@microsoft.graph.downloadUrl":"http://127.0.0.1:%d/content/lohnausweis.pdf"}
+                        """.formatted(server.getAddress().getPort())));
+
         server.start();
         String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
         GraphProperties properties = new GraphProperties(
@@ -146,7 +153,22 @@ class GraphRemoteDriveTest {
                 "item-1", "lohnausweis.pdf", "/Steuern", "ctag-1", 16,
                 "http://127.0.0.1:" + server.getAddress().getPort() + "/content/lohnausweis.pdf", false);
 
-        byte[] content = drive.download(document);
+        byte[] content = drive.download("drive-1", document);
+
+        assertThat(new String(content, StandardCharsets.UTF_8)).startsWith("%PDF-");
+        assertThat(downloadAuthHeaders).containsExactly("null");
+    }
+
+    /**
+     * The delta feed omits the download URL, so a record without one triggers a
+     * per-item metadata GET to resolve it before the header-less download.
+     */
+    @Test
+    void resolvesTheDownloadUrlPerItemWhenTheRecordHasNone() {
+        RemoteDocument noUrl = new RemoteDocument(
+                "item-1", "lohnausweis.pdf", "/Steuern", "ctag-1", 16, null, false);
+
+        byte[] content = drive.download("drive-1", noUrl);
 
         assertThat(new String(content, StandardCharsets.UTF_8)).startsWith("%PDF-");
         assertThat(downloadAuthHeaders).containsExactly("null");
@@ -157,7 +179,7 @@ class GraphRemoteDriveTest {
         RemoteDocument huge = new RemoteDocument(
                 "item-1", "huge.pdf", "/Steuern", "ctag-1", 20_000_000L, "http://127.0.0.1/blob", false);
 
-        assertThatThrownBy(() -> drive.download(huge))
+        assertThatThrownBy(() -> drive.download("drive-1", huge))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maximum ingestion size");
     }
@@ -168,7 +190,7 @@ class GraphRemoteDriveTest {
         RemoteDocument unsized = new RemoteDocument(
                 "item-1", "unbekannt.pdf", "/Steuern", "ctag-1", 0L, "http://127.0.0.1/blob", false);
 
-        assertThatThrownBy(() -> drive.download(unsized))
+        assertThatThrownBy(() -> drive.download("drive-1", unsized))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no size");
     }
@@ -184,7 +206,7 @@ class GraphRemoteDriveTest {
                 "item-1", "lohnausweis.pdf", "/Steuern", "ctag-1", 100,
                 "https://attacker.example/steal", false);
 
-        assertThatThrownBy(() -> drive.download(evil))
+        assertThatThrownBy(() -> drive.download("drive-1", evil))
                 .isInstanceOf(RemoteDriveException.class)
                 .hasMessageContaining("untrusted host");
     }
