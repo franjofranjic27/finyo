@@ -1,0 +1,14 @@
+# finyo's Caddy site block — pushed to the platform at /opt/platform/caddy/sites/
+# and applied via `caddy reload`. Auth is NOT routed here: it lives on the shared
+# subdomain auth.frama-maschinenhandel.ch (platform-owned block).
+finyo.frama-maschinenhandel.ch {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy finyo-be:8080
+	}
+
+	handle {
+		reverse_proxy finyo-fe:80
+	}
+}

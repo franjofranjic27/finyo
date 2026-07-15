@@ -1,0 +1,6 @@
+# finyo's Prometheus scrape target — pushed to the platform monitoring stack at
+# /opt/platform/prometheus/targets/ (file-based service discovery). The backend
+# exposes /actuator/prometheus on the shared `edge` network.
+- targets: ["finyo-be:8080"]
+  labels:
+    app: finyo
