@@ -139,7 +139,13 @@
       "csvImport": "CSV importieren",
       "csvHint": "CSV-Format: Name; ISIN; Anzahl; Kaufkurs; Kurs (optional) — Trennzeichen ; oder ,",
       "csvResult": "{{imported}} importiert, {{failed}} fehlgeschlagen",
-      "csvNoRows": "Keine gültigen Zeilen in der Datei gefunden"
+      "csvNoRows": "Keine gültigen Zeilen in der Datei gefunden",
+      "lookup": {
+        "searching": "Wertpapier wird gesucht …",
+        "priceAuto": "Kurs wird automatisch geholt",
+        "notFound": "Kein Marktpapier zu dieser ISIN/Valor gefunden — Name und Kurs manuell eingeben",
+        "unavailable": "Wertpapier-Suche momentan nicht erreichbar — du kannst trotzdem manuell erfassen"
+      }
     },
     "table": {
       "title": "Positionen",

@@ -86,8 +86,31 @@ export interface BulkImportResult {
   errors: string[];
 }
 
+/** Outcome of the add-position live lookup (mirrors the backend enum). */
+export type InstrumentLookupStatus = 'FOUND' | 'NOT_FOUND' | 'UNAVAILABLE';
+
+/**
+ * Preview of an ISIN/valor from the provider chain. `FOUND` = a listed security whose price
+ * comes automatically; `NOT_FOUND` = unknown (e.g. an unlisted 3a fund — enter price by hand);
+ * `UNAVAILABLE` = the providers could not be reached.
+ */
+export interface InstrumentLookup {
+  status: InstrumentLookupStatus;
+  name: string | null;
+  ticker: string | null;
+  currency: string | null;
+  assetClass: AssetClass | null;
+}
+
 export const portfolioApi = {
   getPortfolio: (token: string) => apiRequest<Portfolio>('/portfolio', {}, token),
+
+  lookupInstrument: (token: string, params: { isin?: string; valor?: string }) => {
+    const query = new URLSearchParams();
+    if (params.isin) query.set('isin', params.isin);
+    if (params.valor) query.set('valor', params.valor);
+    return apiRequest<InstrumentLookup>(`/instruments/lookup?${query.toString()}`, {}, token);
+  },
 
   getHistory: (token: string, months: number) =>
     apiRequest<PortfolioHistory>(`/portfolio/history?months=${months}`, {}, token),

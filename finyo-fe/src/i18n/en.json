@@ -139,7 +139,13 @@
       "csvImport": "Import CSV",
       "csvHint": "CSV format: Name; ISIN; Quantity; Purchase price; Price (optional) — delimiter ; or ,",
       "csvResult": "{{imported}} imported, {{failed}} failed",
-      "csvNoRows": "No valid rows found in the file"
+      "csvNoRows": "No valid rows found in the file",
+      "lookup": {
+        "searching": "Looking up the security …",
+        "priceAuto": "price fetched automatically",
+        "notFound": "No listed security for this ISIN/valor — enter name and price by hand",
+        "unavailable": "Security lookup is currently unavailable — you can still enter it manually"
+      }
     },
     "table": {
       "title": "Positions",
