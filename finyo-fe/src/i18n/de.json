@@ -183,6 +183,12 @@
       "range3y": "3J",
       "notEnoughData": "Noch nicht genügend Daten — die Historie wächst mit jedem Portfolio-Abruf"
     },
+    "priceHistory": {
+      "title": "Kursverlauf",
+      "empty": "Noch keine Kursdaten",
+      "axisPrice": "Kurs",
+      "tooltipDate": "Datum"
+    },
     "position": {
       "loadError": "Position konnte nicht geladen werden",
       "stats": {

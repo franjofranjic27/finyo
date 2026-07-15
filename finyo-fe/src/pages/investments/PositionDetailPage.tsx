@@ -16,6 +16,7 @@ import { formatCHF, formatDate, formatPercent, amountColour } from '@/lib/format
 import { EditInstrumentDialog } from './EditInstrumentDialog';
 import { EditPositionDialog } from './EditPositionDialog';
 import { FactsheetCard } from './FactsheetCard';
+import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceSourceBadge } from './PriceSourceBadge';
 
 function StatTile({ label, value, valueClass }: Readonly<{
@@ -202,6 +203,9 @@ export function PositionDetailPage() {
         <ProductInfoCard position={position} onEdit={() => setEditOpen(true)} />
         <FactsheetCard position={position} />
       </div>
+
+      {/* Price history */}
+      <PriceHistoryChart positionId={position.positionId} />
 
       {/* Danger zone */}
       <div className="flex justify-end">

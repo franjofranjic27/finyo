@@ -36,6 +36,21 @@ export interface PositionDetail {
   factsheet: FactsheetInfo | null;
 }
 
+/** A single trading day's closing price. */
+export interface PriceHistoryPoint {
+  /** ISO date (YYYY-MM-DD) the close belongs to. */
+  date: string;
+  close: number;
+}
+
+export interface PriceHistory {
+  isin: string | null;
+  /** Quote currency — null when unknown. Never assume CHF. */
+  currency: string | null;
+  /** Daily closes, oldest first. Empty when the instrument is unlisted or not yet backfilled. */
+  points: PriceHistoryPoint[];
+}
+
 export interface UpdateInstrumentRequest {
   name?: string;
   assetClass?: AssetClass;
@@ -65,6 +80,9 @@ async function throwProblem(response: Response): Promise<never> {
 export const positionDetailApi = {
   getPosition: (token: string, positionId: string) =>
     apiRequest<PositionDetail>(`/positions/${positionId}`, {}, token),
+
+  getPriceHistory: (positionId: string, token: string) =>
+    apiRequest<PriceHistory>(`/positions/${positionId}/price-history`, {}, token),
 
   updatePosition: (token: string, positionId: string, data: UpdatePositionRequest) =>
     apiRequest<PositionDetail>(

@@ -11,7 +11,7 @@ import {
 import { portfolioApi } from '@/api/portfolio';
 import { positionDetailApi } from '@/api/positionDetail';
 import { renderWithProviders } from '@/test/test-utils';
-import { positionDetail } from '@/test/fixtures/portfolio';
+import { positionDetail, priceHistory } from '@/test/fixtures/portfolio';
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -42,6 +42,7 @@ vi.mock('@/api/positionDetail', () => ({
     uploadFactsheet: vi.fn(),
     fetchFactsheet: vi.fn(),
     deleteFactsheet: vi.fn(),
+    getPriceHistory: vi.fn(),
   },
 }));
 
@@ -89,6 +90,7 @@ describe('PositionDetailPage', () => {
     vi.mocked(positionDetailApi.updateInstrument).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.uploadFactsheet).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.deleteFactsheet).mockResolvedValue(undefined);
+    vi.mocked(positionDetailApi.getPriceHistory).mockResolvedValue(priceHistory());
     vi.mocked(portfolioApi.deletePosition).mockResolvedValue(undefined);
   });
 
@@ -115,6 +117,15 @@ describe('PositionDetailPage', () => {
     expect(screen.getByText('60.0%')).toBeInTheDocument();
 
     expect(positionDetailApi.getPosition).toHaveBeenCalledWith('test-token', 'p1');
+  });
+
+  it('renders the price-history chart for the loaded position', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Price history')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(positionDetailApi.getPriceHistory).toHaveBeenCalledWith('p1', 'test-token'),
+    );
   });
 
   it('warns with the trading day when the market price is stale', async () => {

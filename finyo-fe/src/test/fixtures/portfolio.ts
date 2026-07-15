@@ -1,5 +1,5 @@
 import type { Portfolio, PortfolioPosition } from '@/api/portfolio';
-import type { PositionDetail } from '@/api/positionDetail';
+import type { PositionDetail, PriceHistory } from '@/api/positionDetail';
 
 export function portfolioPosition(
   overrides: Partial<PortfolioPosition> & { id: string },
@@ -63,6 +63,19 @@ export function positionDetail(
     portfolioShare: 60,
     factsheetUrl: null,
     factsheet: null,
+    ...overrides,
+  };
+}
+
+export function priceHistory(overrides: Partial<PriceHistory> = {}): PriceHistory {
+  return {
+    isin: 'CH0038863350',
+    currency: 'CHF',
+    points: [
+      { date: '2026-07-08', close: 96.5 },
+      { date: '2026-07-09', close: 98.2 },
+      { date: '2026-07-10', close: 100.0 },
+    ],
     ...overrides,
   };
 }

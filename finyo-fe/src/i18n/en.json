@@ -183,6 +183,12 @@
       "range3y": "3Y",
       "notEnoughData": "Not enough data yet — the history grows with every portfolio view"
     },
+    "priceHistory": {
+      "title": "Price history",
+      "empty": "No price data yet",
+      "axisPrice": "Price",
+      "tooltipDate": "Date"
+    },
     "position": {
       "loadError": "Failed to load the position",
       "stats": {
