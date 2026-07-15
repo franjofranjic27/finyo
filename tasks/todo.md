@@ -388,7 +388,7 @@ Migration **V36**: `transaction.original_amount`, `original_currency`, `fx_rate`
 - [ ] `CsvImportService:182` — hardcodiertes `.currency("CHF")` durch die gemappte Spalte ersetzen
 
 ### PR 6 — ESTV-Stammdaten *(unabhängig von PR 1–5)*
-Migration **V37**: `tax_deduction_limit(tax_year, code, value)`, `source` + `synced_at` auf den
+Migration **V38**: `tax_deduction_limit(tax_year, code, value)`, `source` + `synced_at` auf den
 `tax_*`-Tabellen.
 
 - [ ] `EstvRateExportAdapter` (nur die zwei Export-Endpunkte — kein Budget-Tanz, simpel)
@@ -479,12 +479,14 @@ Bewusst **nicht** in PR 1 gezogen, damit der Scope hält — aber als Aufgabe, n
 - [ ] **Positions-Historisierung** (`position_transaction` statt mutablem Durchschnittspreis) —
       siehe «Nicht in Scope», unverändert gültig.
 
-### ⚠️ Migrationskonflikt
+### ✅ Merge mit main erledigt (2026-07-15)
 
-**V33 ist doppelt vergeben.** Der Branch `worktree-cloud-doc-ingestion` (SharePoint-Import,
-`ch.finyo.taxdocument`) belegt V33 ebenfalls. Beide Branches sind ungemergt, der Konflikt bricht
-also erst beim Merge des zweiten auf. Wer zuerst merged, behält V33; der andere muss auf V34
-umbenennen — und dann verschieben sich die hier geplanten V34–V37 entsprechend.
+`cloud-doc-ingestion` wurde gemergt (V33 = document_tables). Dieser Branch auf main gemergt:
+Migrationen umnummeriert (V34 = security_reference/currency, V35 = instrument_price/sync_run),
+`SchedulingConfig` vereint (ein Scheduler, aktiv bei sync ODER graph, geteilter 2-Thread-Pool),
+`AppConfig` zusammengeführt, ADRs umnummeriert (Ports = ADR-007, Provenienz = ADR-008; main behält
+ADR-006 cloud-doc). 977 Unit + 335 IT + 685 FE grün, Migrationskette V1–V35 gegen frische DB
+verifiziert. **Folge-PRs verschieben sich: FX = V36, camt = V37, ESTV = V38.**
 
 ---
 
