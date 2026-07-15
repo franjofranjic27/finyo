@@ -64,6 +64,23 @@ public class TaxDocumentService {
         return extractor.extract(text);
     }
 
+    /**
+     * Single-parse analysis for batch ingestion: classify, then extract with the
+     * matching extractor. A type that no extractor supports is not an error here
+     * — the document simply carries no extraction and ends up in the review inbox.
+     *
+     * <p>The PDF is parsed exactly once; callers must not classify and extract
+     * separately, since each parse takes one of the scarce parse slots.
+     */
+    public DocumentAnalysis analyze(byte[] pdfBytes) {
+        String text = pdfTextExtractionService.extractText(pdfBytes);
+        ClassificationResponse classification = documentClassifier.classify(text);
+        TaxDocumentExtractor extractor = extractorsByType.get(classification.detectedType());
+        log.info("Document analyzed: type={} confidence={} extractable={}",
+                classification.detectedType(), classification.confidence(), extractor != null);
+        return new DocumentAnalysis(classification, extractor == null ? null : extractor.extract(text));
+    }
+
     private String extractText(MultipartFile file) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");

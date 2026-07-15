@@ -41,3 +41,4 @@ nav:
   - Testing Notes: TESTING_NOTES.md
   - CI/CD Workflows: WORKFLOWS.md
   - Deployment: DEPLOYMENT.md
+  - Cloud Document Ingestion: CLOUD_DOCUMENT_INGESTION.md

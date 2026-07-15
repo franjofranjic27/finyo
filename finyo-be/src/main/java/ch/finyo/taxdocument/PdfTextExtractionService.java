@@ -1,5 +1,6 @@
 package ch.finyo.taxdocument;
 
+import ch.finyo.common.DocumentBusyException;
 import ch.finyo.common.DocumentProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -101,7 +102,7 @@ public class PdfTextExtractionService {
             acquired = false;
         }
         if (!acquired) {
-            throw new DocumentProcessingException(
+            throw new DocumentBusyException(
                     "Server is busy processing other documents, please retry");
         }
     }
