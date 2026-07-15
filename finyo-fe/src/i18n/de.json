@@ -8,6 +8,7 @@
     "budget": "Budget",
     "insurance": "Versicherungen",
     "accounts": "Konten",
+    "documents": "Dokumente",
     "settings": "Einstellungen",
     "admin": "Admin",
     "adminPillar3Products": "3a-Produkte",
@@ -721,6 +722,66 @@
       "submitEdit": "Speichern"
     },
     "privacyNote": "IBAN und Vertragsnummern werden pro Nutzer gespeichert; Kartennummern (PAN), CVV oder E-Banking-Zugangsdaten werden nicht erfasst."
+  },
+  "documents": {
+    "subtitle": "Steuerdokumente aus deinem SharePoint-Ordner. Eindeutige Dokumente übernimmt finyo selbst — sobald etwas nicht zusammenpasst, fragt es nach.",
+    "loadError": "Dokumente konnten nicht geladen werden",
+    "empty": {
+      "title": "Noch keine Dokumente",
+      "text": "Synchronisiere, um die Steuerdokumente aus deinem SharePoint-Ordner zu importieren."
+    },
+    "sync": {
+      "button": "Jetzt synchronisieren",
+      "pending": "Wird synchronisiert …",
+      "result": "{{autoApplied}} übernommen · {{needsReview}} zu prüfen · {{failed}} fehlgeschlagen"
+    },
+    "status": {
+      "DISCOVERED": "Gefunden",
+      "ANALYZED": "Analysiert",
+      "AUTO_APPLIED": "Automatisch übernommen",
+      "NEEDS_REVIEW": "Zu prüfen",
+      "APPLIED": "Übernommen",
+      "DISMISSED": "Verworfen",
+      "FAILED": "Fehlgeschlagen"
+    },
+    "types": {
+      "SALARY_CERTIFICATE": "Lohnausweis",
+      "HEALTH_INSURANCE": "Krankenkassen-Prämienübersicht",
+      "SECURITIES_STATEMENT": "Wertschriftenverzeichnis",
+      "PILLAR_3A": "Säule-3a-Bescheinigung",
+      "ASSESSMENT": "Veranlagungsverfügung",
+      "UNKNOWN": "Unbekannter Typ"
+    },
+    "meta": {
+      "detectedType": "Dokument: {{type}}",
+      "folderType": "Ordner: {{type}}",
+      "documentYear": "Dokumentjahr {{year}}",
+      "folderYear": "Ordnerjahr {{year}}",
+      "confidence": "{{pct}} % Konfidenz",
+      "deletedInDrive": "nicht mehr im Ordner"
+    },
+    "review": {
+      "title": "Warum finyo das nicht selbst übernommen hat",
+      "expand": "Prüfung anzeigen",
+      "collapse": "Prüfung ausblenden",
+      "reasons": {
+        "typeMismatch": "Der Ordner sagt {{folderType}}, das Dokument sieht aber nach {{detectedType}} aus.",
+        "yearMismatch": "Der Ordner sagt Steuerjahr {{folderYear}}, das Dokument nennt aber {{documentYear}}.",
+        "unknownType": "Der Dokumenttyp konnte nicht erkannt werden.",
+        "valueConflict": "Ein Wert im Steuerjahr weicht vom Wert im Dokument ab."
+      },
+      "year": "Zieljahr",
+      "yearHint": "Die Übernahme überschreibt nur die ausgewählten Felder des Zieljahres.",
+      "noFields": "Aus diesem Dokument konnten keine Werte gelesen werden.",
+      "apply": "Übernehmen",
+      "dismiss": "Verwerfen"
+    },
+    "table": {
+      "field": "Feld",
+      "value": "Wert",
+      "target": "Ziel",
+      "infoOnly": "nur zur Info"
+    }
   },
   "admin": {
     "products": {

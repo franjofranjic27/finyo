@@ -2,6 +2,7 @@ import type React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Inbox,
   LayoutDashboard,
   Landmark,
   ReceiptText,
@@ -53,6 +54,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse, onClose }: Readon
     { to: '/budget', label: t('nav.budget'), icon: ReceiptText },
     { to: '/insurance', label: t('nav.insurance'), icon: Shield },
     { to: '/accounts', label: t('nav.accounts'), icon: Landmark },
+    { to: '/documents', label: t('nav.documents'), icon: Inbox },
   ];
 
   const adminItems: NavItem[] = [

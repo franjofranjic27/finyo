@@ -18,6 +18,7 @@ calculator. A Spring Boot REST API and a React SPA, self-hosted behind Keycloak.
 | [Testing](TESTING.md) | Test types and how to run them |
 | [CI/CD Workflows](WORKFLOWS.md) | GitHub Actions pipelines |
 | [Deployment](DEPLOYMENT.md) | Production setup (VPS, Caddy, Keycloak) |
+| [Cloud Document Ingestion](CLOUD_DOCUMENT_INGESTION.md) | Importing tax documents from SharePoint (Entra setup, folder convention) |
 
 For contributor setup see
 [CONTRIBUTING.md](https://github.com/franjofranjic27/finyo/blob/main/CONTRIBUTING.md);

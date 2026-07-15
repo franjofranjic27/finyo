@@ -1,3 +1,10 @@
+finyo:
+  graph:
+    # Explicit even though it is the production default: a scheduled sync starting
+    # inside every @SpringBootTest context and firing at a non-existent Graph
+    # endpoint would be a flaky-test factory.
+    enabled: false
+
 spring:
   datasource:
     url: jdbc:tc:postgresql:17:///finyo
