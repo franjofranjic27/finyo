@@ -38,6 +38,8 @@ public class ResilienceConfig {
 
     public static final String SIX = "six";
     public static final String OPENFIGI = "openfigi";
+    public static final String FRANKFURTER = "frankfurter";
+    public static final String BAZG = "bazg";
 
     /**
      * Retrying a 4xx is pointless — the request is wrong, not the moment. Only
@@ -57,16 +59,26 @@ public class ResilienceConfig {
                 .waitDurationInOpenState(Duration.ofSeconds(60))
                 .permittedNumberOfCallsInHalfOpenState(3)
                 .build();
+        // The FX sources get the same breaker. Frankfurter is self-hosted and steady, BAZG is an
+        // external government API — both can still go down, and a portfolio must degrade (a rate
+        // goes stale) rather than a nightly sync hammering a dead endpoint.
         return CircuitBreakerRegistry.of(Map.of(
                 SIX, config,
-                OPENFIGI, config));
+                OPENFIGI, config,
+                FRANKFURTER, config,
+                BAZG, config));
     }
 
     @Bean
     public RetryRegistry retryRegistry() {
+        RetryConfig once = RetryConfig.from(NETWORK_RETRY).maxAttempts(1).build();
         return RetryRegistry.of(Map.of(
                 SIX, NETWORK_RETRY,
-                OPENFIGI, RetryConfig.from(NETWORK_RETRY).maxAttempts(1).build()));
+                OPENFIGI, once,
+                // A daily reference rate is not worth hammering: one attempt, and if it fails the
+                // last stored rate simply stands until tomorrow's run.
+                FRANKFURTER, once,
+                BAZG, once));
     }
 
     /**
@@ -95,6 +107,19 @@ public class ResilienceConfig {
                         .build(),
                 SIX, RateLimiterConfig.custom()
                         .limitForPeriod(30)
+                        .limitRefreshPeriod(Duration.ofSeconds(1))
+                        .timeoutDuration(Duration.ofSeconds(3))
+                        .build(),
+                // Neither FX source publishes a limit — Frankfurter is our own container, BAZG is a
+                // public government API. The cap is courtesy: it keeps a runaway backfill loop from
+                // firing hundreds of requests a second, nothing more.
+                FRANKFURTER, RateLimiterConfig.custom()
+                        .limitForPeriod(30)
+                        .limitRefreshPeriod(Duration.ofSeconds(1))
+                        .timeoutDuration(Duration.ofSeconds(3))
+                        .build(),
+                BAZG, RateLimiterConfig.custom()
+                        .limitForPeriod(10)
                         .limitRefreshPeriod(Duration.ofSeconds(1))
                         .timeoutDuration(Duration.ofSeconds(3))
                         .build()));
