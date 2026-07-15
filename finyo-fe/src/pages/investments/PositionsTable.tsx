@@ -5,6 +5,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Pencil, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAuth } from '@/auth/useAuth';
 import { portfolioApi, ASSET_CLASSES } from '@/api/portfolio';
 import type { AssetClass, PortfolioPosition } from '@/api/portfolio';
@@ -12,6 +18,8 @@ import { formatCHF, formatPercent, amountColour } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { displayName } from './positionName';
 import { EditPositionDialog } from './EditPositionDialog';
+import { PriceSourceBadge } from './PriceSourceBadge';
+import { isUnremarkablePrice, usePriceProvenanceText } from './priceProvenance';
 
 interface AssetClassGroup {
   assetClass: AssetClass;
@@ -57,6 +65,32 @@ function GroupHeaderRow({ group }: Readonly<{ group: AssetClassGroup }>) {
   );
 }
 
+/**
+ * The price plus where it came from. A fresh market price stays unadorned — every
+ * other case (stale, hand-typed, or no price at all) is badged, because a number
+ * that is not a market price must never look like one.
+ */
+function PriceCell({ position }: Readonly<{ position: PortfolioPosition }>) {
+  const provenance = usePriceProvenanceText(position);
+
+  return (
+    <td className="py-2 pr-4">
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex items-center justify-end gap-2" tabIndex={0}>
+              {!isUnremarkablePrice(position) && <PriceSourceBadge position={position} />}
+              <span className="tabular-nums">{formatCHF(position.currentPrice)}</span>
+              <span className="sr-only">{provenance}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{provenance}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </td>
+  );
+}
+
 function PositionRow({ position, index, onOpen, onEdit, onRemove, removing }: Readonly<{
   position: PortfolioPosition;
   index: number;
@@ -89,7 +123,7 @@ function PositionRow({ position, index, onOpen, onEdit, onRemove, removing }: Re
       </td>
       <td className="py-2 pr-4 text-right tabular-nums">{position.quantity}</td>
       <td className="py-2 pr-4 text-right tabular-nums">{formatCHF(position.purchasePrice)}</td>
-      <td className="py-2 pr-4 text-right tabular-nums">{formatCHF(position.currentPrice)}</td>
+      <PriceCell position={position} />
       <td className="py-2 pr-4 text-right font-medium tabular-nums">{formatCHF(position.value)}</td>
       <td className={`py-2 pr-4 text-right tabular-nums ${amountColour(position.gainLoss)}`}>
         {formatCHF(position.gainLoss)}

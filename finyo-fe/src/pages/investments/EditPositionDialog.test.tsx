@@ -56,7 +56,7 @@ describe('EditPositionDialog', () => {
     expect(screen.getByLabelText('Purchase Date')).toHaveValue('2026-01-15');
     expect(screen.getByLabelText('Current Price (optional)')).toHaveValue(100);
     expect(
-      screen.getByText('Overrides the market price — a live price refresh may replace it again'),
+      screen.getByText('Stored as a manual price and shown instead of the market price'),
     ).toBeInTheDocument();
   });
 

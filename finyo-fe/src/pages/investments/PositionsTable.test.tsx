@@ -197,4 +197,79 @@ describe('PositionsTable', () => {
 
     expect(portfolioApi.deletePosition).not.toHaveBeenCalled();
   });
+
+  describe('price provenance', () => {
+    const PRICE_COLUMN_INDEX = 3;
+
+    /** The row cell that carries the price and its provenance badge. */
+    function priceCell(name: string): HTMLElement {
+      const row = screen.getByText(name).closest('tr') as HTMLElement;
+      return row.querySelectorAll('td')[PRICE_COLUMN_INDEX];
+    }
+
+    it('leaves a fresh market price unbadged but names its trading day', () => {
+      renderTable([portfolioPosition({ id: 'p1', name: 'Nestlé SA' })]);
+
+      const cell = priceCell('Nestlé SA');
+      expect(within(cell).queryByText('Market')).not.toBeInTheDocument();
+      expect(within(cell).queryByText('No price')).not.toBeInTheDocument();
+      expect(
+        within(cell).getByText('Price from 10 Jul 2026 · Market price, 15 min delayed'),
+      ).toBeInTheDocument();
+    });
+
+    it('badges a stale market price with the day it belongs to', () => {
+      renderTable([
+        portfolioPosition({ id: 'p1', name: 'Nestlé SA', priceAsOf: '2026-07-03', stale: true }),
+      ]);
+
+      const cell = priceCell('Nestlé SA');
+      expect(within(cell).getByText('Price from 03 Jul 2026')).toBeInTheDocument();
+      expect(
+        within(cell).getByText(/Older than expected — the market may have moved since/),
+      ).toBeInTheDocument();
+    });
+
+    it('badges a hand-typed price as manual', () => {
+      renderTable([portfolioPosition({ id: 'p1', name: 'Nestlé SA', priceSource: 'MANUAL' })]);
+
+      const cell = priceCell('Nestlé SA');
+      expect(within(cell).getByText('Manual')).toBeInTheDocument();
+      expect(within(cell).getByText(/A price you entered manually/)).toBeInTheDocument();
+    });
+
+    it('badges a position without any price — it is shown at purchase cost', () => {
+      renderTable([
+        portfolioPosition({
+          id: 'p1',
+          name: 'Nestlé SA',
+          priceSource: 'PURCHASE',
+          priceAsOf: null,
+          currency: null,
+          gainLoss: 0,
+          returnPct: 0,
+        }),
+      ]);
+
+      const cell = priceCell('Nestlé SA');
+      expect(within(cell).getByText('No price')).toBeInTheDocument();
+      expect(
+        within(cell).getByText(
+          'No price available — the position is shown at its purchase cost',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('explains the price on hover', async () => {
+      const user = userEvent.setup();
+      renderTable([portfolioPosition({ id: 'p1', name: 'Nestlé SA', priceSource: 'PURCHASE' })]);
+
+      await user.hover(within(priceCell('Nestlé SA')).getByText('CHF 100.00'));
+
+      const tooltip = await screen.findByRole('tooltip');
+      expect(tooltip).toHaveTextContent(
+        'No price available — the position is shown at its purchase cost',
+      );
+    });
+  });
 });

@@ -155,6 +155,22 @@
       "confirmRemove": "Position «{{name}}» entfernen?",
       "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
     },
+    "price": {
+      "badge": {
+        "MARKET": "Marktkurs",
+        "MANUAL": "Manuell",
+        "PURCHASE": "Kein Kurs",
+        "stale": "Kurs vom {{date}}",
+        "staleUnknown": "Kurs veraltet"
+      },
+      "asOf": "Kurs vom {{date}}",
+      "asOfUnknown": "Kursdatum unbekannt",
+      "marketHint": "Marktkurs, 15 Min. verzögert",
+      "staleHint": "Älter als erwartet — der Markt ist seither möglicherweise gelaufen",
+      "manualHint": "Von dir manuell erfasster Kurs",
+      "purchaseHint": "Kein Kurs verfügbar — die Position wird zum Einstandswert gezeigt",
+      "unknownCurrency": "unbekannt"
+    },
     "allocation": {
       "title": "Allokation",
       "positions": "Positionen",
@@ -169,7 +185,6 @@
     },
     "position": {
       "loadError": "Position konnte nicht geladen werden",
-      "liveChip": "Kurs live · SIX",
       "stats": {
         "value": "Wert",
         "quantity": "Anzahl",
@@ -186,12 +201,13 @@
         "currency": "Währung",
         "ter": "TER",
         "priceSource": "Kursquelle",
+        "priceAsOf": "Kursstand",
         "portfolioShare": "Anteil am Portfolio"
       },
       "priceSourceValue": {
-        "LIVE": "Live (SIX)",
-        "CACHE": "Zwischengespeichert",
-        "PURCHASE": "Kaufkurs"
+        "MARKET": "Marktkurs (15 Min. verzögert)",
+        "MANUAL": "Manuell erfasst",
+        "PURCHASE": "Kein Kurs — Einstandswert"
       },
       "editDialog": {
         "title": "Produkt bearbeiten",
@@ -209,7 +225,7 @@
         "purchasePrice": "Ø Kaufkurs",
         "purchaseDate": "Kaufdatum",
         "currentPrice": "Aktueller Kurs (optional)",
-        "currentPriceHint": "Überschreibt den Marktkurs — ein Live-Kursabruf kann ihn wieder ersetzen",
+        "currentPriceHint": "Wird als «manuell erfasst» gespeichert und ersetzt den Marktkurs",
         "save": "Speichern",
         "quantityInvalid": "Anzahl muss grösser als 0 sein",
         "purchasePriceInvalid": "Kaufkurs muss 0 oder grösser sein",

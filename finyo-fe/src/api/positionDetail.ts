@@ -17,13 +17,17 @@ export interface PositionDetail {
   valor: string | null;
   assetClass: AssetClass;
   ter: number | null;
-  currency: string;
+  /** Trading currency — null when nobody established it. Never assume CHF. */
+  currency: string | null;
   quantity: number;
   avgPurchasePrice: number;
   purchaseDate: string | null;
   currentPrice: number;
   priceSource: PriceSource;
-  priceUpdatedAt: string | null;
+  /** The trading day the price belongs to (ISO date), not the day it was fetched. */
+  priceAsOf: string | null;
+  /** The price is older than a market price should be (> 4 days). */
+  stale: boolean;
   value: number;
   gainLoss: number;
   returnPercent: number;
