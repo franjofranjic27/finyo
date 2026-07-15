@@ -49,7 +49,7 @@ class ArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("ch.finyo.integration..")
                 .should().dependOnClassesThat().resideInAPackage("ch.finyo.integration..")
-                .because("vendor formats must not leak out of the adapters — see ADR-006");
+                .because("vendor formats must not leak out of the adapters — see ADR-007");
 
         rule.check(productionClasses);
     }

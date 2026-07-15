@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /**
  * @param currency  trading currency, or null when nobody has established it. Not defaulted to CHF
- *                  — see ADR-007.
+ *                  — see ADR-008.
  * @param priceAsOf the trading day the price belongs to, not the day it was fetched
  * @param stale     the price is older than a market price should be. Not an error (an unlisted
  *                  fund or a long weekend both produce one) — but the user is told rather than

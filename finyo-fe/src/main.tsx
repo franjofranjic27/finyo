@@ -16,6 +16,7 @@ import { AccountsPage } from './pages/accounts/AccountsPage';
 import { PortfolioPage } from './pages/investments/PortfolioPage';
 import { PositionDetailPage } from './pages/investments/PositionDetailPage';
 import { TaxPage } from './pages/tax/TaxPage';
+import { DocumentInboxPage } from './pages/documents/DocumentInboxPage';
 import { Pillar3Page } from './pages/pillar3/Pillar3Page';
 import { Insurance } from './pages/Insurance';
 import { Settings } from './pages/Settings';
@@ -56,6 +57,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="/investments" element={<PortfolioPage />} />
                     <Route path="/tax" element={<TaxPage />} />
                     <Route path="/tax/:year" element={<TaxPage />} />
+                    <Route path="/documents" element={<DocumentInboxPage />} />
                     <Route path="/pillar3" element={<Pillar3Page />} />
                     <Route path="/insurance" element={<Insurance />} />
                     <Route path="/settings" element={<Settings />} />

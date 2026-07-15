@@ -136,7 +136,7 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.assetClass", is("ETF"))) // classified on auto-creation
                 .andExpect(jsonPath("$.ter", nullValue()))
                 // Name-only position: no ISIN or valor to resolve, so nothing was verified and
-                // the currency stays unknown rather than being defaulted to CHF (ADR-007).
+                // the currency stays unknown rather than being defaulted to CHF (ADR-008).
                 .andExpect(jsonPath("$.currency", nullValue()))
                 .andExpect(jsonPath("$.quantity", is(10.0)))
                 .andExpect(jsonPath("$.avgPurchasePrice", is(100.0)))

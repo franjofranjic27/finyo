@@ -17,7 +17,7 @@ CREATE TABLE instrument_price (
     price_date   DATE           NOT NULL,
     close        NUMERIC(19, 4) NOT NULL,
     -- Nullable, like instrument.currency: a price without a currency is a number without a
-    -- meaning, and inventing CHF for it is exactly the bug ADR-007 exists to prevent.
+    -- meaning, and inventing CHF for it is exactly the bug ADR-008 exists to prevent.
     currency     VARCHAR(3),
     source       VARCHAR(20)    NOT NULL,
     retrieved_at TIMESTAMPTZ    NOT NULL,

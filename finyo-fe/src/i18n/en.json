@@ -8,6 +8,7 @@
     "budget": "Budget",
     "insurance": "Insurance",
     "accounts": "Accounts",
+    "documents": "Documents",
     "settings": "Settings",
     "admin": "Admin",
     "adminPillar3Products": "3a Products",
@@ -743,6 +744,66 @@
       "submitEdit": "Save"
     },
     "privacyNote": "IBANs and contract numbers are stored per user; card numbers (PAN), CVV or e-banking credentials are never captured."
+  },
+  "documents": {
+    "subtitle": "Tax documents imported from your SharePoint folder. finyo applies unambiguous documents on its own and asks you whenever something does not add up.",
+    "loadError": "Could not load documents",
+    "empty": {
+      "title": "No documents yet",
+      "text": "Synchronise to import the tax documents from your SharePoint folder."
+    },
+    "sync": {
+      "button": "Synchronise now",
+      "pending": "Synchronising…",
+      "result": "{{autoApplied}} applied · {{needsReview}} to review · {{failed}} failed"
+    },
+    "status": {
+      "DISCOVERED": "Discovered",
+      "ANALYZED": "Analysed",
+      "AUTO_APPLIED": "Applied automatically",
+      "NEEDS_REVIEW": "Needs review",
+      "APPLIED": "Applied",
+      "DISMISSED": "Dismissed",
+      "FAILED": "Failed"
+    },
+    "types": {
+      "SALARY_CERTIFICATE": "Salary certificate",
+      "HEALTH_INSURANCE": "Health insurance premium statement",
+      "SECURITIES_STATEMENT": "Securities statement",
+      "PILLAR_3A": "Pillar 3a statement",
+      "ASSESSMENT": "Assessment notice",
+      "UNKNOWN": "Unknown type"
+    },
+    "meta": {
+      "detectedType": "Document: {{type}}",
+      "folderType": "Folder: {{type}}",
+      "documentYear": "Document year {{year}}",
+      "folderYear": "Folder year {{year}}",
+      "confidence": "{{pct}}% confidence",
+      "deletedInDrive": "no longer in the folder"
+    },
+    "review": {
+      "title": "Why finyo did not apply this on its own",
+      "expand": "Show review",
+      "collapse": "Hide review",
+      "reasons": {
+        "typeMismatch": "The folder says {{folderType}}, but the document looks like {{detectedType}}.",
+        "yearMismatch": "The folder says tax year {{folderYear}}, but the document names {{documentYear}}.",
+        "unknownType": "The document type could not be detected.",
+        "valueConflict": "A value in the tax year differs from the one in the document."
+      },
+      "year": "Target tax year",
+      "yearHint": "Applying overwrites only the selected fields of the target year.",
+      "noFields": "No values could be read from this document.",
+      "apply": "Apply",
+      "dismiss": "Dismiss"
+    },
+    "table": {
+      "field": "Field",
+      "value": "Value",
+      "target": "Target",
+      "infoOnly": "info only"
+    }
   },
   "admin": {
     "products": {

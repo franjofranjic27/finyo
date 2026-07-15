@@ -18,7 +18,7 @@ package ch.finyo.common;
  * </ul>
  *
  * Generic because the same distinction governs every external source finyo has: security
- * master data and quotes today, exchange rates and Swiss tax data next. See ADR-007.
+ * master data and quotes today, exchange rates and Swiss tax data next. See ADR-008.
  *
  * @param <T> what the source returns when it does have an answer
  */

@@ -58,11 +58,11 @@ This document records key architectural decisions made for the finyo project, in
 - 15-minute TTL is appropriate for market data and news: data is stale on that timescale regardless, and it aligns with typical rate-limit windows on free-tier financial APIs.
 - When horizontal scaling becomes necessary, the cache layer can be swapped to Redis by changing `spring.cache.type` and adding the Redis starter — no application code changes required because all cache interactions go through the Spring `@Cacheable` abstraction.
 
-**Amended (2026-07-14, ADR-006):** The `news` cache no longer exists — the RSS module was removed. The rationale above also over-reaches on one point: an in-process cache with a 15-minute TTL is the right tool for *responses*, but it is the wrong tool for *data*. Reference data and prices must survive a restart and an outage of the source, because the sources are unofficial and will be unavailable at some point. Those therefore live in Postgres (`security_reference`, and `instrument_price` from PR 2), with Caffeine only in front of them as a hot-path cache. The rule going forward: **Caffeine caches answers, Postgres stores data** — if losing an entry while the source is down breaks the feature, it does not belong in Caffeine.
+**Amended (2026-07-14, ADR-007):** The `news` cache no longer exists — the RSS module was removed. The rationale above also over-reaches on one point: an in-process cache with a 15-minute TTL is the right tool for *responses*, but it is the wrong tool for *data*. Reference data and prices must survive a restart and an outage of the source, because the sources are unofficial and will be unavailable at some point. Those therefore live in Postgres (`security_reference`, and `instrument_price` from PR 2), with Caffeine only in front of them as a hot-path cache. The rule going forward: **Caffeine caches answers, Postgres stores data** — if losing an entry while the source is down breaks the feature, it does not belong in Caffeine.
 
 ---
 
-## ADR-006: Ports and adapters for external data sources
+## ADR-007: Ports and adapters for external data sources
 
 **Decision:** External data sources live behind ports. The **port** (interface plus vendor-neutral DTOs) belongs to the consuming module (`ch.finyo.marketdata.spi`, later `ch.finyo.fx.spi` and `ch.finyo.tax.spi`); the **adapter** that speaks HTTP to a vendor belongs to `ch.finyo.integration.<vendor>`. Market data and FX rates get their own top-level modules (`ch.finyo.marketdata`, `ch.finyo.fx`) rather than living inside `investment`. An ArchUnit test enforces that nothing outside `ch.finyo.integration` depends on it.
 
@@ -80,7 +80,7 @@ This document records key architectural decisions made for the finyo project, in
 
 ---
 
-## ADR-007: Provenance — "unknown", "unavailable" and "verified" are different things
+## ADR-008: Provenance — "unknown", "unavailable" and "verified" are different things
 
 **Decision:** Every externally derived value carries where it came from, and the type system keeps the three possible states apart:
 
@@ -112,3 +112,21 @@ The first cut of the market-data module rebuilt that failure one level up, which
 - Spring Shell 3.4.x depends on Spring Framework 6.x APIs. Running it under Spring Framework 7.x may appear to work initially but will break on any API that was removed or changed in the Framework 7 migration (e.g., `HttpInputMessage`, various `@Deprecated(forRemoval=true)` targets).
 - Spring Shell 4.0.0 is the supported version for this Spring Boot generation and is available on Maven Central.
 - The CLI module is currently a low-priority feature; if Spring Shell 4.0.x introduces any breaking changes to the shell DSL, the migration cost at this stage (no commands written yet) is zero.
+
+---
+
+## ADR-006: Cloud document ingestion — delta polling, folder-gated auto-apply
+
+**Decision:** Tax documents are pulled from a SharePoint library via Microsoft Graph on a 15-minute delta poll (not via webhooks). Files are never copied into finyo — only metadata, a reference and the extraction result are stored. A value is written into a tax year unattended only when the folder path and the document agree on both type and year, and only into a field that is still empty. Access uses app-only client credentials scoped with `Sites.Selected`.
+
+**Context:** Documents (salary certificates, insurance statements, assessments) are filed in OneDrive/SharePoint under a `STE-<year>/<type>/` convention. The existing `taxdocument` module could already classify and extract them, but was preview-only: it persisted nothing and had no way to be fed by anything but an upload.
+
+**Rationale:**
+- **Polling over webhooks.** Graph change notifications for `driveItem` carry no payload, so a delta query must follow regardless. Subscriptions expire after ~30 days and need renewal, and a missed notification means a document silently never arrives. A poll is self-healing: whatever one run misses, the next picks up. A webhook can be added later purely as a latency optimization, but must never carry correctness.
+- **The folder, not the confidence, gates auto-apply.** `DocumentClassifier` normalizes its score per type against the sum of that type's keyword weights, and those maxima are unequal (salary 10, assessment 14). A score is therefore not comparable across types, and a global threshold would permanently lock some types out of automation. The folder convention is user-maintained and a far stronger signal. The year cross-check specifically prevents a 2024 document filed under `STE-2025/` from silently overwriting the 2025 figures.
+- **Never overwrite unattended.** Auto-apply fills empty fields only; a stored value that differs is reported as a conflict and routed to the review inbox. `TaxYearService.upsert()` is a full replace and is deliberately not used on this path — a payload built from one document would null out every other field of the year.
+- **`cTag`, not a content hash.** A unique constraint on a content hash would collide on legitimate duplicates and break on every delta full-resync. Graph's `cTag` changes only when content changes and needs no download to check. It also provides the repair path: re-uploading an OCR'd version of a failed scan changes the `cTag` and the document is reprocessed automatically.
+- **`Sites.Selected` over `Files.Read.All`.** The latter grants read access to every OneDrive and site in the tenant to a self-hosted service. `Sites.Selected` grants nothing until an admin hands out access to one named site.
+- **No file copies.** SharePoint is already the system of record and is backed up there. Storing a second copy of tax documents on the application server buys nothing and enlarges both the database and the blast radius.
+
+**Consequence:** Scanned PDFs without an OCR text layer cannot be processed at all — the extraction stack reads text, not pixels. Enabling OCR in the scanner software is a precondition, not a nice-to-have.

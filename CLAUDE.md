@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | docs/TESTING.md | Test types, how to run, how to write tests |
 | docs/WORKFLOWS.md | GitHub Actions workflows and local equivalents |
 | docs/DEPLOYMENT.md | Production deployment (compose.prod.yml, Caddy, Keycloak persistence) |
+| docs/CLOUD_DOCUMENT_INGESTION.md | SharePoint document import (Entra setup, folder convention, auto-apply rules) |
 | CONTRIBUTING.md | Contributor setup and workflow |
 
 The `docs/` folder is published as a MkDocs Material site to
