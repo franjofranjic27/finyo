@@ -1,6 +1,8 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
+import ch.finyo.marketdata.MarketDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -8,8 +10,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,14 +40,46 @@ public class PositionDetailService {
     private static final String INSTRUMENT_RESOURCE = "Instrument";
     private static final String FACTSHEET_RESOURCE = "Factsheet for position";
 
+    /** How much history the chart asks for — matches the backfill window. */
+    private static final int HISTORY_YEARS = 3;
+
     private final PositionRepository positionRepository;
     private final InstrumentRepository instrumentRepository;
     private final InstrumentFactsheetRepository factsheetRepository;
     private final PortfolioService portfolioService;
+    private final MarketDataService marketData;
 
     /** The read logic lives in {@link PortfolioService#getPositionDetail} (pricing-chain reuse). */
     public PositionDetailResponse getDetail(UUID positionId, String userId) {
         return portfolioService.getPositionDetail(positionId, userId);
+    }
+
+    /**
+     * The instrument's stored daily closes, for the position-detail chart. Authorised through the
+     * position — a user can only chart an instrument they hold — but the prices themselves are the
+     * shared, tenant-free market data. A read: it never calls a provider.
+     *
+     * <p>An instrument without an ISIN (a name-only holding, or an unlisted fund a provider does
+     * not quote) simply has no history, and the response says so with an empty list rather than
+     * an error.
+     */
+    public PriceHistoryResponse getPriceHistory(UUID positionId, String userId) {
+        Position position = positionRepository.findByIdAndUserId(positionId, userId)
+                .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
+        Instrument instrument = instrumentRepository.findByIdAndUserId(position.getInstrumentId(), userId)
+                .orElseThrow(() -> ResourceNotFoundException.of(INSTRUMENT_RESOURCE, position.getInstrumentId()));
+
+        String isin = instrument.getIsin();
+        String currency = instrument.getCurrency() == null ? null : instrument.getCurrency().value();
+        if (isin == null) {
+            return new PriceHistoryResponse(null, currency, List.of());
+        }
+
+        LocalDate from = LocalDate.now(SwissTime.ZONE).minusYears(HISTORY_YEARS);
+        List<PriceHistoryResponse.PriceHistoryPoint> points = marketData.priceHistory(isin, from).stream()
+                .map(p -> new PriceHistoryResponse.PriceHistoryPoint(p.asOf(), p.price()))
+                .toList();
+        return new PriceHistoryResponse(isin, currency, points);
     }
 
     /**

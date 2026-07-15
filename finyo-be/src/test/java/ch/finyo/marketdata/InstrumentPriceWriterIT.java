@@ -254,4 +254,87 @@ class InstrumentPriceWriterIT extends BaseIntegrationTest {
         assertThat(latest).hasSize(1);
         assertThat(latest.getFirst().getIsin()).isEqualTo(ISIN);
     }
+
+    // =========================================================================
+    // countByIsin — the backfill-vs-refresh decision the nightly job makes
+    // =========================================================================
+
+    @Nested
+    @DisplayName("countByIsin: how many stored closes a security already has")
+    class CountByIsin {
+
+        @Test
+        void counts_only_the_rows_of_the_asked_security() {
+            // The job backfills a security with fewer than two closes and only refreshes it
+            // after — so this count is what decides between a whole three-year fetch and one
+            // cheap request. Counting another ISIN's rows would freeze a chart that should fill.
+            writer.store(quote(ISIN, "83.88", CurrencyCode.CHF, TRADE_DAY));
+            writer.store(quote(ISIN, "84.55", CurrencyCode.CHF, TRADE_DAY.plusDays(1)));
+            writer.store(quote("IE00B4L5Y983", "144.20", new CurrencyCode("USD"), TRADE_DAY));
+
+            assertThat(repository.countByIsin(ISIN)).isEqualTo(2);
+            assertThat(repository.countByIsin("IE00B4L5Y983")).isEqualTo(1);
+        }
+
+        @Test
+        void is_zero_for_a_security_nobody_has_priced() {
+            assertThat(repository.countByIsin("CH0214967314")).isZero();
+        }
+    }
+
+    // =========================================================================
+    // findByIsinAndPriceDateGreaterThanEqual — the chart's read query
+    // =========================================================================
+
+    @Nested
+    @DisplayName("the stored time series, from a cut-off date, oldest first")
+    class PriceHistoryQuery {
+
+        @Test
+        void returns_the_securitys_closes_oldest_first() {
+            // The chart draws left to right, so the order is not cosmetic — an unordered result
+            // would zig-zag the line. Stored out of order on purpose to prove the ORDER BY runs.
+            writer.store(quote(ISIN, "83.88", CurrencyCode.CHF, TRADE_DAY));
+            writer.store(quote(ISIN, "80.00", CurrencyCode.CHF, TRADE_DAY.minusDays(2)));
+            writer.store(quote(ISIN, "82.50", CurrencyCode.CHF, TRADE_DAY.minusDays(1)));
+
+            var history = repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(
+                    ISIN, TRADE_DAY.minusDays(2));
+
+            assertThat(history).extracting(InstrumentPrice::getPriceDate).containsExactly(
+                    TRADE_DAY.minusDays(2), TRADE_DAY.minusDays(1), TRADE_DAY);
+        }
+
+        @Test
+        void includes_a_close_that_falls_exactly_on_the_cut_off_date() {
+            // The cut-off is the backfill window's far edge (three years ago). An exclusive
+            // comparison would silently drop the oldest bar every single time.
+            writer.store(quote(ISIN, "80.00", CurrencyCode.CHF, TRADE_DAY.minusDays(2)));
+            writer.store(quote(ISIN, "83.88", CurrencyCode.CHF, TRADE_DAY));
+
+            var history = repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(
+                    ISIN, TRADE_DAY.minusDays(2));
+
+            assertThat(history).extracting(InstrumentPrice::getPriceDate)
+                    .contains(TRADE_DAY.minusDays(2));
+        }
+
+        @Test
+        void excludes_closes_older_than_the_cut_off_and_other_securities() {
+            writer.store(quote(ISIN, "70.00", CurrencyCode.CHF, TRADE_DAY.minusDays(10)));
+            writer.store(quote(ISIN, "83.88", CurrencyCode.CHF, TRADE_DAY));
+            writer.store(quote("IE00B4L5Y983", "144.20", new CurrencyCode("USD"), TRADE_DAY));
+
+            var history = repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(
+                    ISIN, TRADE_DAY.minusDays(2));
+
+            assertThat(history).extracting(InstrumentPrice::getPriceDate).containsExactly(TRADE_DAY);
+        }
+
+        @Test
+        void is_empty_for_a_security_with_no_stored_closes() {
+            assertThat(repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(
+                    "CH0214967314", TRADE_DAY.minusYears(3))).isEmpty();
+        }
+    }
 }

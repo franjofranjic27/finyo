@@ -57,6 +57,7 @@ class ResilientCallTest {
         return new MarketDataProperties(
                 List.of("six", "openfigi"),
                 List.of("six"),
+                List.of("six"),
                 new MarketDataProperties.SixProperties(true, "http://six.invalid"),
                 new MarketDataProperties.OpenFigiProperties(true, "http://openfigi.invalid", openFigiApiKey),
                 new MarketDataProperties.EodhdProperties(false, null, null));

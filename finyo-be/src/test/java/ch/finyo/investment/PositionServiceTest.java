@@ -248,9 +248,11 @@ class PositionServiceTest {
     class InitialPrice {
 
         @Test
-        void refreshes_the_price_of_the_security_it_just_added() {
+        void backfills_the_price_and_history_of_the_security_it_just_added() {
             // Without this the new position shows no market price until the nightly job runs,
-            // which for a position created at 09:00 means a whole day of looking broken.
+            // which for a position created at 09:00 means a whole day of looking broken. A
+            // backfill rather than a bare refresh: it fetches the current close and the
+            // three-year history in one go, so the detail chart works from creation.
             stubNoProviderKnowsTheSecurity();
             given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, ISIN))
                     .willReturn(Optional.empty());
@@ -261,16 +263,16 @@ class PositionServiceTest {
 
             positionService.create(request(null, ISIN, null, "10", "80.00", null), USER_ID);
 
-            then(marketData).should().refresh(List.of(ISIN));
+            then(marketData).should().backfill(ISIN);
         }
 
         @Test
         void fetches_the_price_before_the_transaction_opens() {
-            // Same reason as the master-data lookup: refresh() goes to SIX over HTTP. Inside
+            // Same reason as the master-data lookup: backfill() goes to SIX over HTTP. Inside
             // the transaction it would pin a database connection for the length of the round
             // trip — and the whole PR is about getting vendor latency out of the connection
             // pool's way. The first database write of the create path is the instrument save,
-            // so refresh must come first.
+            // so backfill must come first.
             stubNoProviderKnowsTheSecurity();
             given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, ISIN))
                     .willReturn(Optional.empty());
@@ -283,7 +285,7 @@ class PositionServiceTest {
 
             InOrder order = Mockito.inOrder(instrumentFactory, marketData, transactionManager);
             order.verify(instrumentFactory).lookup(ISIN, null);
-            order.verify(marketData).refresh(List.of(ISIN));
+            order.verify(marketData).backfill(ISIN);
             order.verify(transactionManager).getTransaction(any());
         }
 
@@ -310,7 +312,7 @@ class PositionServiceTest {
             stubNoProviderKnowsTheSecurity();
             given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, ISIN))
                     .willReturn(Optional.empty());
-            given(marketData.refresh(List.of(ISIN))).willReturn(0);
+            given(marketData.backfill(ISIN)).willReturn(0);
             stubInstrumentFactoryEchoesRequestFields();
             stubInstrumentSaveEchoesArgument();
             stubNoExistingPosition();
@@ -575,8 +577,8 @@ class PositionServiceTest {
 
             then(instrumentFactory).should().lookup(eq(ISIN), any());
             then(instrumentFactory).should().lookup(eq("IE00B4L5Y983"), any());
-            then(marketData).should().refresh(List.of(ISIN));
-            then(marketData).should().refresh(List.of("IE00B4L5Y983"));
+            then(marketData).should().backfill(ISIN);
+            then(marketData).should().backfill("IE00B4L5Y983");
         }
     }
 

@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "finyo.marketdata.reference-providers=six,openfigi",
         "finyo.marketdata.quote-providers=six",
+        "finyo.marketdata.history-providers=six",
         "finyo.marketdata.six.enabled=true",
         "finyo.marketdata.openfigi.enabled=true"
 })
@@ -103,5 +104,25 @@ class SixLiveCheck extends BaseIntegrationTest {
         // Fetched today, so it cannot be stale.
         assertThat(price.stale()).isFalse();
         assertThat(price.asOf()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("backfills three years of daily closes from charts.json and reads them from Postgres")
+    void backfillsDailyHistory() {
+        int stored = marketData.backfill("CH0038863350");
+        // A quote plus a meaningful stretch of daily closes — charts.json goes back years, so this
+        // is dozens of bars at least, not a handful.
+        assertThat(stored).isGreaterThan(20);
+
+        var history = marketData.priceHistory("CH0038863350",
+                java.time.LocalDate.now(ch.finyo.common.SwissTime.ZONE).minusYears(3));
+        assertThat(history).isNotEmpty();
+        // Oldest first, every close a real positive price in the instrument's currency.
+        assertThat(history).allSatisfy(point -> {
+            assertThat(point.price()).isPositive();
+            assertThat(point.currency().value()).isEqualTo("CHF");
+        });
+        assertThat(history).isSortedAccordingTo(
+                java.util.Comparator.comparing(PricePoint::asOf));
     }
 }

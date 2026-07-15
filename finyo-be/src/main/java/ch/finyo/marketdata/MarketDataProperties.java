@@ -30,6 +30,7 @@ import java.util.List;
 public record MarketDataProperties(
         List<String> referenceProviders,
         List<String> quoteProviders,
+        List<String> historyProviders,
         SixProperties six,
         OpenFigiProperties openfigi,
         EodhdProperties eodhd
@@ -38,6 +39,7 @@ public record MarketDataProperties(
     public MarketDataProperties {
         referenceProviders = referenceProviders == null ? List.of() : List.copyOf(referenceProviders);
         quoteProviders = quoteProviders == null ? List.of() : List.copyOf(quoteProviders);
+        historyProviders = historyProviders == null ? List.of() : List.copyOf(historyProviders);
     }
 
     public record SixProperties(boolean enabled, String baseUrl) {}

@@ -54,6 +54,6 @@ public class PriceSyncJob implements SyncJob {
             return 0;
         }
         log.info("Refreshing prices for {} securities", isins.size());
-        return marketData.refresh(isins);
+        return marketData.refreshOrBackfillHeld(isins);
     }
 }

@@ -1,6 +1,10 @@
 package ch.finyo.investment;
 
 import ch.finyo.BaseIntegrationTest;
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.InstrumentPrice;
+import ch.finyo.marketdata.InstrumentPriceRepository;
+import ch.finyo.marketdata.spi.DataSource;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,7 +14,11 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -58,11 +66,38 @@ class PositionDetailIT extends BaseIntegrationTest {
     @Autowired
     private InstrumentRepository instrumentRepository;
 
+    @Autowired
+    private InstrumentPriceRepository instrumentPriceRepository;
+
     @BeforeEach
     void cleanTables() {
         positionRepository.deleteAll();
         snapshotRepository.deleteAll();
         instrumentRepository.deleteAll();
+        instrumentPriceRepository.deleteAll();
+    }
+
+    /**
+     * Attaches an ISIN and trading currency to the instrument behind a name-only position, so a
+     * price history can be looked up for it. The position is still created without touching the
+     * network (providers are off in the test profile); this only patches the stored row.
+     */
+    private void giveInstrumentAnIsin(UUID positionId, String isin, CurrencyCode currency) {
+        Position position = positionRepository.findByIdAndUserId(positionId, TEST_USER_ID).orElseThrow();
+        Instrument instrument = instrumentRepository
+                .findByIdAndUserId(position.getInstrumentId(), TEST_USER_ID).orElseThrow();
+        instrumentRepository.save(instrument.toBuilder().isin(isin).currency(currency).build());
+    }
+
+    private void storeClose(String isin, String close, LocalDate date, CurrencyCode currency) {
+        instrumentPriceRepository.save(InstrumentPrice.builder()
+                .isin(isin)
+                .priceDate(date)
+                .close(new BigDecimal(close))
+                .currency(currency)
+                .source(DataSource.SIX)
+                .retrievedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                .build());
     }
 
     private UUID createPosition(String name, String quantity, String purchasePrice, String currentPrice)
@@ -127,6 +162,65 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/positions/{id}", positionId).with(asOtherUser()))
                 .andExpect(status().isNotFound());
+    }
+
+    // =========================================================================
+    // GET /api/v1/positions/{positionId}/price-history
+    // =========================================================================
+
+    @Test
+    void price_history_returns_the_stored_closes_oldest_first_with_the_currency() throws Exception {
+        UUID positionId = createPosition("Global ETF", "10", "100", "150");
+        CurrencyCode usd = new CurrencyCode("USD");
+        giveInstrumentAnIsin(positionId, "IE00B4L5Y983", usd);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        // stored out of order on purpose — the endpoint has to return them oldest first
+        storeClose("IE00B4L5Y983", "142.00", today.minusDays(1), usd);
+        storeClose("IE00B4L5Y983", "140.00", today.minusDays(2), usd);
+        storeClose("IE00B4L5Y983", "145.10", today, usd);
+
+        mockMvc.perform(get("/api/v1/positions/{id}/price-history", positionId).with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isin", is("IE00B4L5Y983")))
+                .andExpect(jsonPath("$.currency", is("USD")))
+                .andExpect(jsonPath("$.points.length()", is(3)))
+                .andExpect(jsonPath("$.points[0].date", is(today.minusDays(2).toString())))
+                .andExpect(jsonPath("$.points[0].close", is(140.0)))
+                .andExpect(jsonPath("$.points[1].date", is(today.minusDays(1).toString())))
+                .andExpect(jsonPath("$.points[2].date", is(today.toString())))
+                .andExpect(jsonPath("$.points[2].close", is(145.1)));
+    }
+
+    @Test
+    void price_history_is_empty_for_a_name_only_instrument() throws Exception {
+        // A holding entered by name only has no ISIN and therefore no history — the endpoint
+        // says so with an empty list rather than an error.
+        UUID positionId = createPosition("Notgroschen", "1", "10", "10");
+
+        mockMvc.perform(get("/api/v1/positions/{id}/price-history", positionId).with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isin", nullValue()))
+                .andExpect(jsonPath("$.points.length()", is(0)));
+    }
+
+    @Test
+    void price_history_only_returns_the_callers_own_position_and_404s_otherwise() throws Exception {
+        UUID positionId = createPosition("Owner Fund", "1", "10", "10");
+        giveInstrumentAnIsin(positionId, "IE00B4L5Y983", new CurrencyCode("USD"));
+        storeClose("IE00B4L5Y983", "140.00", LocalDate.now(ZoneOffset.UTC), new CurrencyCode("USD"));
+
+        // a foreign user cannot chart it, even though the price data itself is shared
+        mockMvc.perform(get("/api/v1/positions/{id}/price-history", positionId).with(asOtherUser()))
+                .andExpect(status().isNotFound());
+        // an unknown position is a 404 too
+        mockMvc.perform(get("/api/v1/positions/{id}/price-history", UUID.randomUUID()).with(asUser()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void price_history_requires_authentication() throws Exception {
+        mockMvc.perform(get("/api/v1/positions/{id}/price-history", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
     }
 
     // =========================================================================

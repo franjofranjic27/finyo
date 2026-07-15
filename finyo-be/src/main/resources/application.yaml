@@ -87,6 +87,8 @@ finyo:
     # Only SIX quotes. OpenFIGI is a symbology service and has no prices at all — asking it for
     # one would be a guaranteed miss on a rate-limited endpoint.
     quote-providers: ${MARKETDATA_QUOTE_PROVIDERS:six}
+    # SIX serves history via charts.json; OpenFIGI has none.
+    history-providers: ${MARKETDATA_HISTORY_PROVIDERS:six}
     six:
       enabled: ${MARKETDATA_SIX_ENABLED:true}
       base-url: ${MARKETDATA_SIX_BASE_URL:https://www.six-group.com/fqs}

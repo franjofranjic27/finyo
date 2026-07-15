@@ -1,6 +1,13 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.SwissTime;
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.MarketDataService;
+import ch.finyo.marketdata.PricePoint;
+import ch.finyo.marketdata.spi.DataSource;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -63,6 +70,9 @@ class PositionDetailServiceTest {
     @Mock
     private PortfolioService portfolioService;
 
+    @Mock
+    private MarketDataService marketData;
+
     @InjectMocks
     private PositionDetailService service;
 
@@ -117,6 +127,94 @@ class PositionDetailServiceTest {
                 .purchaseDate(LocalDate.of(2026, 1, 15))
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(30))
                 .build();
+    }
+
+    // =========================================================================
+    // getPriceHistory() — the position-detail chart
+    // =========================================================================
+
+    @Nested
+    @DisplayName("getPriceHistory — authorised through the position, read from stored prices")
+    class GetPriceHistory {
+
+        @Test
+        void returns_the_stored_closes_with_the_instruments_currency() {
+            Instrument instrument = existingInstrument().toBuilder()
+                    .currency(new CurrencyCode("USD")).build();
+            stubOwnedPositionWithInstrument(instrument);
+            given(marketData.priceHistory(eq("CH0038863350"), any(LocalDate.class)))
+                    .willReturn(java.util.List.of(
+                            new PricePoint(new BigDecimal("140.00"), new CurrencyCode("USD"),
+                                    LocalDate.of(2026, 7, 13), DataSource.SIX, false),
+                            new PricePoint(new BigDecimal("142.00"), new CurrencyCode("USD"),
+                                    LocalDate.of(2026, 7, 14), DataSource.SIX, false)));
+
+            PriceHistoryResponse response = service.getPriceHistory(POSITION_ID, USER_ID);
+
+            assertThat(response.isin()).isEqualTo("CH0038863350");
+            assertThat(response.currency()).isEqualTo("USD");
+            assertThat(response.points())
+                    .extracting(PriceHistoryResponse.PriceHistoryPoint::date)
+                    .containsExactly(LocalDate.of(2026, 7, 13), LocalDate.of(2026, 7, 14));
+            assertThat(response.points())
+                    .extracting(point -> point.close().stripTrailingZeros().toPlainString())
+                    .containsExactly("140", "142");
+        }
+
+        @Test
+        void asks_the_market_data_for_three_years_of_history() {
+            // The window matches the backfill's, so the chart's far end is never blank.
+            stubOwnedPositionWithInstrument(existingInstrument());
+            given(marketData.priceHistory(eq("CH0038863350"), any(LocalDate.class)))
+                    .willReturn(java.util.List.of());
+
+            service.getPriceHistory(POSITION_ID, USER_ID);
+
+            then(marketData).should()
+                    .priceHistory("CH0038863350", LocalDate.now(SwissTime.ZONE).minusYears(3));
+        }
+
+        @Test
+        void returns_empty_points_for_an_instrument_without_an_isin() {
+            // A name-only holding, or an unlisted fund no provider quotes: it has no history,
+            // and the response says so with an empty list rather than an error.
+            Instrument nameOnly = Instrument.builder()
+                    .id(INSTRUMENT_ID).userId(USER_ID).name("Notgroschen")
+                    .currency(new CurrencyCode("CHF")).sortOrder(0).build();
+            stubOwnedPositionWithInstrument(nameOnly);
+
+            PriceHistoryResponse response = service.getPriceHistory(POSITION_ID, USER_ID);
+
+            assertThat(response.isin()).isNull();
+            assertThat(response.currency()).isEqualTo("CHF");
+            assertThat(response.points()).isEmpty();
+            // With no ISIN there is nothing to look up — the market data is never touched.
+            then(marketData).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void passes_a_null_currency_straight_through_rather_than_defaulting_it() {
+            // An instrument resolved through OpenFIGI genuinely has no currency; defaulting it
+            // to CHF here would recreate the very bug this module exists to kill.
+            Instrument noCurrency = existingInstrument().toBuilder().currency(null).build();
+            stubOwnedPositionWithInstrument(noCurrency);
+            given(marketData.priceHistory(eq("CH0038863350"), any(LocalDate.class)))
+                    .willReturn(java.util.List.of());
+
+            PriceHistoryResponse response = service.getPriceHistory(POSITION_ID, USER_ID);
+
+            assertThat(response.currency()).isNull();
+        }
+
+        @Test
+        void throws_404_for_a_foreign_or_unknown_position() {
+            // Authorised through the position: a user can only chart an instrument they hold.
+            given(positionRepository.findByIdAndUserId(POSITION_ID, USER_ID)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getPriceHistory(POSITION_ID, USER_ID))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            then(marketData).shouldHaveNoInteractions();
+        }
     }
 
     // =========================================================================

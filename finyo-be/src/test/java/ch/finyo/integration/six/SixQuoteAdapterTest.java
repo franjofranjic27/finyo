@@ -105,6 +105,7 @@ class SixQuoteAdapterTest {
         MarketDataProperties properties = new MarketDataProperties(
                 List.of("six"),
                 List.of("six"),
+                List.of("six"),
                 new MarketDataProperties.SixProperties(true, baseUrl),
                 new MarketDataProperties.OpenFigiProperties(false, null, null),
                 new MarketDataProperties.EodhdProperties(false, null, null));

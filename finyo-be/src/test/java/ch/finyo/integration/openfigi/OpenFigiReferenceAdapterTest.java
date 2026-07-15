@@ -120,6 +120,8 @@ class OpenFigiReferenceAdapterTest {
                 List.of("openfigi"),
                 // OpenFIGI is symbology and has no prices at all — it is in no quote chain.
                 List.of(),
+                // ...and no history either.
+                List.of(),
                 new MarketDataProperties.SixProperties(false, null),
                 new MarketDataProperties.OpenFigiProperties(true, baseUrl, apiKey),
                 new MarketDataProperties.EodhdProperties(false, null, null));

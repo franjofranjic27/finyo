@@ -115,7 +115,7 @@ public class PositionService {
         if (isin == null || isin.isBlank()) {
             return;
         }
-        marketData.refresh(List.of(isin));
+        marketData.backfill(isin);
     }
 
     /** Shared create path, running inside a transaction. Every network call already happened. */

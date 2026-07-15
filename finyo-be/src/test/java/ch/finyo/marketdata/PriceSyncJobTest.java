@@ -54,12 +54,12 @@ class PriceSyncJobTest {
     @Test
     void refreshes_exactly_the_securities_somebody_holds() {
         given(heldIsins.findAll()).willReturn(List.of("CH0038863350", "IE00B4L5Y983"));
-        given(marketData.refresh(List.of("CH0038863350", "IE00B4L5Y983"))).willReturn(2);
+        given(marketData.refreshOrBackfillHeld(List.of("CH0038863350", "IE00B4L5Y983"))).willReturn(2);
         givenTheRunnerExecutesTheWork();
 
         job.run();
 
-        then(marketData).should().refresh(List.of("CH0038863350", "IE00B4L5Y983"));
+        then(marketData).should().refreshOrBackfillHeld(List.of("CH0038863350", "IE00B4L5Y983"));
         assertThat(recordedRun.getItemsProcessed()).isEqualTo(2);
     }
 
@@ -69,7 +69,7 @@ class PriceSyncJobTest {
         // normal night. Reporting ten would make sync_run a comfort blanket rather than a
         // signal — the whole point of the row is that it can say something went wrong.
         given(heldIsins.findAll()).willReturn(List.of("CH0038863350", "CH0214967314"));
-        given(marketData.refresh(any())).willReturn(1);
+        given(marketData.refreshOrBackfillHeld(any())).willReturn(1);
         givenTheRunnerExecutesTheWork();
 
         job.run();
@@ -86,7 +86,7 @@ class PriceSyncJobTest {
 
         job.run();
 
-        then(marketData).should(never()).refresh(any());
+        then(marketData).should(never()).refreshOrBackfillHeld(any());
         assertThat(recordedRun.getItemsProcessed()).isZero();
     }
 

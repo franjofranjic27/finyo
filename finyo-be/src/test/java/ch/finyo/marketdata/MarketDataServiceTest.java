@@ -4,6 +4,8 @@ import ch.finyo.common.SourceResult;
 import ch.finyo.common.SwissTime;
 import ch.finyo.common.money.CurrencyCode;
 import ch.finyo.marketdata.spi.DataSource;
+import ch.finyo.marketdata.spi.PriceBar;
+import ch.finyo.marketdata.spi.PriceHistoryProvider;
 import ch.finyo.marketdata.spi.Quote;
 import ch.finyo.marketdata.spi.QuoteProvider;
 import ch.finyo.marketdata.spi.SecurityId;
@@ -68,6 +70,9 @@ class MarketDataServiceTest {
     private QuoteProvider eodhd;
 
     @Mock
+    private PriceHistoryProvider sixHistory;
+
+    @Mock
     private InstrumentPriceRepository repository;
 
     @Mock
@@ -79,17 +84,29 @@ class MarketDataServiceTest {
 
     /**
      * The bean list is deliberately [six, eodhd] everywhere, so a test that configures the
-     * reverse order proves configuration wins rather than luck.
+     * reverse order proves configuration wins rather than luck. No history provider — the
+     * read/refresh tests never touch that chain.
      */
     private MarketDataService serviceWithChain(String... quoteProviders) {
+        return service(List.of(quoteProviders), List.of(), List.of());
+    }
+
+    /** A service wired with the history chain too, for the backfill and job-entry tests. */
+    private MarketDataService serviceWithHistory(List<String> quoteChain, List<String> historyChain) {
+        return service(quoteChain, historyChain, List.of(sixHistory));
+    }
+
+    private MarketDataService service(List<String> quoteChain, List<String> historyChain,
+                                      List<PriceHistoryProvider> historyBeans) {
         MarketDataProperties properties = new MarketDataProperties(
                 List.of(),
-                List.of(quoteProviders),
+                quoteChain,
+                historyChain,
                 new MarketDataProperties.SixProperties(true, "http://six.invalid"),
                 new MarketDataProperties.OpenFigiProperties(false, null, null),
                 new MarketDataProperties.EodhdProperties(false, null, null));
 
-        return new MarketDataService(List.of(six, eodhd), properties, repository, writer);
+        return new MarketDataService(List.of(six, eodhd), historyBeans, properties, repository, writer);
     }
 
     private static InstrumentPrice storedPrice(String isin, String close, LocalDate priceDate) {
@@ -108,9 +125,29 @@ class MarketDataServiceTest {
                 RETRIEVED_AT, true, DataSource.SIX);
     }
 
+    private static Quote quote(String isin, String price, CurrencyCode currency) {
+        return new Quote(isin, new BigDecimal(price), currency, TODAY,
+                RETRIEVED_AT, true, DataSource.SIX);
+    }
+
+    private static PriceBar bar(LocalDate date, String close) {
+        return new PriceBar(date, new BigDecimal(close));
+    }
+
+    /** The bar-as-stored quote the backfill builds: the current quote's currency, source and
+     * metadata carried onto the bar's date and close. */
+    private static Quote storedBar(String isin, String close, CurrencyCode currency, LocalDate date) {
+        return new Quote(isin, new BigDecimal(close), currency, date,
+                RETRIEVED_AT, true, DataSource.SIX);
+    }
+
     private void nameTheProviders() {
         given(six.name()).willReturn("six");
         given(eodhd.name()).willReturn("eodhd");
+    }
+
+    private void nameTheHistoryProvider() {
+        given(sixHistory.name()).willReturn("six");
     }
 
     // =========================================================================
@@ -396,6 +433,286 @@ class MarketDataServiceTest {
             assertThat(serviceWithChain().refresh(List.of(ISIN))).isZero();
 
             then(writer).shouldHaveNoInteractions();
+        }
+    }
+
+    // =========================================================================
+    // priceHistory — the stored time series, database only
+    // =========================================================================
+
+    @Nested
+    @DisplayName("priceHistory: the stored daily closes, read from the database and only there")
+    class PriceHistoryReads {
+
+        private static final LocalDate FROM = TODAY.minusYears(3);
+
+        @Test
+        void returns_the_stored_closes_in_the_order_the_repository_yields_them() {
+            // The chart draws them left to right, so the oldest-first ordering the query
+            // guarantees has to survive the mapping untouched.
+            nameTheProviders();
+            given(repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(ISIN, FROM))
+                    .willReturn(List.of(
+                            storedPrice(ISIN, "80.00", TODAY.minusDays(2)),
+                            storedPrice(ISIN, "82.50", TODAY.minusDays(1)),
+                            storedPrice(ISIN, "83.88", TODAY)));
+
+            List<PricePoint> history = serviceWithChain("six").priceHistory(ISIN, FROM);
+
+            assertThat(history).extracting(PricePoint::asOf)
+                    .containsExactly(TODAY.minusDays(2), TODAY.minusDays(1), TODAY);
+            assertThat(history).extracting(point -> point.price().stripTrailingZeros().toPlainString())
+                    .containsExactly("80", "82.5", "83.88");
+        }
+
+        @Test
+        void never_asks_a_provider_for_a_history_it_does_not_have_in_the_database() {
+            // The same guarantee reads carry everywhere in this class: a chart request is a
+            // database read, never a synchronous HTTP round trip inside the user's request.
+            nameTheProviders();
+            given(repository.findByIsinAndPriceDateGreaterThanEqualOrderByPriceDateAsc(ISIN, FROM))
+                    .willReturn(List.of());
+
+            List<PricePoint> history = serviceWithChain("six").priceHistory(ISIN, FROM);
+
+            assertThat(history).isEmpty();
+            then(six).should(never()).quote(any());
+            then(sixHistory).should(never()).history(any(), any());
+        }
+    }
+
+    // =========================================================================
+    // backfill — the only method that fetches a security's history
+    // =========================================================================
+
+    @Nested
+    @DisplayName("backfill: fill in a security's history, stamping every bar with the quote's currency")
+    class Backfill {
+
+        @Test
+        void stamps_every_bar_with_the_currency_of_the_current_quote_not_the_history_feed() {
+            // The load-bearing case. charts.json carries dates and closes but no currency, so
+            // the currency has to come from the current quote and be applied to every bar. A
+            // USD ETF whose bars silently became CHF is the original bug rebuilt one level down.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            CurrencyCode usd = new CurrencyCode("USD");
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(new SecurityId.Isin(OTHER_ISIN)))
+                    .willReturn(SourceResult.found(quote(OTHER_ISIN, "144.20", usd)));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any())).willReturn(SourceResult.found(List.of(
+                    bar(TODAY.minusDays(2), "140.00"),
+                    bar(TODAY.minusDays(1), "142.00"))));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill(OTHER_ISIN);
+
+            // The current quote plus one row per bar.
+            assertThat(stored).isEqualTo(3);
+            then(writer).should().store(quote(OTHER_ISIN, "144.20", usd));
+            then(writer).should().store(storedBar(OTHER_ISIN, "140.00", usd, TODAY.minusDays(2)));
+            then(writer).should().store(storedBar(OTHER_ISIN, "142.00", usd, TODAY.minusDays(1)));
+        }
+
+        @Test
+        void asks_for_history_going_back_three_years() {
+            // Three years is the chart window, matched by the detail read. Asking for less would
+            // leave the far end of the chart blank; asking for more would bloat the table.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any())).willReturn(SourceResult.found(List.of()));
+
+            serviceWithHistory(List.of("six"), List.of("six")).backfill(ISIN);
+
+            then(sixHistory).should().history(new SecurityId.Isin(ISIN), TODAY.minusYears(3));
+        }
+
+        @Test
+        void writes_nothing_and_fetches_no_history_when_there_is_no_current_quote() {
+            // Without a current quote there is no currency to stamp the bars with, and the
+            // security is either unlisted or the provider is down — nothing to backfill. The
+            // history feed must not even be consulted.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.notFound());
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill(ISIN);
+
+            assertThat(stored).isZero();
+            then(sixHistory).should(never()).history(any(), any());
+            then(writer).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void writes_nothing_when_the_quote_provider_is_unreachable() {
+            // Unavailable says nothing about the security, only about the vendor. A backfill
+            // started here would either stamp bars with a missing currency or write nothing at
+            // all — so it must not start.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.unavailable("six: read timed out"));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill(ISIN);
+
+            assertThat(stored).isZero();
+            then(sixHistory).should(never()).history(any(), any());
+            then(writer).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void stores_only_the_current_quote_when_the_history_feed_is_empty() {
+            // A freshly listed security has a quote but no three-year history yet. The current
+            // close is still worth storing; the return is that one row.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any())).willReturn(SourceResult.found(List.of()));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill(ISIN);
+
+            assertThat(stored).isEqualTo(1);
+            then(writer).should().store(quote(ISIN, "83.88"));
+        }
+
+        @Test
+        void treats_a_history_provider_that_blows_up_as_no_history_rather_than_failing_the_backfill() {
+            // The current quote is already stored by the time history is fetched; a history
+            // provider throwing must not undo that or fail the sync. The quote survives, the
+            // history is simply empty this run.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any()))
+                    .willThrow(new IllegalStateException("charts.json changed its shape"));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill(ISIN);
+
+            assertThat(stored).isEqualTo(1);
+            then(writer).should().store(quote(ISIN, "83.88"));
+        }
+
+        @Test
+        void skips_a_malformed_isin_without_spending_a_request() {
+            nameTheProviders();
+            nameTheHistoryProvider();
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).backfill("not-an-isin");
+
+            assertThat(stored).isZero();
+            then(six).should(never()).quote(any());
+            then(sixHistory).should(never()).history(any(), any());
+        }
+    }
+
+    // =========================================================================
+    // refreshOrBackfillHeld — the nightly job's entry point
+    // =========================================================================
+
+    @Nested
+    @DisplayName("refreshOrBackfillHeld: backfill a security the first time, then only refresh it")
+    class RefreshOrBackfillHeld {
+
+        @Test
+        void backfills_a_security_that_has_fewer_than_two_stored_closes() {
+            // The first night a position survives: one stored close at most (from position
+            // creation), so there is no chart yet. The whole three-year history is fetched.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(repository.countByIsin(ISIN)).willReturn(1L);
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any()))
+                    .willReturn(SourceResult.found(List.of(bar(TODAY.minusDays(1), "82.50"))));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).refreshOrBackfillHeld(List.of(ISIN));
+
+            // Current quote plus the one historical bar.
+            assertThat(stored).isEqualTo(2);
+            then(sixHistory).should().history(any(), any());
+        }
+
+        @Test
+        void only_refreshes_the_days_close_for_a_security_that_already_has_a_history() {
+            // Every night after the first: the chart is already populated, so one cheap quote
+            // request is enough. Fetching the whole history again nightly would be waste on an
+            // endpoint finyo is merely tolerated on.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(repository.countByIsin(ISIN)).willReturn(750L);
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six")).refreshOrBackfillHeld(List.of(ISIN));
+
+            assertThat(stored).isEqualTo(1);
+            then(sixHistory).should(never()).history(any(), any());
+            then(writer).should().store(quote(ISIN, "83.88"));
+        }
+
+        @Test
+        void backfills_at_the_boundary_of_a_single_stored_close() {
+            // The boundary is countByIsin < 2. A security with exactly one close still has no
+            // chart worth the name, so it is backfilled, not just refreshed.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(repository.countByIsin(ISIN)).willReturn(1L);
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(any(), any())).willReturn(SourceResult.found(List.of()));
+
+            serviceWithHistory(List.of("six"), List.of("six")).refreshOrBackfillHeld(List.of(ISIN));
+
+            then(sixHistory).should().history(any(), any());
+        }
+
+        @Test
+        void refreshes_at_the_boundary_of_two_stored_closes() {
+            // Exactly two closes is enough of a series to just refresh from here on.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(repository.countByIsin(ISIN)).willReturn(2L);
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(any())).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+
+            serviceWithHistory(List.of("six"), List.of("six")).refreshOrBackfillHeld(List.of(ISIN));
+
+            then(sixHistory).should(never()).history(any(), any());
+        }
+
+        @Test
+        void decides_per_security_backfilling_the_new_one_and_refreshing_the_old_one() {
+            // A portfolio holds both: a long-standing position and one added yesterday. Each
+            // takes the path its own history warrants, in one pass.
+            nameTheProviders();
+            nameTheHistoryProvider();
+            given(repository.countByIsin(ISIN)).willReturn(500L);
+            given(repository.countByIsin(OTHER_ISIN)).willReturn(0L);
+            given(six.supports(any())).willReturn(true);
+            given(six.quote(new SecurityId.Isin(ISIN))).willReturn(SourceResult.found(quote(ISIN, "83.88")));
+            given(six.quote(new SecurityId.Isin(OTHER_ISIN)))
+                    .willReturn(SourceResult.found(quote(OTHER_ISIN, "144.20")));
+            given(sixHistory.supports(any())).willReturn(true);
+            given(sixHistory.history(new SecurityId.Isin(OTHER_ISIN), TODAY.minusYears(3)))
+                    .willReturn(SourceResult.found(List.of(bar(TODAY.minusDays(1), "142.00"))));
+
+            int stored = serviceWithHistory(List.of("six"), List.of("six"))
+                    .refreshOrBackfillHeld(List.of(ISIN, OTHER_ISIN));
+
+            // ISIN: one refreshed close. OTHER_ISIN: current quote plus one bar.
+            assertThat(stored).isEqualTo(3);
+            then(sixHistory).should().history(new SecurityId.Isin(OTHER_ISIN), TODAY.minusYears(3));
+            then(sixHistory).should(never()).history(new SecurityId.Isin(ISIN), TODAY.minusYears(3));
         }
     }
 }

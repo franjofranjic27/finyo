@@ -91,6 +91,8 @@ class SecurityLookupTest {
                 List.of(configuredOrder),
                 // Quote providers are a separate chain and none of SecurityLookup's business.
                 List.of(),
+                // History providers are a separate chain too.
+                List.of(),
                 new MarketDataProperties.SixProperties(true, "http://six.invalid"),
                 new MarketDataProperties.OpenFigiProperties(true, "http://openfigi.invalid", null),
                 new MarketDataProperties.EodhdProperties(false, null, null));

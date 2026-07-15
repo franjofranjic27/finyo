@@ -16,6 +16,8 @@ public interface InstrumentPriceRepository extends JpaRepository<InstrumentPrice
 
     Optional<InstrumentPrice> findFirstByIsinOrderByPriceDateDesc(String isin);
 
+    long countByIsin(String isin);
+
     /** One query for the whole portfolio: the latest price per ISIN, without an N+1. */
     @Query("""
             SELECT p FROM InstrumentPrice p
