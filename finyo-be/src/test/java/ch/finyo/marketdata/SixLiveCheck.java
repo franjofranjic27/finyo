@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 
-import static ch.finyo.marketdata.spi.LookupResults.foundReference;
+import static ch.finyo.common.SourceResults.foundValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @TestPropertySource(properties = {
         "finyo.marketdata.reference-providers=six,openfigi",
+        "finyo.marketdata.quote-providers=six",
         "finyo.marketdata.six.enabled=true",
         "finyo.marketdata.openfigi.enabled=true"
 })
@@ -40,10 +41,13 @@ class SixLiveCheck extends BaseIntegrationTest {
     @Autowired
     private SecurityReferenceRepository repository;
 
+    @Autowired
+    private MarketDataService marketData;
+
     @Test
     @DisplayName("resolves Nestlé by its Swiss valor number — the case no other free source covers")
     void resolvesByValor() {
-        SecurityReference nestle = foundReference(securityLookup.resolve(new SecurityId.Valor("3886335")));
+        SecurityReference nestle = foundValue(securityLookup.resolve(new SecurityId.Valor("3886335")));
 
         assertThat(nestle.isin()).isEqualTo("CH0038863350");
         assertThat(nestle.ticker()).isEqualTo("NESN");
@@ -59,7 +63,7 @@ class SixLiveCheck extends BaseIntegrationTest {
     @Test
     @DisplayName("resolves a USD-quoted ETF by ISIN, currency included — the field FX depends on")
     void resolvesForeignCurrencyEtf() {
-        SecurityReference etf = foundReference(securityLookup.resolve(new SecurityId.Isin("IE00B4L5Y983")));
+        SecurityReference etf = foundValue(securityLookup.resolve(new SecurityId.Isin("IE00B4L5Y983")));
 
         assertThat(etf.ticker()).isEqualTo("SWDA");
         assertThat(etf.type()).isEqualTo(SecurityType.ETF);
@@ -74,12 +78,30 @@ class SixLiveCheck extends BaseIntegrationTest {
         // CSIF (CH) Equity World ex CH — a VIAC/finpension building block. It is an
         // unlisted institutional share class, so SIX answers totalRows: 0. If this ever
         // comes back NotFound, the 3a instruments regress to name-guessing.
-        SecurityReference fund = foundReference(securityLookup.resolve(new SecurityId.Isin("CH0214967314")));
+        SecurityReference fund = foundValue(securityLookup.resolve(new SecurityId.Isin("CH0214967314")));
 
         assertThat(fund.source()).isEqualTo(DataSource.OPENFIGI);
         assertThat(fund.name()).isNotBlank();
         // OpenFIGI is symbology, not market data — it carries no currency. Honest gap, and
         // the reason Instrument.currency has to stay nullable.
         assertThat(fund.currency()).isNull();
+    }
+
+    @Test
+    @DisplayName("fetches a real quote from SIX and reads it straight back out of Postgres")
+    void refreshesAndPersistsAQuote() {
+        // The whole shape of PR 2 in one test: refresh() is the only thing that touches the
+        // network, it writes to instrument_price, and latestPrice() reads from the database
+        // without a provider anywhere in sight.
+        int stored = marketData.refresh(java.util.List.of("CH0038863350"));
+        assertThat(stored).isEqualTo(1);
+
+        PricePoint price = marketData.latestPrice("CH0038863350").orElseThrow();
+        assertThat(price.price()).isPositive();
+        assertThat(price.currency().value()).isEqualTo("CHF");
+        assertThat(price.source()).isEqualTo(DataSource.SIX);
+        // Fetched today, so it cannot be stale.
+        assertThat(price.stale()).isFalse();
+        assertThat(price.asOf()).isNotNull();
     }
 }

@@ -100,13 +100,17 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.valor", nullValue()))
                 .andExpect(jsonPath("$.assetClass", is("ETF"))) // classified on auto-creation
                 .andExpect(jsonPath("$.ter", nullValue()))
-                .andExpect(jsonPath("$.currency", is("CHF")))
+                // Name-only position: no ISIN or valor to resolve, so nothing was verified and
+                // the currency stays unknown rather than being defaulted to CHF (ADR-007).
+                .andExpect(jsonPath("$.currency", nullValue()))
                 .andExpect(jsonPath("$.quantity", is(10.0)))
                 .andExpect(jsonPath("$.avgPurchasePrice", is(100.0)))
                 .andExpect(jsonPath("$.purchaseDate", nullValue())) // POST does not accept one
                 .andExpect(jsonPath("$.currentPrice", is(150.0)))
-                .andExpect(jsonPath("$.priceSource", is("CACHE")))
-                .andExpect(jsonPath("$.priceUpdatedAt", notNullValue()))
+                // The manual price entered on creation — no provider prices a name-only holding.
+                .andExpect(jsonPath("$.priceSource", is("MANUAL")))
+                .andExpect(jsonPath("$.priceAsOf", notNullValue()))
+                .andExpect(jsonPath("$.stale", is(false)))
                 .andExpect(jsonPath("$.value", is(1500.0)))
                 .andExpect(jsonPath("$.gainLoss", is(500.0)))
                 .andExpect(jsonPath("$.returnPercent", is(50.0)))
@@ -143,8 +147,8 @@ class PositionDetailIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.purchaseDate", is("2026-03-01")))
                 // the explicit edit overwrites the manual price set on creation
                 .andExpect(jsonPath("$.currentPrice", is(200.0)))
-                .andExpect(jsonPath("$.priceSource", is("CACHE")))
-                .andExpect(jsonPath("$.priceUpdatedAt", notNullValue()))
+                .andExpect(jsonPath("$.priceSource", is("MANUAL")))
+                .andExpect(jsonPath("$.priceAsOf", notNullValue()))
                 .andExpect(jsonPath("$.value", is(4000.0)));
 
         // purchaseDate is always applied: omitting it while sending another

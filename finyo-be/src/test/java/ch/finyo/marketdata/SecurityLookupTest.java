@@ -2,7 +2,7 @@ package ch.finyo.marketdata;
 
 import ch.finyo.common.money.CurrencyCode;
 import ch.finyo.marketdata.spi.DataSource;
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
 import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityReferenceProvider;
@@ -20,8 +20,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
-import static ch.finyo.marketdata.spi.LookupResults.foundReference;
-import static ch.finyo.marketdata.spi.LookupResults.unavailableReason;
+import static ch.finyo.common.SourceResults.foundValue;
+import static ch.finyo.common.SourceResults.unavailableReason;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.given;
@@ -41,7 +41,7 @@ import static org.mockito.BDDMockito.times;
  * be {@code Optional.empty()}, and the consequence was not academic: during a SIX
  * outage every imported instrument was written down as a name-derived guess and then
  * found by ISIN on every later import, so it was never resolved again. The guess became
- * permanent. {@link LookupResult} exists to make that impossible, and these tests are
+ * permanent. {@link SourceResult} exists to make that impossible, and these tests are
  * what keep it impossible.
  *
  * The providers are mocks on purpose — the chain's behaviour must not depend on which
@@ -89,6 +89,8 @@ class SecurityLookupTest {
     private SecurityLookup lookupWithChain(String... configuredOrder) {
         MarketDataProperties properties = new MarketDataProperties(
                 List.of(configuredOrder),
+                // Quote providers are a separate chain and none of SecurityLookup's business.
+                List.of(),
                 new MarketDataProperties.SixProperties(true, "http://six.invalid"),
                 new MarketDataProperties.OpenFigiProperties(true, "http://openfigi.invalid", null),
                 new MarketDataProperties.EodhdProperties(false, null, null));
@@ -138,9 +140,9 @@ class SecurityLookupTest {
             given(repository.findById(ISIN)).willReturn(Optional.of(cachedReference()));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).isin()).isEqualTo(ISIN);
+            assertThat(foundValue(result).isin()).isEqualTo(ISIN);
             then(six).should(never()).lookup(any());
             then(openfigi).should(never()).lookup(any());
             then(cache).shouldHaveNoInteractions();
@@ -153,9 +155,9 @@ class SecurityLookupTest {
             given(repository.findFirstByValor(VALOR)).willReturn(Optional.of(cachedReference()));
             SecurityLookup lookup = lookupWithChain("six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Valor(VALOR));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Valor(VALOR));
 
-            assertThat(foundReference(result).valor()).isEqualTo(VALOR);
+            assertThat(foundValue(result).valor()).isEqualTo(VALOR);
             then(repository).should().findFirstByValor(VALOR);
             then(six).should(never()).lookup(any());
         }
@@ -167,7 +169,7 @@ class SecurityLookupTest {
             given(repository.findById(ISIN)).willReturn(Optional.of(cachedReference()));
             SecurityLookup lookup = lookupWithChain();
 
-            assertThat(lookup.resolve(new SecurityId.Isin(ISIN))).isInstanceOf(LookupResult.Found.class);
+            assertThat(lookup.resolve(new SecurityId.Isin(ISIN))).isInstanceOf(SourceResult.Found.class);
         }
     }
 
@@ -183,12 +185,12 @@ class SecurityLookupTest {
         void a_cache_miss_asks_the_first_provider_and_hands_the_answer_to_the_cache() {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
-            given(six.lookup(any())).willReturn(LookupResult.found(reference(DataSource.SIX)));
+            given(six.lookup(any())).willReturn(SourceResult.found(reference(DataSource.SIX)));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result)).isEqualTo(reference(DataSource.SIX));
+            assertThat(foundValue(result)).isEqualTo(reference(DataSource.SIX));
             then(openfigi).should(never()).lookup(any());
             then(cache).should().store(reference(DataSource.SIX));
         }
@@ -200,13 +202,13 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
-            given(six.lookup(any())).willReturn(LookupResult.notFound());
-            given(openfigi.lookup(any())).willReturn(LookupResult.found(reference(DataSource.OPENFIGI)));
+            given(six.lookup(any())).willReturn(SourceResult.notFound());
+            given(openfigi.lookup(any())).willReturn(SourceResult.found(reference(DataSource.OPENFIGI)));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.OPENFIGI);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.OPENFIGI);
             then(six).should().lookup(any());
         }
 
@@ -216,13 +218,13 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
-            given(six.lookup(any())).willReturn(LookupResult.unavailable("six: read timed out"));
-            given(openfigi.lookup(any())).willReturn(LookupResult.found(reference(DataSource.OPENFIGI)));
+            given(six.lookup(any())).willReturn(SourceResult.unavailable("six: read timed out"));
+            given(openfigi.lookup(any())).willReturn(SourceResult.found(reference(DataSource.OPENFIGI)));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.OPENFIGI);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.OPENFIGI);
         }
 
         @Test
@@ -234,12 +236,12 @@ class SecurityLookupTest {
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
             given(six.lookup(any())).willThrow(new IllegalStateException("FQS changed its payload"));
-            given(openfigi.lookup(any())).willReturn(LookupResult.found(reference(DataSource.OPENFIGI)));
+            given(openfigi.lookup(any())).willReturn(SourceResult.found(reference(DataSource.OPENFIGI)));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.OPENFIGI);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.OPENFIGI);
         }
 
         @Test
@@ -249,12 +251,12 @@ class SecurityLookupTest {
             given(repository.findFirstByValor(VALOR)).willReturn(Optional.empty());
             given(openfigi.supports(any())).willReturn(false);
             givenProviderSupportsEverything(six);
-            given(six.lookup(any())).willReturn(LookupResult.found(reference(DataSource.SIX)));
+            given(six.lookup(any())).willReturn(SourceResult.found(reference(DataSource.SIX)));
             SecurityLookup lookup = lookupWithChain("openfigi", "six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Valor(VALOR));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Valor(VALOR));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.SIX);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.SIX);
             then(openfigi).should(never()).lookup(any());
         }
 
@@ -268,12 +270,12 @@ class SecurityLookupTest {
             SecurityReference withoutIsin = new SecurityReference(
                     null, null, TICKER, "ISHARES CORE MSCI WORLD", SecurityType.ETF,
                     CurrencyCode.CHF, null, DataSource.SIX, RETRIEVED_AT);
-            given(six.lookup(any())).willReturn(LookupResult.found(withoutIsin));
+            given(six.lookup(any())).willReturn(SourceResult.found(withoutIsin));
             SecurityLookup lookup = lookupWithChain("six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result)).isEqualTo(withoutIsin);
+            assertThat(foundValue(result)).isEqualTo(withoutIsin);
         }
     }
 
@@ -292,10 +294,10 @@ class SecurityLookupTest {
             // becomes permanent.
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
-            given(six.lookup(any())).willReturn(LookupResult.unavailable("six: read timed out"));
+            given(six.lookup(any())).willReturn(SourceResult.unavailable("six: read timed out"));
             SecurityLookup lookup = lookupWithChain("six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).contains("read timed out");
             then(cache).should(never()).store(any());
@@ -309,11 +311,11 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
-            given(six.lookup(any())).willReturn(LookupResult.unavailable("six: connection refused"));
-            given(openfigi.lookup(any())).willReturn(LookupResult.notFound());
+            given(six.lookup(any())).willReturn(SourceResult.unavailable("six: connection refused"));
+            given(openfigi.lookup(any())).willReturn(SourceResult.notFound());
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).contains("connection refused");
         }
@@ -325,11 +327,11 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
-            given(six.lookup(any())).willReturn(LookupResult.notFound());
-            given(openfigi.lookup(any())).willReturn(LookupResult.unavailable("openfigi: 429"));
+            given(six.lookup(any())).willReturn(SourceResult.notFound());
+            given(openfigi.lookup(any())).willReturn(SourceResult.unavailable("openfigi: 429"));
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).contains("429");
         }
@@ -342,13 +344,13 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             givenProviderSupportsEverything(openfigi);
-            given(six.lookup(any())).willReturn(LookupResult.notFound());
-            given(openfigi.lookup(any())).willReturn(LookupResult.notFound());
+            given(six.lookup(any())).willReturn(SourceResult.notFound());
+            given(openfigi.lookup(any())).willReturn(SourceResult.notFound());
             SecurityLookup lookup = lookupWithChain("six", "openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
             then(cache).should(never()).store(any());
         }
 
@@ -361,7 +363,7 @@ class SecurityLookupTest {
             given(six.lookup(any())).willThrow(new IllegalStateException("FQS changed its payload"));
             SecurityLookup lookup = lookupWithChain("six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).contains("six").contains("IllegalStateException");
         }
@@ -373,7 +375,7 @@ class SecurityLookupTest {
             given(repository.findById(any())).willReturn(Optional.empty());
             SecurityLookup lookup = lookupWithChain();
 
-            assertThat(lookup.resolve(new SecurityId.Isin(ISIN))).isEqualTo(LookupResult.notFound());
+            assertThat(lookup.resolve(new SecurityId.Isin(ISIN))).isEqualTo(SourceResult.notFound());
         }
     }
 
@@ -392,13 +394,13 @@ class SecurityLookupTest {
             // would otherwise hammer two vendors we are merely tolerated on, every time.
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
-            given(six.lookup(any())).willReturn(LookupResult.notFound());
+            given(six.lookup(any())).willReturn(SourceResult.notFound());
             SecurityLookup lookup = lookupWithChain("six");
 
             lookup.resolve(new SecurityId.Isin(ISIN));
-            LookupResult second = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> second = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(second).isEqualTo(LookupResult.notFound());
+            assertThat(second).isEqualTo(SourceResult.notFound());
             then(six).should(times(1)).lookup(any());
         }
 
@@ -407,20 +409,20 @@ class SecurityLookupTest {
             // The trap this test exists for: caching an outage would freeze it. A SIX
             // timeout would turn into "this security does not exist" for the next hour,
             // and every instrument imported in that hour would be written down as a guess
-            // — which is the exact failure LookupResult was introduced to prevent, moved
+            // — which is the exact failure SourceResult was introduced to prevent, moved
             // one layer inwards.
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             given(six.lookup(any()))
-                    .willReturn(LookupResult.unavailable("six: read timed out"))
-                    .willReturn(LookupResult.found(reference(DataSource.SIX)));
+                    .willReturn(SourceResult.unavailable("six: read timed out"))
+                    .willReturn(SourceResult.found(reference(DataSource.SIX)));
             SecurityLookup lookup = lookupWithChain("six");
 
-            LookupResult first = lookup.resolve(new SecurityId.Isin(ISIN));
-            LookupResult second = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> first = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> second = lookup.resolve(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(first)).contains("read timed out");
-            assertThat(foundReference(second).source()).isEqualTo(DataSource.SIX);
+            assertThat(foundValue(second).source()).isEqualTo(DataSource.SIX);
             then(six).should(times(2)).lookup(any());
         }
 
@@ -429,14 +431,14 @@ class SecurityLookupTest {
             givenNothingIsCached();
             givenProviderSupportsEverything(six);
             given(six.lookup(any()))
-                    .willReturn(LookupResult.notFound())
-                    .willReturn(LookupResult.found(reference(DataSource.SIX)));
+                    .willReturn(SourceResult.notFound())
+                    .willReturn(SourceResult.found(reference(DataSource.SIX)));
             SecurityLookup lookup = lookupWithChain("six");
 
             lookup.resolve(new SecurityId.Isin("CH0214967314"));
-            LookupResult other = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> other = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(other).source()).isEqualTo(DataSource.SIX);
+            assertThat(foundValue(other).source()).isEqualTo(DataSource.SIX);
         }
     }
 
@@ -456,12 +458,12 @@ class SecurityLookupTest {
             // that wins would be the one nobody checked.
             givenNothingIsCached();
             givenProviderSupportsEverything(openfigi);
-            given(openfigi.lookup(any())).willReturn(LookupResult.found(reference(DataSource.OPENFIGI)));
+            given(openfigi.lookup(any())).willReturn(SourceResult.found(reference(DataSource.OPENFIGI)));
             SecurityLookup lookup = lookupWithChain("openfigi");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.OPENFIGI);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.OPENFIGI);
             then(six).should(never()).supports(any());
             then(six).should(never()).lookup(any());
         }
@@ -473,12 +475,12 @@ class SecurityLookupTest {
             // accident of classpath scanning.
             givenNothingIsCached();
             givenProviderSupportsEverything(openfigi);
-            given(openfigi.lookup(any())).willReturn(LookupResult.found(reference(DataSource.OPENFIGI)));
+            given(openfigi.lookup(any())).willReturn(SourceResult.found(reference(DataSource.OPENFIGI)));
             SecurityLookup lookup = lookupWithChain("openfigi", "six");
 
-            LookupResult result = lookup.resolve(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = lookup.resolve(new SecurityId.Isin(ISIN));
 
-            assertThat(foundReference(result).source()).isEqualTo(DataSource.OPENFIGI);
+            assertThat(foundValue(result).source()).isEqualTo(DataSource.OPENFIGI);
             then(six).should(never()).lookup(any());
         }
     }

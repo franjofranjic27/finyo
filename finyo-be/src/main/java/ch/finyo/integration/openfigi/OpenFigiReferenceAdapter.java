@@ -4,6 +4,7 @@ import ch.finyo.config.ResilienceConfig;
 import ch.finyo.integration.CallOutcome;
 import ch.finyo.integration.ResilientCall;
 import ch.finyo.marketdata.MarketDataProperties;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -94,9 +95,9 @@ public class OpenFigiReferenceAdapter implements SecurityReferenceProvider {
     }
 
     @Override
-    public LookupResult lookup(SecurityId id) {
+    public SourceResult<SecurityReference> lookup(SecurityId id) {
         if (!supports(id)) {
-            return LookupResult.notFound();
+            return SourceResult.notFound();
         }
 
         CallOutcome<Optional<SecurityReference>> outcome =
@@ -104,9 +105,9 @@ public class OpenFigiReferenceAdapter implements SecurityReferenceProvider {
 
         return switch (outcome) {
             case CallOutcome.Success<Optional<SecurityReference>>(var reference) ->
-                    reference.map(LookupResult::found).orElseGet(LookupResult::notFound);
+                    reference.map(SourceResult::found).orElseGet(SourceResult::notFound);
             case CallOutcome.Unavailable<Optional<SecurityReference>>(var reason) ->
-                    LookupResult.unavailable("openfigi: " + reason);
+                    SourceResult.unavailable("openfigi: " + reason);
         };
     }
 

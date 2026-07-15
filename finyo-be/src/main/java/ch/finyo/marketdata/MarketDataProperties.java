@@ -29,6 +29,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "finyo.marketdata")
 public record MarketDataProperties(
         List<String> referenceProviders,
+        List<String> quoteProviders,
         SixProperties six,
         OpenFigiProperties openfigi,
         EodhdProperties eodhd
@@ -36,6 +37,7 @@ public record MarketDataProperties(
 
     public MarketDataProperties {
         referenceProviders = referenceProviders == null ? List.of() : List.copyOf(referenceProviders);
+        quoteProviders = quoteProviders == null ? List.of() : List.copyOf(quoteProviders);
     }
 
     public record SixProperties(boolean enabled, String baseUrl) {}

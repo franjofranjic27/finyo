@@ -5,7 +5,7 @@ import ch.finyo.config.ResilienceConfig;
 import ch.finyo.integration.ResilientCall;
 import ch.finyo.marketdata.MarketDataProperties;
 import ch.finyo.marketdata.spi.DataSource;
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
 import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityType;
@@ -25,8 +25,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static ch.finyo.marketdata.spi.LookupResults.foundReference;
-import static ch.finyo.marketdata.spi.LookupResults.unavailableReason;
+import static ch.finyo.common.SourceResults.foundValue;
+import static ch.finyo.common.SourceResults.unavailableReason;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -110,6 +110,7 @@ class SixReferenceAdapterTest {
         String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
         MarketDataProperties properties = new MarketDataProperties(
                 List.of("six"),
+                List.of("six"),
                 new MarketDataProperties.SixProperties(true, baseUrl),
                 new MarketDataProperties.OpenFigiProperties(false, null, null),
                 new MarketDataProperties.EodhdProperties(false, null, null));
@@ -155,7 +156,7 @@ class SixReferenceAdapterTest {
 
         @Test
         void maps_the_column_oriented_response_onto_a_security_reference() {
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.isin()).isEqualTo(ISIN);
             assertThat(reference.ticker()).isEqualTo("NESN");
@@ -170,7 +171,7 @@ class SixReferenceAdapterTest {
         void maps_the_numeric_valor_cell_to_a_string() {
             // FQS sends 3886335 as a JSON number; the domain keeps valors as text, and a
             // valor that arrives as an Integer would fail the moment it hits the column.
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.valor()).isEqualTo("3886335");
         }
@@ -179,7 +180,7 @@ class SixReferenceAdapterTest {
         void stamps_the_reference_with_SIX_as_its_source() {
             // Provenance is the point of the whole redesign: a value must always say
             // where it came from.
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.source()).isEqualTo(DataSource.SIX);
         }
@@ -194,7 +195,7 @@ class SixReferenceAdapterTest {
         void maps_the_product_line_to_a_security_type(String productLine, SecurityType expected) {
             responseBody = nestleResponse(productLine);
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.type()).isEqualTo(expected);
         }
@@ -210,7 +211,7 @@ class SixReferenceAdapterTest {
                      "rowData":[["CH0038863350",3886335,"NESN","NESTLE N",null,"Nestlé SA","CHF"]]}
                     """;
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.type()).isEqualTo(SecurityType.OTHER);
         }
@@ -226,7 +227,7 @@ class SixReferenceAdapterTest {
                      "rowData":[["CH0038863350",3886335,"NESN","NESTLE N","BC",null,null]]}
                     """;
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.currency()).isNull();
             assertThat(reference.issuer()).isNull();
@@ -277,9 +278,9 @@ class SixReferenceAdapterTest {
             // and if nobody knows it either, the name heuristic is legitimately final.
             responseBody = NOT_LISTED;
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin("CH0214967314"));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin("CH0214967314"));
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
         }
 
         @Test
@@ -289,7 +290,7 @@ class SixReferenceAdapterTest {
             responseStatus = 500;
             responseBody = "{\"error\":\"boom\"}";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("six:");
         }
@@ -301,7 +302,7 @@ class SixReferenceAdapterTest {
             // masquerade as "this security does not exist".
             responseBody = "<html><body>503 Service Unavailable</body></html>";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("six:");
         }
@@ -322,9 +323,9 @@ class SixReferenceAdapterTest {
             // the test above, which reports Unavailable.)
             responseBody = payload;
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
-            assertThat(result).as(description).isEqualTo(LookupResult.notFound());
+            assertThat(result).as(description).isEqualTo(SourceResult.notFound());
         }
 
         @Test
@@ -337,7 +338,7 @@ class SixReferenceAdapterTest {
             // one, so the circuit breaker sees it and the instrument stays retryable.
             responseBody = "{\"totalRows\":1,\"rowData\":[[\"CH0038863350\"]]}";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("six:");
         }

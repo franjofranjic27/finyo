@@ -84,6 +84,9 @@ finyo:
     #   six.enabled: false / eodhd.enabled: true / reference-providers: [eodhd, openfigi]
     # SixLicenceCheck logs an error on start if it is forgotten.
     reference-providers: ${MARKETDATA_REFERENCE_PROVIDERS:six,openfigi}
+    # Only SIX quotes. OpenFIGI is a symbology service and has no prices at all — asking it for
+    # one would be a guaranteed miss on a rate-limited endpoint.
+    quote-providers: ${MARKETDATA_QUOTE_PROVIDERS:six}
     six:
       enabled: ${MARKETDATA_SIX_ENABLED:true}
       base-url: ${MARKETDATA_SIX_BASE_URL:https://www.six-group.com/fqs}
@@ -97,6 +100,11 @@ finyo:
       enabled: ${MARKETDATA_EODHD_ENABLED:false}
       base-url: ${MARKETDATA_EODHD_BASE_URL:https://eodhd.com/api}
       api-key: ${EODHD_API_KEY:}
+  sync:
+    # Background jobs: prices at 22:30, portfolio snapshots at 23:00 (Europe/Zurich).
+    # Off in tests — a scheduled job firing mid-test would reach for the network.
+    enabled: ${SYNC_ENABLED:true}
+
   cors:
     # Comma-separated; deployments append their public origin via env
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173}

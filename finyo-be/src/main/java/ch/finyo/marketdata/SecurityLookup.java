@@ -1,7 +1,9 @@
 package ch.finyo.marketdata;
 
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
+import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityReferenceProvider;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -65,15 +67,15 @@ public class SecurityLookup {
         log.info("Security reference chain: {}", this.chain.stream().map(SecurityReferenceProvider::name).toList());
     }
 
-    public LookupResult resolve(SecurityId id) {
+    public SourceResult<SecurityReference> resolve(SecurityId id) {
         Optional<CachedSecurityReference> cached = findCached(id);
         if (cached.isPresent()) {
             log.debug("Security reference cache hit for {}", id.value());
-            return LookupResult.found(cached.get().toReference());
+            return SourceResult.found(cached.get().toReference());
         }
         if (misses.getIfPresent(id.value()) != null) {
             log.debug("Security reference known-miss for {}", id.value());
-            return LookupResult.notFound();
+            return SourceResult.notFound();
         }
 
         return askProviders(id);
@@ -86,7 +88,7 @@ public class SecurityLookup {
      * that as NotFound would let the caller write a guess down as fact and never ask
      * again.
      */
-    private LookupResult askProviders(SecurityId id) {
+    private SourceResult<SecurityReference> askProviders(SecurityId id) {
         boolean anyUnavailable = false;
         String reason = null;
 
@@ -94,16 +96,17 @@ public class SecurityLookup {
             if (!provider.supports(id)) {
                 continue;
             }
-            switch (lookupQuietly(provider, id)) {
-                case LookupResult.Found found -> {
-                    cache.store(found.reference());
-                    return found;
+            SourceResult<SecurityReference> result = lookupQuietly(provider, id);
+            switch (result) {
+                case SourceResult.Found<SecurityReference>(SecurityReference reference) -> {
+                    cache.store(reference);
+                    return result;
                 }
-                case LookupResult.Unavailable unavailable -> {
+                case SourceResult.Unavailable<SecurityReference>(String why) -> {
                     anyUnavailable = true;
-                    reason = unavailable.reason();
+                    reason = why;
                 }
-                case LookupResult.NotFound _ -> {
+                case SourceResult.NotFound<SecurityReference> _ -> {
                     // this provider does not know it; the next one might
                 }
             }
@@ -111,12 +114,12 @@ public class SecurityLookup {
 
         if (anyUnavailable) {
             log.warn("Could not resolve {} — a provider was unavailable: {}", id.value(), reason);
-            return LookupResult.unavailable(reason);
+            return SourceResult.unavailable(reason);
         }
 
         log.info("No provider knows {} — this is expected for unlisted funds", id.value());
         misses.put(id.value(), Boolean.TRUE);
-        return LookupResult.notFound();
+        return SourceResult.notFound();
     }
 
     private Optional<CachedSecurityReference> findCached(SecurityId id) {
@@ -134,12 +137,12 @@ public class SecurityLookup {
      * this catches the unexpected, and reports it as what it is: a vendor problem, not a
      * statement about the security.
      */
-    private LookupResult lookupQuietly(SecurityReferenceProvider provider, SecurityId id) {
+    private SourceResult<SecurityReference> lookupQuietly(SecurityReferenceProvider provider, SecurityId id) {
         try {
             return provider.lookup(id);
         } catch (RuntimeException e) {
             log.warn("Provider {} failed to resolve {}: {}", provider.name(), id.value(), e.getMessage());
-            return LookupResult.unavailable(provider.name() + ": " + e.getClass().getSimpleName());
+            return SourceResult.unavailable(provider.name() + ": " + e.getClass().getSimpleName());
         }
     }
 

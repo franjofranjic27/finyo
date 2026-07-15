@@ -23,7 +23,7 @@ import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
 
 /**
- * Pure unit tests for InstrumentService with a mocked SixMarketDataClient.
+ * Pure unit tests for InstrumentService (CRUD and multi-tenancy).
  *
  * Focus areas (matching the recent refactoring):
  *   1. resolveIdentifier() precedence: valor > ISIN > ticker.
@@ -41,8 +41,6 @@ class InstrumentServiceTest {
     @Mock
     private InstrumentRepository instrumentRepository;
 
-    @Mock
-    private SixMarketDataClient sixClient;
 
     @InjectMocks
     private InstrumentService instrumentService;
@@ -60,13 +58,6 @@ class InstrumentServiceTest {
                 .sortOrder(1);
     }
 
-    private MarketDataResponse marketData(String name, BigDecimal lastPrice) {
-        return new MarketDataResponse(
-                "3886335", "CH0038863350", "NESN", name, "SIX", "CHF", lastPrice,
-                null, null, null, null, null, null,
-                null, null, null, null, "STOCK", "Consumer", null,
-                OffsetDateTime.now(ZoneOffset.UTC), false);
-    }
 
     // =========================================================================
     // getAll() / getById()
@@ -175,176 +166,5 @@ class InstrumentServiceTest {
         assertThatThrownBy(() -> instrumentService.delete(id, "attacker"))
                 .isInstanceOf(ResourceNotFoundException.class);
         then(instrumentRepository).should(never()).deleteById(any());
-    }
-
-    // =========================================================================
-    // getMarketData() — identifier resolution
-    // =========================================================================
-
-    @Test
-    void getMarketData_prefers_valor_over_isin_and_ticker() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder()
-                .id(id).valor("3886335").isin("CH0038863350").ticker("NESN").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335"))
-                .willReturn(Optional.of(marketData("Nestlé", new BigDecimal("92.50"))));
-
-        instrumentService.getMarketData(id, USER_ID);
-
-        then(sixClient).should().fetchByValorOrIsin("3886335");
-    }
-
-    @Test
-    void getMarketData_falls_back_to_isin_when_valor_is_missing() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder()
-                .id(id).valor(null).isin("CH0038863350").ticker("NESN").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("CH0038863350"))
-                .willReturn(Optional.of(marketData("Nestlé", new BigDecimal("92.50"))));
-
-        instrumentService.getMarketData(id, USER_ID);
-
-        then(sixClient).should().fetchByValorOrIsin("CH0038863350");
-    }
-
-    @Test
-    void getMarketData_falls_back_to_ticker_when_valor_and_isin_are_missing() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder()
-                .id(id).valor(null).isin(null).ticker("NESN").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("NESN"))
-                .willReturn(Optional.of(marketData("Nestlé", new BigDecimal("92.50"))));
-
-        instrumentService.getMarketData(id, USER_ID);
-
-        then(sixClient).should().fetchByValorOrIsin("NESN");
-    }
-
-    // =========================================================================
-    // getMarketData() — live data, cache update, fallback, error
-    // =========================================================================
-
-    @Test
-    void getMarketData_returns_live_data_and_persists_the_fresh_price_and_name() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder().id(id).valor("3886335").name("Old Name").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335"))
-                .willReturn(Optional.of(marketData("Nestlé SA", new BigDecimal("92.50"))));
-
-        MarketDataResponse result = instrumentService.getMarketData(id, USER_ID);
-
-        assertThat(result.lastPrice()).isEqualByComparingTo("92.50");
-        assertThat(result.fromCache()).isFalse();
-        then(instrumentRepository).should().save(argThat(i ->
-                new BigDecimal("92.50").compareTo(i.getLastPrice()) == 0
-                        && "Nestlé SA".equals(i.getName())
-                        && i.getLastPriceUpdatedAt() != null
-                        && USER_ID.equals(i.getUserId())));
-    }
-
-    @Test
-    void getMarketData_keeps_the_existing_name_when_the_live_name_is_blank() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder().id(id).valor("3886335").name("My Custom Name").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335"))
-                .willReturn(Optional.of(marketData(" ", new BigDecimal("92.50"))));
-
-        instrumentService.getMarketData(id, USER_ID);
-
-        then(instrumentRepository).should().save(argThat(i -> "My Custom Name".equals(i.getName())));
-    }
-
-    @Test
-    void getMarketData_does_not_persist_anything_when_live_data_has_no_price() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder().id(id).valor("3886335").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335"))
-                .willReturn(Optional.of(marketData("Nestlé", null)));
-
-        MarketDataResponse result = instrumentService.getMarketData(id, USER_ID);
-
-        assertThat(result.lastPrice()).isNull();
-        then(instrumentRepository).should(never()).save(any());
-    }
-
-    @Test
-    void getMarketData_still_returns_live_data_when_persisting_the_cached_price_fails() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder().id(id).valor("3886335").build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335"))
-                .willReturn(Optional.of(marketData("Nestlé", new BigDecimal("92.50"))));
-        given(instrumentRepository.save(any(Instrument.class)))
-                .willThrow(new IllegalStateException("db down"));
-
-        MarketDataResponse result = instrumentService.getMarketData(id, USER_ID);
-
-        assertThat(result.lastPrice())
-                .as("cache persistence failures must never break the market-data response")
-                .isEqualByComparingTo("92.50");
-    }
-
-    @Test
-    void getMarketData_returns_cached_price_marked_fromCache_when_six_is_unavailable() {
-        UUID id = UUID.randomUUID();
-        OffsetDateTime cachedAt = OffsetDateTime.parse("2026-07-01T10:00:00Z");
-        Instrument instrument = instrumentBuilder()
-                .id(id)
-                .valor("3886335")
-                .lastPrice(new BigDecimal("90.00"))
-                .lastPriceUpdatedAt(cachedAt)
-                .build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("3886335")).willReturn(Optional.empty());
-
-        MarketDataResponse result = instrumentService.getMarketData(id, USER_ID);
-
-        assertThat(result.fromCache()).isTrue();
-        assertThat(result.lastPrice()).isEqualByComparingTo("90.00");
-        assertThat(result.dataAsOf()).isEqualTo(cachedAt);
-        assertThat(result.currency()).isEqualTo("CHF");
-    }
-
-    @Test
-    void getMarketData_never_calls_six_when_instrument_has_no_identifier_at_all() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder()
-                .id(id).valor(null).isin(null).ticker(null)
-                .lastPrice(new BigDecimal("50.00"))
-                .build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-
-        MarketDataResponse result = instrumentService.getMarketData(id, USER_ID);
-
-        assertThat(result.fromCache()).isTrue();
-        then(sixClient).shouldHaveNoInteractions();
-    }
-
-    @Test
-    void getMarketData_throws_IllegalStateException_when_neither_live_nor_cached_data_exists() {
-        UUID id = UUID.randomUUID();
-        Instrument instrument = instrumentBuilder().id(id).valor("999").lastPrice(null).build();
-        given(instrumentRepository.findByIdAndUserId(id, USER_ID)).willReturn(Optional.of(instrument));
-        given(sixClient.fetchByValorOrIsin("999")).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> instrumentService.getMarketData(id, USER_ID))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No market data available");
-    }
-
-    @Test
-    void getMarketData_throws_ResourceNotFoundException_for_a_foreign_instrument() {
-        UUID id = UUID.randomUUID();
-        given(instrumentRepository.findByIdAndUserId(id, "attacker")).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> instrumentService.getMarketData(id, "attacker"))
-                .isInstanceOf(ResourceNotFoundException.class);
-        then(sixClient).shouldHaveNoInteractions();
     }
 }

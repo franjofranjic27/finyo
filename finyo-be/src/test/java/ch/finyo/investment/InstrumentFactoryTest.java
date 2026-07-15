@@ -3,7 +3,7 @@ package ch.finyo.investment;
 import ch.finyo.common.money.CurrencyCode;
 import ch.finyo.marketdata.SecurityLookup;
 import ch.finyo.marketdata.spi.DataSource;
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
 import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityType;
@@ -80,8 +80,8 @@ class InstrumentFactoryTest {
                 "BlackRock", DataSource.SIX, RETRIEVED_AT);
     }
 
-    private static LookupResult found(SecurityType type, CurrencyCode currency, String name) {
-        return LookupResult.found(reference(type, currency, name));
+    private static SourceResult<SecurityReference> found(SecurityType type, CurrencyCode currency, String name) {
+        return SourceResult.found(reference(type, currency, name));
     }
 
     // =========================================================================
@@ -96,7 +96,7 @@ class InstrumentFactoryTest {
         void looks_the_security_up_by_isin_when_one_is_given() {
             // ISIN is the better key: every provider resolves it, while only SIX knows
             // valor numbers.
-            given(securityLookup.resolve(any())).willReturn(LookupResult.notFound());
+            given(securityLookup.resolve(any())).willReturn(SourceResult.notFound());
 
             instrumentFactory.lookup(ISIN, VALOR);
 
@@ -106,7 +106,7 @@ class InstrumentFactoryTest {
 
         @Test
         void looks_the_security_up_by_valor_when_no_isin_is_given() {
-            given(securityLookup.resolve(any())).willReturn(LookupResult.notFound());
+            given(securityLookup.resolve(any())).willReturn(SourceResult.notFound());
 
             instrumentFactory.lookup(null, VALOR);
 
@@ -116,7 +116,7 @@ class InstrumentFactoryTest {
 
         @Test
         void hands_the_providers_answer_straight_through() {
-            LookupResult unavailable = LookupResult.unavailable("six: read timed out");
+            SourceResult<SecurityReference> unavailable = SourceResult.unavailable("six: read timed out");
             given(securityLookup.resolve(any())).willReturn(unavailable);
 
             assertThat(instrumentFactory.lookup(ISIN, null)).isEqualTo(unavailable);
@@ -126,9 +126,9 @@ class InstrumentFactoryTest {
         void never_looks_anything_up_when_neither_isin_nor_valor_is_given() {
             // A position entered by name only ("Notgroschen") has nothing to resolve.
             // Calling a rate-limited vendor with nothing to ask about is pure waste.
-            LookupResult result = instrumentFactory.lookup(null, "  ");
+            SourceResult<SecurityReference> result = instrumentFactory.lookup(null, "  ");
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
             then(securityLookup).shouldHaveNoInteractions();
         }
 
@@ -138,9 +138,9 @@ class InstrumentFactoryTest {
             // string used to travel all the way to OpenFIGI. It is refused here instead —
             // and NotFound, not Unavailable: nothing is wrong with the providers, the
             // identifier is simply not one, and retrying it forever would be pointless.
-            LookupResult result = instrumentFactory.lookup("not-an-isin", null);
+            SourceResult<SecurityReference> result = instrumentFactory.lookup("not-an-isin", null);
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
             then(securityLookup).shouldHaveNoInteractions();
         }
     }
@@ -248,7 +248,7 @@ class InstrumentFactoryTest {
             // regress the 3a instruments this project cares most about — but the label says
             // it is a guess, and a final one: PositionService will not re-ask.
             Instrument instrument = instrumentFactory.create(
-                    LookupResult.notFound(), "CSIF Switzerland Equity Fund", "CH0214967314", null, USER_ID);
+                    SourceResult.notFound(), "CSIF Switzerland Equity Fund", "CH0214967314", null, USER_ID);
 
             assertThat(instrument.getName()).isEqualTo("CSIF Switzerland Equity Fund");
             assertThat(instrument.getIsin()).isEqualTo("CH0214967314");
@@ -263,7 +263,7 @@ class InstrumentFactoryTest {
             // about it. "Unknown" is a value the schema can hold; "CHF" would be an
             // invention that later code cannot tell apart from a verified one.
             Instrument instrument = instrumentFactory.create(
-                    LookupResult.notFound(), "Unbekannt AG", ISIN, null, USER_ID);
+                    SourceResult.notFound(), "Unbekannt AG", ISIN, null, USER_ID);
 
             assertThat(instrument.getCurrency()).isNull();
             assertThat(instrument.getSource()).isEqualTo(DataSource.HEURISTIC);
@@ -277,7 +277,7 @@ class InstrumentFactoryTest {
             // permanently pin a name-derived guess to a real security. UNRESOLVED is a
             // to-do, and PositionService picks it up on the next touch.
             Instrument instrument = instrumentFactory.create(
-                    LookupResult.unavailable("six: read timed out"),
+                    SourceResult.unavailable("six: read timed out"),
                     "iShares Core MSCI World ETF", ISIN, VALOR, USER_ID);
 
             assertThat(instrument.getSource()).isEqualTo(DataSource.UNRESOLVED);
@@ -296,9 +296,9 @@ class InstrumentFactoryTest {
             // Stated as a property, because the two paths are one line apart in the factory
             // and collapsing them is the easiest possible regression.
             Instrument unreachable = instrumentFactory.create(
-                    LookupResult.unavailable("six: 503"), "X", ISIN, null, USER_ID);
+                    SourceResult.unavailable("six: 503"), "X", ISIN, null, USER_ID);
             Instrument unknown = instrumentFactory.create(
-                    LookupResult.notFound(), "X", ISIN, null, USER_ID);
+                    SourceResult.notFound(), "X", ISIN, null, USER_ID);
 
             assertThat(unreachable.getSource()).isNotEqualTo(unknown.getSource());
         }
@@ -361,7 +361,7 @@ class InstrumentFactoryTest {
             // No answer, no update — and crucially the instrument keeps its UNRESOLVED
             // source, so it stays on the to-do list for the next attempt.
             assertThat(instrumentFactory.enrich(
-                    unresolvedInstrument(), LookupResult.unavailable("six: still down"))).isEmpty();
+                    unresolvedInstrument(), SourceResult.unavailable("six: still down"))).isEmpty();
         }
 
         @Test
@@ -370,7 +370,7 @@ class InstrumentFactoryTest {
             // So the instrument stops being a to-do: without this it would stay UNRESOLVED
             // and be re-queried against both vendors on every single touch, forever.
             Optional<Instrument> enriched =
-                    instrumentFactory.enrich(unresolvedInstrument(), LookupResult.notFound());
+                    instrumentFactory.enrich(unresolvedInstrument(), SourceResult.notFound());
 
             assertThat(enriched).isPresent();
             assertThat(enriched.orElseThrow().getSource()).isEqualTo(DataSource.HEURISTIC);
@@ -379,7 +379,7 @@ class InstrumentFactoryTest {
         @Test
         void leaves_it_UNRESOLVED_while_the_providers_stay_unreachable() {
             // Nothing was learned, so nothing may be written down — it gets another chance.
-            assertThat(instrumentFactory.enrich(unresolvedInstrument(), LookupResult.unavailable("six: timeout")))
+            assertThat(instrumentFactory.enrich(unresolvedInstrument(), SourceResult.unavailable("six: timeout")))
                     .isEmpty();
         }
     }

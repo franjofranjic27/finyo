@@ -1,6 +1,7 @@
 package ch.finyo.investment;
 
 import ch.finyo.marketdata.SecurityLookup;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,19 +46,19 @@ class InstrumentFactory {
      * Resolves master data. Called <em>outside</em> the caller's transaction — it does
      * network I/O, and a database connection must not be held open across it.
      */
-    LookupResult lookup(String isin, String valor) {
+    SourceResult<SecurityReference> lookup(String isin, String valor) {
         return identifierFor(isin, valor)
                 .map(securityLookup::resolve)
-                .orElseGet(LookupResult::notFound);
+                .orElseGet(SourceResult::notFound);
     }
 
-    Instrument create(LookupResult lookup, String name, String isin, String valor, String userId) {
+    Instrument create(SourceResult<SecurityReference> lookup, String name, String isin, String valor, String userId) {
         return switch (lookup) {
-            case LookupResult.Found(SecurityReference reference) ->
+            case SourceResult.Found(SecurityReference reference) ->
                     fromReference(reference, name, isin, valor, userId);
-            case LookupResult.NotFound _ ->
+            case SourceResult.NotFound _ ->
                     unverified(name, isin, valor, userId, DataSource.HEURISTIC);
-            case LookupResult.Unavailable(String reason) -> {
+            case SourceResult.Unavailable(String reason) -> {
                 log.warn("Providers unavailable while creating instrument isin={} valor={} ({}) — "
                         + "storing it UNRESOLVED so it gets another chance", isin, valor, reason);
                 yield unverified(name, isin, valor, userId, DataSource.UNRESOLVED);
@@ -72,9 +73,9 @@ class InstrumentFactory {
      * @return the updated instrument, or empty when nothing changed — the providers are
      *         still unreachable, so it stays UNRESOLVED and will be asked again next time
      */
-    Optional<Instrument> enrich(Instrument instrument, LookupResult lookup) {
+    Optional<Instrument> enrich(Instrument instrument, SourceResult<SecurityReference> lookup) {
         return switch (lookup) {
-            case LookupResult.Found(SecurityReference reference) -> {
+            case SourceResult.Found(SecurityReference reference) -> {
                 log.info("Re-resolved previously unresolved instrument id={} via {}",
                         instrument.getId(), reference.source());
                 yield Optional.of(instrument.toBuilder()
@@ -91,13 +92,13 @@ class InstrumentFactory {
             // The providers answered this time, and none of them knows the security. That is
             // a final answer, so the instrument stops being a to-do and settles as HEURISTIC
             // — otherwise it would be re-queried on every single touch, forever.
-            case LookupResult.NotFound _ -> {
+            case SourceResult.NotFound _ -> {
                 log.info("Instrument id={} is unknown to every provider — settling it as HEURISTIC",
                         instrument.getId());
                 yield Optional.of(instrument.toBuilder().source(DataSource.HEURISTIC).build());
             }
             // Still unreachable. Leave it UNRESOLVED; it gets another chance next time.
-            case LookupResult.Unavailable _ -> Optional.empty();
+            case SourceResult.Unavailable _ -> Optional.empty();
         };
     }
 

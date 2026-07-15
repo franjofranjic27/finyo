@@ -103,8 +103,8 @@ class WealthOverviewServiceTest {
     private static PortfolioPositionResponse position(AssetClass assetClass, String value) {
         UUID id = UUID.randomUUID();
         return new PortfolioPositionResponse(id, id, UUID.randomUUID(), assetClass,
-                "Position " + assetClass, null, null,
-                BigDecimal.ONE, BigDecimal.ONE, null, BigDecimal.ONE, PriceSource.CACHE,
+                "Position " + assetClass, null, null, "CHF",
+                BigDecimal.ONE, BigDecimal.ONE, null, BigDecimal.ONE, PriceSource.MARKET, null, false,
                 new BigDecimal(value), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 

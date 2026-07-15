@@ -3,7 +3,7 @@ package ch.finyo.marketdata;
 import ch.finyo.BaseIntegrationTest;
 import ch.finyo.common.money.CurrencyCode;
 import ch.finyo.marketdata.spi.DataSource;
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
 import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityType;
@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
-import static ch.finyo.marketdata.spi.LookupResults.foundReference;
+import static ch.finyo.common.SourceResults.foundValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -133,7 +133,7 @@ class SecurityLookupIT extends BaseIntegrationTest {
         // still answers from Postgres.
         cache.store(reference(new CurrencyCode("USD")));
 
-        SecurityReference resolved = foundReference(securityLookup.resolve(new SecurityId.Isin(ISIN)));
+        SecurityReference resolved = foundValue(securityLookup.resolve(new SecurityId.Isin(ISIN)));
 
         assertThat(resolved.currency()).isEqualTo(new CurrencyCode("USD"));
         assertThat(resolved.source()).isEqualTo(DataSource.OPENFIGI);
@@ -147,15 +147,15 @@ class SecurityLookupIT extends BaseIntegrationTest {
         cache.store(reference(CurrencyCode.CHF));
 
         assertThat(securityLookup.resolve(new SecurityId.Isin("ie00b4l5y983")))
-                .isInstanceOf(LookupResult.Found.class);
+                .isInstanceOf(SourceResult.Found.class);
     }
 
     @Test
     void reports_NotFound_for_an_unknown_security_when_no_provider_is_configured() {
         // Nobody was asked, but nobody was unreachable either — so NotFound, not
         // Unavailable. An empty chain is a deliberate configuration, not an outage.
-        LookupResult resolved = securityLookup.resolve(new SecurityId.Isin("CH9999999999"));
+        SourceResult<SecurityReference> resolved = securityLookup.resolve(new SecurityId.Isin("CH9999999999"));
 
-        assertThat(resolved).isEqualTo(LookupResult.notFound());
+        assertThat(resolved).isEqualTo(SourceResult.notFound());
     }
 }

@@ -18,7 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/instruments")
 @RequiredArgsConstructor
-@Tag(name = "Investments", description = "Track financial instruments and market data")
+@Tag(name = "Investments", description = "Track financial instruments")
 public class InstrumentController {
 
     private final InstrumentService instrumentService;
@@ -43,15 +43,6 @@ public class InstrumentController {
         return ResponseEntity.ok(instrumentService.getById(id, userId));
     }
 
-    @GetMapping("/{id}/market-data")
-    @Operation(summary = "Get live market data for an instrument from SIX Swiss Exchange")
-    @ApiResponse(responseCode = "200", description = "Market data returned")
-    @ApiResponse(responseCode = "404", description = "Instrument not found")
-    public ResponseEntity<MarketDataResponse> getMarketData(@PathVariable UUID id) {
-        String userId = userContextProvider.getUserId();
-        log.info("GET /api/v1/instruments/{}/market-data user={}", id, userId);
-        return ResponseEntity.ok(instrumentService.getMarketData(id, userId));
-    }
 
     @PostMapping
     @Operation(summary = "Add a new instrument to track")

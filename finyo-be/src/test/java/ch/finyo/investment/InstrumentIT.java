@@ -88,37 +88,7 @@ class InstrumentIT extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
-    @Test
-    void market_data_falls_back_to_the_cached_price_when_no_identifier_exists() throws Exception {
-        Instrument cached = instrumentRepository.save(Instrument.builder()
-                .userId(TEST_USER_ID)
-                .name("Manual Fund")
-                .instrumentType(InstrumentType.FUND)
-                .sortOrder(0)
-                .lastPrice(new BigDecimal("123.4500"))
-                .lastPriceUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC))
-                .build());
 
-        mockMvc.perform(get("/api/v1/instruments/{id}/market-data", cached.getId()).with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fromCache", is(true)))
-                .andExpect(jsonPath("$.lastPrice", is(123.45)))
-                .andExpect(jsonPath("$.currency", is("CHF")));
-    }
-
-    @Test
-    void market_data_returns_conflict_when_neither_identifier_nor_cached_price_exists() throws Exception {
-        Instrument empty = instrumentRepository.save(Instrument.builder()
-                .userId(TEST_USER_ID)
-                .name("Empty Instrument")
-                .instrumentType(InstrumentType.OTHER)
-                .sortOrder(0)
-                .build());
-
-        mockMvc.perform(get("/api/v1/instruments/{id}/market-data", empty.getId()).with(asUser()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.title", is("Conflict")));
-    }
 
     @Test
     void a_foreign_currency_and_its_provenance_survive_a_round_trip_through_the_database() {

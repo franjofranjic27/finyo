@@ -46,6 +46,9 @@ class PortfolioIT extends BaseIntegrationTest {
     private PortfolioSnapshotRepository snapshotRepository;
 
     @Autowired
+    private PortfolioService portfolioService;
+
+    @Autowired
     private InstrumentRepository instrumentRepository;
 
     @BeforeEach
@@ -80,11 +83,13 @@ class PortfolioIT extends BaseIntegrationTest {
     void full_lifecycle_position_portfolio_snapshot_history_and_delete() throws Exception {
         UUID positionId = createPosition("Test Fund", "10", "100", "110");
 
+        // The manual currentPrice from position creation is the price shown — sourced as MANUAL,
+        // not a market quote. A name-only position has no ISIN, so no provider prices it.
         mockMvc.perform(get("/api/v1/portfolio").with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.positions.length()", is(1)))
                 .andExpect(jsonPath("$.positions[0].name", is("Test Fund")))
-                .andExpect(jsonPath("$.positions[0].priceSource", is("CACHE")))
+                .andExpect(jsonPath("$.positions[0].priceSource", is("MANUAL")))
                 .andExpect(jsonPath("$.positions[0].currentPrice", is(110.0)))
                 .andExpect(jsonPath("$.positions[0].allocationPct", is(100.0)))
                 .andExpect(jsonPath("$.totalValue", is(1100.0)))
@@ -92,17 +97,21 @@ class PortfolioIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.gainLoss", is(100.0)))
                 .andExpect(jsonPath("$.returnPct", is(10.0)));
 
-        // exactly one snapshot for today, carrying the aggregated totals
+        // The read no longer writes a snapshot — that was a GET mutating state, and it left a
+        // hole in the history on every day the user did not log in. The snapshot is a job now.
+        assertThat(snapshotRepository.count()).isZero();
+
+        // Drive the snapshot the way PortfolioSnapshotJob does.
         LocalDate today = LocalDate.now(SwissTime.ZONE);
+        portfolioService.writeSnapshot(TEST_USER_ID);
         assertThat(snapshotRepository.count()).isEqualTo(1);
         PortfolioSnapshot snapshot = snapshotRepository
                 .findByUserIdAndSnapshotDate(TEST_USER_ID, today).orElseThrow();
         assertThat(snapshot.getTotalValue()).isEqualByComparingTo("1100");
         assertThat(snapshot.getTotalCost()).isEqualByComparingTo("1000");
 
-        // a second read on the same day updates instead of inserting
-        mockMvc.perform(get("/api/v1/portfolio").with(asUser()))
-                .andExpect(status().isOk());
+        // Running it again the same day updates rather than inserts.
+        portfolioService.writeSnapshot(TEST_USER_ID);
         assertThat(snapshotRepository.count()).isEqualTo(1);
 
         mockMvc.perform(get("/api/v1/portfolio/history").with(asUser()))

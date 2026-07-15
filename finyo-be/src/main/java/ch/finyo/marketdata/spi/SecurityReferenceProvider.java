@@ -1,5 +1,7 @@
 package ch.finyo.marketdata.spi;
 
+import ch.finyo.common.SourceResult;
+
 /**
  * Resolves master data for a security. Implemented by the adapters in
  * {@code ch.finyo.integration}.
@@ -24,9 +26,9 @@ public interface SecurityReferenceProvider {
 
     /**
      * Never throws for an unreachable backend — an unavailable source is an expected
-     * state, not an exception. It is reported as {@link LookupResult.Unavailable},
-     * which is deliberately <em>not</em> the same as {@link LookupResult.NotFound}:
+     * state, not an exception. It is reported as {@link SourceResult.Unavailable},
+     * which is deliberately <em>not</em> the same as {@link SourceResult.NotFound}:
      * only the latter licenses the caller to write a fallback down as fact.
      */
-    LookupResult lookup(SecurityId id);
+    SourceResult<SecurityReference> lookup(SecurityId id);
 }

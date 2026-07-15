@@ -20,8 +20,12 @@ spring:
 # on. Adapter behaviour is covered by unit tests against a MockRestServiceServer;
 # the chain itself is covered by wiring a stub provider.
 finyo:
+  sync:
+    # No scheduled job may fire during a test — it would reach for the network.
+    enabled: false
   marketdata:
     reference-providers: []
+    quote-providers: []
     six:
       enabled: false
     openfigi:

@@ -320,22 +320,42 @@ Migration **V33**: `security_reference`, `instrument.currency` (`char(3) NOT NUL
 **Nutzen für sich:** Eine Position per ISIN oder Valor anlegen füllt Name, Ticker, Valor, Währung
 und Typ korrekt — statt sie aus dem Namensstring zu raten.
 
-### PR 2 — Kurse (das grösste Delta)
-Migration **V34**: `instrument_price(isin, price_date, close, currency, source, retrieved_at)`.
+### PR 2 — Kurse (das grösste Delta) ✅ FERTIG (nicht committet)
+Migration **V34**: `instrument_price(isin, price_date, close, currency, source, retrieved_at)` +
+`sync_run`.
 
-- [ ] `SixMarketDataClient` **löschen** (geratener Endpoint, toter Code)
-- [ ] `SixQuoteAdapter` (`fqs/movie.json`), `MarketDataService` mit stale-while-revalidate
-- [ ] **SIX aus dem Lesepfad entfernen** — `PortfolioService.fetchLivePrices()` fällt weg
-- [ ] Provenienz (`asOf`, `source`, `stale`) in die Portfolio-DTOs und ins Frontend
-- [ ] `PriceSyncJob` + `PortfolioSnapshotJob`; Write-on-Read aus `getPortfolio()` entfernen
-- [ ] Den stillen `PriceSource.PURCHASE`-Fallback ersetzen: kein Kurs → explizit als solcher markiert
+- [x] `SixMarketDataClient` **gelöscht** (geratener Endpoint, toter Code) samt
+      `SixMarketDataProperties`, `MarketDataResponse`, Endpunkt `GET /instruments/{id}/market-data`
+- [x] `SixQuoteAdapter` (`fqs/movie.json`), `MarketDataService` (Lesen nur DB, `refresh` nur Netz)
+- [x] **SIX aus dem Lesepfad entfernt** — `getPortfolio()` macht keinen HTTP-Call mehr
+- [x] Provenienz (`priceAsOf`, `priceSource` MARKET/MANUAL/PURCHASE, `stale`, `currency`) in die
+      DTOs und ins Frontend (PURCHASE = rotes „Kein Kurs"-Badge, stale = Amber, currency null =
+      „unbekannt" statt CHF)
+- [x] `PriceSyncJob` (22:30) + `PortfolioSnapshotJob` (23:00); Write-on-Read aus `getPortfolio()`
+      entfernt, `writeSnapshot()` vom Job gerufen
+- [x] `ch.finyo.sync`: `SyncRun`-Audit, `SyncRunner` (In-Process-Lock statt Advisory-Lock — siehe
+      unten), `SyncAdminController` (`GET/POST /api/v1/admin/sync`)
+- [x] `SourceResult<T>` generisch (ersetzt `LookupResult`) — trägt PR 4 (FX) und PR 6 (Steuer)
+- [x] 875 Unit + 304 IT grün; Live-Check inkl. Kurspfad (SIX → Postgres → gelesen) grün;
+      Migrationskette V1–V34 gegen frische DB verifiziert
 
-**Nutzen für sich:** Der Portfolio-Read blockiert nie mehr auf einer externen Quelle, und die UI
-lügt nicht mehr über die Herkunft der Zahlen.
+**Zwei bewusste Abweichungen vom Plan (beim Bauen falsch geworden):**
+- **Kein `pg_try_advisory_xact_lock`.** Der gilt nur für die Transaktionsdauer — der Lock hätte
+  die gesamte Sync-Transaktion inkl. ~30 HTTP-Calls offen gehalten, exakt das Anti-Pattern, das
+  PR 1 aus dem Lesepfad entfernt hat. Stattdessen prozessinterner `ReentrantLock` pro Job + kurze
+  Audit-Transaktionen. Kommentar sagt, ab wann (Multi-Instance) das nicht mehr reicht.
+- **`SyncRunner.record()` ohne `@Transactional`.** Selbstaufruf innerhalb der Bean → Spring-Proxy
+  greift nicht. `repository.save()` bringt seine eigene Transaktion mit.
 
 ### PR 3 — Kurshistorie
 - [ ] `SixHistoryAdapter` (`fqs/charts.json`, `netting=1440`, bis 2011)
 - [ ] Backfill-Job, Instrument-Chart auf der Positionsdetailseite
+
+> **Aus PR-2-Review übernommen:** Das Frontend (`PositionsTable`, Value-Spalte) formatiert Kurs
+> und Wert weiterhin hart als CHF via `formatCHF`, obwohl das Backend jetzt ein nullable
+> `currency` pro Position liefert. Solange es keine FX-Umrechnung gibt, ist Mehrwährungs-Anzeige
+> aber halbfertig — mit diesem PR die Value-Spalte in der jeweiligen Währung formatieren und für
+> das gemischtwährige Total die Konvertierung nutzen.
 
 ### PR 4 — FX-Modul (repariert eine falsche Zahl)
 Migration **V35**: `fx_rate(currency, rate_date, chf_per_unit, rate_type, source)`.

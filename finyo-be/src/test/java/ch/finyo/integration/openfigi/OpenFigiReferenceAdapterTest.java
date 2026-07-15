@@ -4,7 +4,7 @@ import ch.finyo.config.ResilienceConfig;
 import ch.finyo.integration.ResilientCall;
 import ch.finyo.marketdata.MarketDataProperties;
 import ch.finyo.marketdata.spi.DataSource;
-import ch.finyo.marketdata.spi.LookupResult;
+import ch.finyo.common.SourceResult;
 import ch.finyo.marketdata.spi.SecurityId;
 import ch.finyo.marketdata.spi.SecurityReference;
 import ch.finyo.marketdata.spi.SecurityType;
@@ -24,8 +24,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static ch.finyo.marketdata.spi.LookupResults.foundReference;
-import static ch.finyo.marketdata.spi.LookupResults.unavailableReason;
+import static ch.finyo.common.SourceResults.foundValue;
+import static ch.finyo.common.SourceResults.unavailableReason;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -118,6 +118,8 @@ class OpenFigiReferenceAdapterTest {
         String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
         MarketDataProperties properties = new MarketDataProperties(
                 List.of("openfigi"),
+                // OpenFIGI is symbology and has no prices at all — it is in no quote chain.
+                List.of(),
                 new MarketDataProperties.SixProperties(false, null),
                 new MarketDataProperties.OpenFigiProperties(true, baseUrl, apiKey),
                 new MarketDataProperties.EodhdProperties(false, null, null));
@@ -164,9 +166,9 @@ class OpenFigiReferenceAdapterTest {
             // NotFound, not Unavailable: OpenFIGI is up, it just has no concept of a
             // valor. Reporting an outage here would mark healthy instruments UNRESOLVED
             // and retry them on every import, forever.
-            LookupResult result = newAdapter().lookup(new SecurityId.Valor("3886335"));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Valor("3886335"));
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
             assertThat(requestCount).isZero();
         }
     }
@@ -218,7 +220,7 @@ class OpenFigiReferenceAdapterTest {
 
         @Test
         void maps_a_mapping_hit_onto_a_security_reference() {
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.isin()).isEqualTo(ISIN);
             assertThat(reference.ticker()).isEqualTo("SWDA");
@@ -232,7 +234,7 @@ class OpenFigiReferenceAdapterTest {
             // This is the trap the mapping order exists for. OpenFIGI answers
             // securityType "ETP" AND securityType2 "Mutual Fund" for every ETF; check the
             // fund rule first and the entire portfolio is misclassified.
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.type()).isEqualTo(SecurityType.ETF);
         }
@@ -248,7 +250,7 @@ class OpenFigiReferenceAdapterTest {
         void maps_the_security_type(String securityType, SecurityType expected) {
             responseBody = mappingResponse(securityType, "Mutual Fund");
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.type()).isEqualTo(expected);
         }
@@ -260,7 +262,7 @@ class OpenFigiReferenceAdapterTest {
             // a USD ETF resolved through OpenFIGI (which is precisely what happens when
             // SIX does not know it or is down) would be summed into the portfolio total as
             // francs. Null means unknown, and unknown must stay distinguishable from CHF.
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.currency()).isNull();
             assertThat(reference.valor()).isNull();
@@ -279,7 +281,7 @@ class OpenFigiReferenceAdapterTest {
                                "exchCode":"LN","securityType":"ETP","securityType2":"Mutual Fund","marketSector":"Equity"}]}]
                     """;
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.ticker()).isEqualTo("SWDA");
         }
@@ -293,7 +295,7 @@ class OpenFigiReferenceAdapterTest {
                                "exchCode":"LN","securityType":"ETP","securityType2":"Mutual Fund","marketSector":"Equity"}]}]
                     """;
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.ticker()).isEqualTo("IWDA");
         }
@@ -307,7 +309,7 @@ class OpenFigiReferenceAdapterTest {
                                "exchCode":"SW","securityType":null,"securityType2":null,"marketSector":null}]}]
                     """;
 
-            SecurityReference reference = foundReference(newAdapter().lookup(new SecurityId.Isin(ISIN)));
+            SecurityReference reference = foundValue(newAdapter().lookup(new SecurityId.Isin(ISIN)));
 
             assertThat(reference.type()).isEqualTo(SecurityType.OTHER);
         }
@@ -327,18 +329,18 @@ class OpenFigiReferenceAdapterTest {
             // parse failure, and a durable answer about the security.
             responseBody = NO_IDENTIFIER_FOUND;
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin("CH9999999999"));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin("CH9999999999"));
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
         }
 
         @Test
         void reports_NotFound_when_the_result_carries_an_empty_data_array() {
             responseBody = "[{\"data\":[]}]";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
-            assertThat(result).isEqualTo(LookupResult.notFound());
+            assertThat(result).isEqualTo(SourceResult.notFound());
         }
 
         @Test
@@ -346,7 +348,7 @@ class OpenFigiReferenceAdapterTest {
             responseStatus = 500;
             responseBody = "{\"error\":\"boom\"}";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("openfigi:");
         }
@@ -359,7 +361,7 @@ class OpenFigiReferenceAdapterTest {
             responseStatus = 429;
             responseBody = "{\"error\":\"Too Many Requests\"}";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("openfigi:");
         }
@@ -368,7 +370,7 @@ class OpenFigiReferenceAdapterTest {
         void reports_Unavailable_when_openfigi_answers_with_something_that_is_not_json() {
             responseBody = "<html>we moved</html>";
 
-            LookupResult result = newAdapter().lookup(new SecurityId.Isin(ISIN));
+            SourceResult<SecurityReference> result = newAdapter().lookup(new SecurityId.Isin(ISIN));
 
             assertThat(unavailableReason(result)).startsWith("openfigi:");
         }
