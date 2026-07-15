@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { AssetClass, PriceSource } from './portfolio';
+import type { AssetClass, FxRateType, PriceSource } from './portfolio';
 
 const BASE_URL = '/api/v1';
 
@@ -28,10 +28,21 @@ export interface PositionDetail {
   priceAsOf: string | null;
   /** The price is older than a market price should be (> 4 days). */
   stale: boolean;
+  /** Value in the position's own {@link currency}. */
   value: number;
-  gainLoss: number;
-  returnPercent: number;
-  portfolioShare: number;
+  /** Value in CHF, or null when the currency has no stored rate. The CHF figures below match. */
+  valueChf: number | null;
+  /** CHF gain/loss; null when unconvertible. */
+  gainLoss: number | null;
+  /** CHF return; null when unconvertible. */
+  returnPercent: number | null;
+  /** Share of the CHF total; null when unconvertible. */
+  portfolioShare: number | null;
+  /** CHF-per-unit rate applied to reach valueChf; null for a CHF or unknown-currency position. */
+  fxRate: number | null;
+  /** The day the applied rate belongs to (ISO date); null when no rate was applied. */
+  fxRateDate: string | null;
+  fxRateType: FxRateType | null;
   factsheetUrl: string | null;
   factsheet: FactsheetInfo | null;
 }

@@ -15,6 +15,9 @@ export type AssetClass = 'ETF' | 'FUND' | 'STOCK' | 'CRYPTO' | 'BOND';
 /** Display order of asset classes — used for table grouping and selects. */
 export const ASSET_CLASSES: readonly AssetClass[] = ['ETF', 'FUND', 'STOCK', 'CRYPTO', 'BOND'];
 
+/** Which kind of exchange rate was applied (mirrors the backend enum). */
+export type FxRateType = 'MID' | 'OFFICIAL_CH';
+
 export interface PortfolioPosition {
   id: string;
   positionId: string;
@@ -34,14 +37,32 @@ export interface PortfolioPosition {
   priceAsOf: string | null;
   /** The price is older than a market price should be (> 4 days). */
   stale: boolean;
+  /** Value in the position's own {@link currency}. */
   value: number;
-  gainLoss: number;
-  returnPct: number;
-  allocationPct: number;
+  /**
+   * Value converted to CHF, or null when it could not be converted (no rate stored for the
+   * currency yet). The CHF figures below are null in the same case — never assume a rate.
+   */
+  valueChf: number | null;
+  /** CHF gain/loss; null when unconvertible. */
+  gainLoss: number | null;
+  /** CHF return; null when unconvertible. */
+  returnPct: number | null;
+  /** Share of the CHF total; null when unconvertible. */
+  allocationPct: number | null;
+  /** CHF-per-unit rate applied to reach valueChf; null for a CHF or unknown-currency position. */
+  fxRate: number | null;
+  /** The day the applied rate belongs to (ISO date); null when no rate was applied. */
+  fxRateDate: string | null;
+  fxRateType: FxRateType | null;
 }
 
 export interface Portfolio {
   positions: PortfolioPosition[];
+  /** All totals are in this currency — always "CHF". */
+  totalCurrency: string;
+  /** True when a position could not be converted and is therefore excluded from the totals. */
+  hasUnconverted: boolean;
   totalValue: number;
   totalCost: number;
   gainLoss: number;

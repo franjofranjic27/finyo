@@ -4,7 +4,7 @@ import type { PositionDetail, PriceHistory } from '@/api/positionDetail';
 export function portfolioPosition(
   overrides: Partial<PortfolioPosition> & { id: string },
 ): PortfolioPosition {
-  return {
+  const merged: PortfolioPosition = {
     positionId: overrides.id,
     instrumentId: `instrument-${overrides.id}`,
     assetClass: 'STOCK',
@@ -20,16 +20,28 @@ export function portfolioPosition(
     priceAsOf: '2026-07-10',
     stale: false,
     value: 1000,
+    valueChf: 1000,
     gainLoss: 100,
     returnPct: 11.1,
     allocationPct: 100,
+    fxRate: null,
+    fxRateDate: null,
+    fxRateType: null,
     ...overrides,
   };
+  // valueChf follows value unless a test sets it explicitly — these fixtures are CHF holdings, so
+  // the converted value equals the native one, and a test that overrides only `value` still balances.
+  if (overrides.valueChf === undefined) {
+    merged.valueChf = merged.value;
+  }
+  return merged;
 }
 
 export function portfolio(overrides: Partial<Portfolio> = {}): Portfolio {
   return {
     positions: [portfolioPosition({ id: 'p1' })],
+    totalCurrency: 'CHF',
+    hasUnconverted: false,
     totalValue: 1000,
     totalCost: 900,
     gainLoss: 100,
@@ -58,9 +70,13 @@ export function positionDetail(
     priceAsOf: '2026-07-10',
     stale: false,
     value: 1000,
+    valueChf: 1000,
     gainLoss: 100,
     returnPercent: 11.1,
     portfolioShare: 60,
+    fxRate: null,
+    fxRateDate: null,
+    fxRateType: null,
     factsheetUrl: null,
     factsheet: null,
     ...overrides,

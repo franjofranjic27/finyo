@@ -272,4 +272,55 @@ describe('PositionsTable', () => {
       );
     });
   });
+
+  describe('multi-currency', () => {
+    it('shows a foreign value in its own currency and the applied rate on hover', async () => {
+      const user = userEvent.setup();
+      renderTable([
+        portfolioPosition({
+          id: 'usd',
+          name: 'Vanguard S&P 500',
+          currency: 'USD',
+          value: 1000,      // native USD
+          valueChf: 800,    // converted
+          fxRate: 0.8,
+          fxRateDate: '2026-07-11',
+          fxRateType: 'MID',
+        }),
+      ]);
+
+      // The value cell shows USD, not francs.
+      const usdValue = screen.getByText('$1,000.00');
+      expect(usdValue).toBeInTheDocument();
+
+      // Hovering reveals the CHF figure and the exact rate, so the total is checkable.
+      await user.hover(usdValue);
+      const tooltip = await screen.findByRole('tooltip');
+      expect(tooltip).toHaveTextContent("CHF 800.00");
+      expect(tooltip).toHaveTextContent('USD @ 0.8');
+      expect(tooltip).toHaveTextContent('ECB mid rate');
+    });
+
+    it('dashes the CHF figures of a position that could not be converted', () => {
+      renderTable([
+        portfolioPosition({
+          id: 'gbp',
+          name: 'Unpriced GBP fund',
+          assetClass: 'STOCK',
+          currency: 'GBP',
+          value: 500,
+          valueChf: null,
+          gainLoss: null,
+          returnPct: null,
+          allocationPct: null,
+          fxRate: null,
+        }),
+      ]);
+
+      const row = screen.getByText('Unpriced GBP fund').closest('tr') as HTMLElement;
+      // Native value still shown; the CHF gain/loss, return and share are dashes, not zeros.
+      expect(within(row).getByText('£500.00')).toBeInTheDocument();
+      expect(within(row).getAllByText('—').length).toBeGreaterThanOrEqual(3);
+    });
+  });
 });
