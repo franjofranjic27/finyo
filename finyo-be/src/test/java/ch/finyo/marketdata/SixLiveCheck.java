@@ -68,7 +68,7 @@ class SixLiveCheck extends BaseIntegrationTest {
 
         assertThat(etf.ticker()).isEqualTo("SWDA");
         assertThat(etf.type()).isEqualTo(SecurityType.ETF);
-        // The whole point of V33: this instrument is NOT in CHF, and until now the
+        // The whole point of V34: this instrument is NOT in CHF, and until now the
         // portfolio summed it as if it were.
         assertThat(etf.currency().value()).isEqualTo("USD");
     }

@@ -92,7 +92,7 @@ class InstrumentIT extends BaseIntegrationTest {
 
     @Test
     void a_foreign_currency_and_its_provenance_survive_a_round_trip_through_the_database() {
-        // V33 added instrument.currency and instrument.source. Both go through a
+        // V34 added instrument.currency and instrument.source. Both go through a
         // converter (CurrencyCode) or an enum mapping, and both are what stop a USD
         // position from being summed into the portfolio total as though it were CHF.
         // Only a real Postgres proves the schema and the mapping agree.
@@ -115,7 +115,7 @@ class InstrumentIT extends BaseIntegrationTest {
 
     @Test
     void an_instrument_created_without_a_currency_keeps_it_unknown_rather_than_defaulting_to_CHF() {
-        // V33 makes instrument.currency NULLABLE and gives it no default, and that is the
+        // V34 makes instrument.currency NULLABLE and gives it no default, and that is the
         // load-bearing decision of the whole migration. NULL means "we do not know" —
         // OpenFIGI publishes no currency at all, so instruments resolved through it
         // genuinely have none. A NOT NULL DEFAULT 'CHF' would make an unknown currency

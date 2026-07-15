@@ -347,9 +347,17 @@ Migration **V34**: `instrument_price(isin, price_date, close, currency, source, 
 - **`SyncRunner.record()` ohne `@Transactional`.** Selbstaufruf innerhalb der Bean → Spring-Proxy
   greift nicht. `repository.save()` bringt seine eigene Transaktion mit.
 
-### PR 3 — Kurshistorie
-- [ ] `SixHistoryAdapter` (`fqs/charts.json`, `netting=1440`, bis 2011)
-- [ ] Backfill-Job, Instrument-Chart auf der Positionsdetailseite
+### PR 3 — Kurshistorie ✅ FERTIG (committet)
+- [x] `SixHistoryAdapter` (`fqs/charts.json`, `netting=1440`) — Struktur `valors[].data.{Date[],Close[]}`,
+      **NICHT** spaltenbasiert; `@JsonProperty("Date"/"Close")` nötig (Jackson 3 case-sensitiv, sonst
+      still leere Historie)
+- [x] `PriceBar`/`PriceHistoryProvider`, `MarketDataService.backfill` (Währung aus dem Quote, da
+      charts.json keine liefert) + `priceHistory` (nur DB) + `refreshOrBackfillHeld` (Nachtlauf
+      backfillt Bestandspositionen bei `countByIsin < 2`)
+- [x] Backfill off-read-path: beim Position-Create (ein Call: Quote + Historie) und im Nachtlauf
+- [x] `GET /positions/{id}/price-history` + `PriceHistoryChart` (Fremdwährung ohne CHF-Annahme,
+      Empty-State, TZ-sichere Datumsformatierung)
+- [x] 924 Unit + 316 IT + 680 FE grün; Live-Backfill (749 Nestlé-Tagesschlusskurse) grün
 
 > **Aus PR-2-Review übernommen:** Das Frontend (`PositionsTable`, Value-Spalte) formatiert Kurs
 > und Wert weiterhin hart als CHF via `formatCHF`, obwohl das Backend jetzt ein nullable

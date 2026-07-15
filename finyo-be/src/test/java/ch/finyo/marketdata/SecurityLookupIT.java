@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Two things can only be verified here, and both are silent killers:
  *
- *   1. Migration V33 and the JPA mapping agree. They did not: the migration declared
+ *   1. Migration V34 and the JPA mapping agree. They did not: the migration declared
  *      CHAR(3) while CurrencyCodeConverter maps CurrencyCode to a String — i.e.
  *      VARCHAR — and ddl-auto=validate refused to start the application at all. A unit
  *      test cannot see that; the schema is not in the picture.

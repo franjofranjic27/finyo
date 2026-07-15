@@ -52,7 +52,7 @@ public class Instrument {
     private AssetClass assetClass = AssetClass.STOCK;
 
     /**
-     * Trading currency. Until V33 this did not exist, which meant a USD ETF was summed
+     * Trading currency. Until V34 this did not exist, which meant a USD ETF was summed
      * into the portfolio total as if it were CHF — the total was simply wrong. FX
      * conversion arrives in PR 4; this column is what makes it possible.
      *
