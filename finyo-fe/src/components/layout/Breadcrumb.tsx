@@ -13,6 +13,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/budget': 'nav.budget',
   '/insurance': 'nav.insurance',
   '/accounts': 'nav.accounts',
+  '/documents': 'nav.documents',
   '/settings': 'nav.settings',
   '/admin': 'nav.admin',
 };

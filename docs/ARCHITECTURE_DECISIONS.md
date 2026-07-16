@@ -58,6 +58,48 @@ This document records key architectural decisions made for the finyo project, in
 - 15-minute TTL is appropriate for market data and news: data is stale on that timescale regardless, and it aligns with typical rate-limit windows on free-tier financial APIs.
 - When horizontal scaling becomes necessary, the cache layer can be swapped to Redis by changing `spring.cache.type` and adding the Redis starter — no application code changes required because all cache interactions go through the Spring `@Cacheable` abstraction.
 
+**Amended (2026-07-14, ADR-007):** The `news` cache no longer exists — the RSS module was removed. The rationale above also over-reaches on one point: an in-process cache with a 15-minute TTL is the right tool for *responses*, but it is the wrong tool for *data*. Reference data and prices must survive a restart and an outage of the source, because the sources are unofficial and will be unavailable at some point. Those therefore live in Postgres (`security_reference`, and `instrument_price` from PR 2), with Caffeine only in front of them as a hot-path cache. The rule going forward: **Caffeine caches answers, Postgres stores data** — if losing an entry while the source is down breaks the feature, it does not belong in Caffeine.
+
+---
+
+## ADR-007: Ports and adapters for external data sources
+
+**Decision:** External data sources live behind ports. The **port** (interface plus vendor-neutral DTOs) belongs to the consuming module (`ch.finyo.marketdata.spi`, later `ch.finyo.fx.spi` and `ch.finyo.tax.spi`); the **adapter** that speaks HTTP to a vendor belongs to `ch.finyo.integration.<vendor>`. Market data and FX rates get their own top-level modules (`ch.finyo.marketdata`, `ch.finyo.fx`) rather than living inside `investment`. An ArchUnit test enforces that nothing outside `ch.finyo.integration` depends on it.
+
+**Context:** finyo needs security master data and prices (SIX, OpenFIGI, EODHD), exchange rates (Frankfurter, BAZG) and Swiss tax data (ESTV). The research in `docs/DATENQUELLEN.md` established that the three most valuable sources are all *unofficial*: SIX FQS and the ESTV calculator have no contract, no documentation and no stability promise, and SIX's terms of use permit personal use only — which stops being true the moment finyo has a second user.
+
+**Rationale:**
+- **The sources will change; the domain should not.** A vendor breaking its wire format, or becoming legally unusable, must be a configuration change, not a refactoring. That only holds if a SIX field name (`ProductLine`, `TradingBaseCurrency`) or an ESTV request quirk never escapes the adapter that produced it.
+- **Market data is tenant-free; `Instrument` is not.** The closing price of `IE00B4L5Y983` is identical for every user, while `instrument` carries a `user_id` under ADR-001. Storing prices per user would be duplication with a consistency risk, and it would make a shared price cache impossible. That asymmetry is what justifies a separate module rather than a package inside `investment`.
+- **Several modules need the same data.** FX is needed by `investment`, `transaction`, `wealth` and `tax`; ESTV by `tax` and `pillar3`. Homing those clients in any one feature module would point the dependency the wrong way.
+- **A single fat `MarketDataProvider` interface was rejected.** The providers are asymmetric: SIX resolves master data *and* prices, OpenFIGI only master data. One interface would force OpenFIGI to answer `latestQuote()` with `Optional.empty()` — an interface-segregation violation that disguises itself as "the provider just returned nothing" and poisons debugging. Instead the ports are split by capability, and a `supports(SecurityId)` predicate expresses what each provider can resolve (OpenFIGI has no concept of a Swiss valor number).
+- **The chain order lives in configuration, not in `@Order` annotations.** Which vendor answers first is an operational decision. `finyo.marketdata.reference-providers: [six, openfigi]` is the whole switch; the multi-user migration to a licensed provider is three YAML lines. Spring profiles were rejected for this: they describe environments, and provider choice is orthogonal — one may well want to test EODHD in dev. Abusing profiles as feature switches multiplies the test matrix.
+- **ArchUnit rather than review discipline.** The boundary decays silently under normal maintenance — someone imports an FQS record into a service "just to read the ProductLine", and a year later SIX is wired through half the codebase. The rule costs seconds to run and is the reason the boundary still exists in six months.
+
+**Consequences:** Three new packages and one `spi` sub-package per consuming module. In exchange, the day SIX has to be switched off is a config change. `SixLicenceCheck` makes the personal-use threshold an executable assertion instead of a footnote: it logs an error on every start if SIX is enabled while more than one user exists.
+
+---
+
+## ADR-008: Provenance — "unknown", "unavailable" and "verified" are different things
+
+**Decision:** Every externally derived value carries where it came from, and the type system keeps the three possible states apart:
+
+- A lookup returns `LookupResult.Found` / `NotFound` / `Unavailable` — never an `Optional`.
+- `Instrument.currency` is **nullable**. `NULL` means unknown, and that is not the same as a verified `CHF`.
+- `Instrument.source` distinguishes `SIX` / `OPENFIGI` (verified), `MANUAL` (the user), `HEURISTIC` (asked, nobody knew — the asset class was guessed from the name) and `UNRESOLVED` (could not ask; needs another attempt, and gets one on the next touch).
+
+**Context:** This project already had the bug this ADR exists to prevent, twice. When the SIX API key was absent — its default state — `PortfolioService` silently fell back to the *purchase price*, so every position showed a gain/loss of exactly 0.00 and nothing said the number was not a market price. Separately, `Instrument` had no currency column at all, so a USD-quoted ETF was summed into the portfolio total as though it were francs. Both are the same failure: a guess presented as a fact.
+
+The first cut of the market-data module rebuilt that failure one level up, which is why this ADR exists. `Optional.empty()` was returned both when a provider did not know a security and when it could not be reached; and the missing currency from OpenFIGI (which publishes none) was defaulted to CHF while being stamped `source = OPENFIGI`. A USD ETF resolved through the fallback path — exactly the path taken when SIX does not know it or is down — would have been stored as a Swiss-franc instrument with authoritative-looking provenance.
+
+**Rationale:**
+- **`Optional` is the wrong type for a lookup against an unreliable source.** "The catalogue does not contain this security" is a durable fact about the world and licenses a fallback. "The network was down" is a fact about us and licenses nothing. Collapsing them means a provider outage during an import freezes guesses into the database permanently: the instrument then exists, is found by ISIN on every subsequent import, and is never re-resolved.
+- **A default value is a lie with good posture.** `NOT NULL DEFAULT 'CHF'` makes an unknown currency indistinguishable from a verified one and hands the FX converter (PR 4) a guess it will treat as data. Nullable is uncomfortable and correct — it forces the consumer to decide what to do about not knowing.
+- **Record provenance is not field provenance.** `source = OPENFIGI` says the master data came from OpenFIGI. It says nothing about the currency, which OpenFIGI does not publish. Conflating the two turns the provenance flag itself into a false assurance.
+- The cost is real: three states to handle instead of two, and a nullable column that every consumer must think about. That is the price of not being confidently wrong.
+
+**Consequences:** `ResilientCall` returns a typed `CallOutcome` instead of swallowing failures into an empty `Optional`, and re-throws `Error` and `InterruptedException` rather than reporting them as "the vendor had nothing" — a broken JVM must not quietly write master data. `PositionService` re-resolves `UNRESOLVED` instruments the next time it touches them, so an outage degrades the data rather than corrupting it.
+
 ---
 
 ## ADR-005: Spring Shell version alignment
@@ -70,3 +112,41 @@ This document records key architectural decisions made for the finyo project, in
 - Spring Shell 3.4.x depends on Spring Framework 6.x APIs. Running it under Spring Framework 7.x may appear to work initially but will break on any API that was removed or changed in the Framework 7 migration (e.g., `HttpInputMessage`, various `@Deprecated(forRemoval=true)` targets).
 - Spring Shell 4.0.0 is the supported version for this Spring Boot generation and is available on Maven Central.
 - The CLI module is currently a low-priority feature; if Spring Shell 4.0.x introduces any breaking changes to the shell DSL, the migration cost at this stage (no commands written yet) is zero.
+
+---
+
+## ADR-006: Cloud document ingestion — delta polling, folder-gated auto-apply
+
+**Decision:** Tax documents are pulled from a SharePoint library via Microsoft Graph on a 15-minute delta poll (not via webhooks). Files are never copied into finyo — only metadata, a reference and the extraction result are stored. A value is written into a tax year unattended only when the folder path and the document agree on both type and year, and only into a field that is still empty. Access uses app-only client credentials scoped with `Sites.Selected`.
+
+**Context:** Documents (salary certificates, insurance statements, assessments) are filed in OneDrive/SharePoint under a `STE-<year>/<type>/` convention. The existing `taxdocument` module could already classify and extract them, but was preview-only: it persisted nothing and had no way to be fed by anything but an upload.
+
+**Rationale:**
+- **Polling over webhooks.** Graph change notifications for `driveItem` carry no payload, so a delta query must follow regardless. Subscriptions expire after ~30 days and need renewal, and a missed notification means a document silently never arrives. A poll is self-healing: whatever one run misses, the next picks up. A webhook can be added later purely as a latency optimization, but must never carry correctness.
+- **The folder, not the confidence, gates auto-apply.** `DocumentClassifier` normalizes its score per type against the sum of that type's keyword weights, and those maxima are unequal (salary 10, assessment 14). A score is therefore not comparable across types, and a global threshold would permanently lock some types out of automation. The folder convention is user-maintained and a far stronger signal. The year cross-check specifically prevents a 2024 document filed under `STE-2025/` from silently overwriting the 2025 figures.
+- **Never overwrite unattended.** Auto-apply fills empty fields only; a stored value that differs is reported as a conflict and routed to the review inbox. `TaxYearService.upsert()` is a full replace and is deliberately not used on this path — a payload built from one document would null out every other field of the year.
+- **`cTag`, not a content hash.** A unique constraint on a content hash would collide on legitimate duplicates and break on every delta full-resync. Graph's `cTag` changes only when content changes and needs no download to check. It also provides the repair path: re-uploading an OCR'd version of a failed scan changes the `cTag` and the document is reprocessed automatically.
+- **`Sites.Selected` over `Files.Read.All`.** The latter grants read access to every OneDrive and site in the tenant to a self-hosted service. `Sites.Selected` grants nothing until an admin hands out access to one named site.
+- **No file copies.** SharePoint is already the system of record and is backed up there. Storing a second copy of tax documents on the application server buys nothing and enlarges both the database and the blast radius.
+
+**Consequence:** Scanned PDFs without an OCR text layer cannot be processed at all — the extraction stack reads text, not pixels. Enabling OCR in the scanner software is a precondition, not a nice-to-have.
+
+---
+
+## ADR-009: Money, currency and FX — `plus()` throws, `FxRateType` has no default
+
+**Decision:** A foreign-currency portfolio is totalled in CHF by converting each position at one place — the aggregation boundary in `PortfolioService` — using rates stored in `fx_rate` and read from the database only. Currency conversion never happens implicitly: the `Money` value object's `plus()` refuses to add two currencies, and `FxConverter.toChf` takes the rate type (`MID` / `OFFICIAL_CH`) as a required argument with no default. Rates live in a tenant-free `fx` module behind a `FxRateProvider` port; Frankfurter (self-hosted, ECB mid) and BAZG (official Swiss sell rate) are adapters in `ch.finyo.integration`. A position whose currency has no stored rate is excluded from the CHF total and flagged, never counted at face value.
+
+**Context:** `PortfolioService` summed position values directly with `BigDecimal::add`, so a USD holding was added to the total as though its value were francs — a wrong number, not a rounding error. Instruments carry a nullable `currency` (ADR-008) but there was no conversion. Two vendors disagree on direction (Frankfurter returns units-per-CHF, BAZG CHF-per-unit) and on which rate is appropriate (mid for valuation, the ~1.2 %-higher sell rate for tax).
+
+**Rationale:**
+- **A type that refuses the bug.** `Money.plus()` throwing on a currency mismatch is the guardrail no review enforces as reliably — where FX is needed, the developer must convert first and say so. There is no implicit rate anywhere in the domain.
+- **`FxRateType` is required, never defaulted.** On the same day the ECB mid rate and the BAZG sell rate for EUR/CHF sat ~1.2 % apart; on a six-figure portfolio that is real money. A default overload would hide exactly the decision that must be made deliberately. Portfolio valuation uses `MID`; the official rate is stored for the tax strand and can never be picked up for valuation.
+- **Direction is fixed by the schema, not by convention.** `fx_rate` stores only `chf_per_unit` — CHF per one unit of the foreign currency. Frankfurter's units-per-CHF is inverted inside its adapter; BAZG already speaks CHF-per-unit. Both fallible directions are sealed in the adapters and never reach the domain.
+- **Reads never touch the network.** Like prices (ADR-004/007), a conversion is a database lookup; `fx_rate` is filled by the nightly `FxRateSyncJob`. A dead Frankfurter cannot slow a portfolio page — at worst the newest rate is a day old, which for a daily reference rate is no loss.
+- **Value at today's rate, cost at the purchase-day rate.** The CHF gain/loss then reflects the real return including the currency move, not just the price move. The nearest rate at or before the date is used; a weekend gap is filled with the last real rate, never interpolated.
+- **Convert once, at the aggregation boundary.** Stored always in the original currency, converted only where values are summed (`PortfolioService`, and the wealth net-worth roll-up which now reads `valueChf`). The applied rate is returned in the response so the user can reconstruct the number rather than trust it.
+- **Unconvertible is excluded, not guessed.** A currency with no stored rate yet makes the position `Unconvertible`: kept out of the CHF total, its native value still shown, and the total flagged partial. Folding in a made-up rate would rebuild the very bug this ADR exists to prevent.
+- **No entity retrofit (yet).** `Money` is used as a value object at the boundary, not mapped onto `Instrument`/`Position`/`Transaction`/`Account` with `@Embedded`. That retrofit is larger than the fix warrants and is deliberately deferred.
+
+**Consequence:** Frankfurter is a new runtime dependency (self-hosted in `compose.yml`, so no quota or third-party runtime coupling). BAZG's `OFFICIAL_CH` rates are stored but have no consumer until the tax strand (PR 6–9). The `Money.plus()` guardrail only covers code paths that route through it — budget, tax and 3a remain plain `BigDecimal` (all CHF by law).

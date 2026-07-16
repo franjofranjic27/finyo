@@ -1,5 +1,6 @@
 package ch.finyo.taxdocument;
 
+import ch.finyo.common.DocumentBusyException;
 import ch.finyo.common.DocumentProcessingException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -94,6 +95,11 @@ class PdfTextExtractionServiceTest {
                 .hasMessageContaining("exceeds the supported size");
     }
 
+    /**
+     * Exhausted parse slots are transient: batch ingestion must be able to tell
+     * this apart from a permanently unreadable document, or it would mark healthy
+     * PDFs as failed whenever interactive uploads saturate the slots.
+     */
     @Test
     void rejectsWhenNoParseSlotBecomesAvailable() throws IOException {
         PdfTextExtractionService busyService =
@@ -101,8 +107,19 @@ class PdfTextExtractionServiceTest {
         byte[] pdf = pdfWithText(textLines());
 
         assertThatThrownBy(() -> busyService.extractText(pdf))
-                .isInstanceOf(DocumentProcessingException.class)
+                .isInstanceOf(DocumentBusyException.class)
                 .hasMessageContaining("busy");
+    }
+
+    /** The counterpart: a scan is permanently unreadable and must NOT look transient. */
+    @Test
+    void scanFailureIsNotReportedAsTransient() throws IOException {
+        byte[] scan = pdfWithText("x");
+
+        assertThatThrownBy(() -> service.extractText(scan))
+                .isInstanceOf(DocumentProcessingException.class)
+                .isNotInstanceOf(DocumentBusyException.class)
+                .hasMessageContaining("scan");
     }
 
     @Test

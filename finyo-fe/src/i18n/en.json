@@ -8,6 +8,7 @@
     "budget": "Budget",
     "insurance": "Insurance",
     "accounts": "Accounts",
+    "documents": "Documents",
     "settings": "Settings",
     "admin": "Admin",
     "adminPillar3Products": "3a Products",
@@ -123,7 +124,8 @@
       "totalValue": "Total Value",
       "invested": "Invested",
       "gainLoss": "Gain / Loss",
-      "returnPct": "Return"
+      "returnPct": "Return",
+      "partialTotal": "One or more positions have no exchange rate yet and are not included in the total."
     },
     "add": {
       "title": "Add Security",
@@ -138,7 +140,13 @@
       "csvImport": "Import CSV",
       "csvHint": "CSV format: Name; ISIN; Quantity; Purchase price; Price (optional) — delimiter ; or ,",
       "csvResult": "{{imported}} imported, {{failed}} failed",
-      "csvNoRows": "No valid rows found in the file"
+      "csvNoRows": "No valid rows found in the file",
+      "lookup": {
+        "searching": "Looking up the security …",
+        "priceAuto": "price fetched automatically",
+        "notFound": "No listed security for this ISIN/valor — enter name and price by hand",
+        "unavailable": "Security lookup is currently unavailable — you can still enter it manually"
+      }
     },
     "table": {
       "title": "Positions",
@@ -150,10 +158,28 @@
       "gainLoss": "G/L",
       "returnPct": "Return",
       "allocation": "Share",
+      "fxMid": "ECB mid rate",
+      "fxOfficial": "Official CH rate",
       "edit": "Edit position",
       "remove": "Remove position",
       "confirmRemove": "Remove position \"{{name}}\"?",
       "empty": "No positions yet — add your first security above"
+    },
+    "price": {
+      "badge": {
+        "MARKET": "Market",
+        "MANUAL": "Manual",
+        "PURCHASE": "No price",
+        "stale": "Price from {{date}}",
+        "staleUnknown": "Price outdated"
+      },
+      "asOf": "Price from {{date}}",
+      "asOfUnknown": "Price date unknown",
+      "marketHint": "Market price, 15 min delayed",
+      "staleHint": "Older than expected — the market may have moved since",
+      "manualHint": "A price you entered manually",
+      "purchaseHint": "No price available — the position is shown at its purchase cost",
+      "unknownCurrency": "unknown"
     },
     "allocation": {
       "title": "Allocation",
@@ -167,9 +193,14 @@
       "range3y": "3Y",
       "notEnoughData": "Not enough data yet — the history grows with every portfolio view"
     },
+    "priceHistory": {
+      "title": "Price history",
+      "empty": "No price data yet",
+      "axisPrice": "Price",
+      "tooltipDate": "Date"
+    },
     "position": {
       "loadError": "Failed to load the position",
-      "liveChip": "Price live · SIX",
       "stats": {
         "value": "Value",
         "quantity": "Quantity",
@@ -186,12 +217,13 @@
         "currency": "Currency",
         "ter": "TER",
         "priceSource": "Price Source",
+        "priceAsOf": "Price As Of",
         "portfolioShare": "Portfolio Share"
       },
       "priceSourceValue": {
-        "LIVE": "Live (SIX)",
-        "CACHE": "Cached",
-        "PURCHASE": "Purchase price"
+        "MARKET": "Market price (15 min delayed)",
+        "MANUAL": "Entered manually",
+        "PURCHASE": "No price — purchase cost"
       },
       "editDialog": {
         "title": "Edit product",
@@ -209,7 +241,7 @@
         "purchasePrice": "Avg. Purchase Price",
         "purchaseDate": "Purchase Date",
         "currentPrice": "Current Price (optional)",
-        "currentPriceHint": "Overrides the market price — a live price refresh may replace it again",
+        "currentPriceHint": "Stored as a manual price and shown instead of the market price",
         "save": "Save",
         "quantityInvalid": "Quantity must be greater than 0",
         "purchasePriceInvalid": "Purchase price must be 0 or greater",
@@ -721,6 +753,66 @@
       "submitEdit": "Save"
     },
     "privacyNote": "IBANs and contract numbers are stored per user; card numbers (PAN), CVV or e-banking credentials are never captured."
+  },
+  "documents": {
+    "subtitle": "Tax documents imported from your SharePoint folder. finyo applies unambiguous documents on its own and asks you whenever something does not add up.",
+    "loadError": "Could not load documents",
+    "empty": {
+      "title": "No documents yet",
+      "text": "Synchronise to import the tax documents from your SharePoint folder."
+    },
+    "sync": {
+      "button": "Synchronise now",
+      "pending": "Synchronising…",
+      "result": "{{autoApplied}} applied · {{needsReview}} to review · {{failed}} failed"
+    },
+    "status": {
+      "DISCOVERED": "Discovered",
+      "ANALYZED": "Analysed",
+      "AUTO_APPLIED": "Applied automatically",
+      "NEEDS_REVIEW": "Needs review",
+      "APPLIED": "Applied",
+      "DISMISSED": "Dismissed",
+      "FAILED": "Failed"
+    },
+    "types": {
+      "SALARY_CERTIFICATE": "Salary certificate",
+      "HEALTH_INSURANCE": "Health insurance premium statement",
+      "SECURITIES_STATEMENT": "Securities statement",
+      "PILLAR_3A": "Pillar 3a statement",
+      "ASSESSMENT": "Assessment notice",
+      "UNKNOWN": "Unknown type"
+    },
+    "meta": {
+      "detectedType": "Document: {{type}}",
+      "folderType": "Folder: {{type}}",
+      "documentYear": "Document year {{year}}",
+      "folderYear": "Folder year {{year}}",
+      "confidence": "{{pct}}% confidence",
+      "deletedInDrive": "no longer in the folder"
+    },
+    "review": {
+      "title": "Why finyo did not apply this on its own",
+      "expand": "Show review",
+      "collapse": "Hide review",
+      "reasons": {
+        "typeMismatch": "The folder says {{folderType}}, but the document looks like {{detectedType}}.",
+        "yearMismatch": "The folder says tax year {{folderYear}}, but the document names {{documentYear}}.",
+        "unknownType": "The document type could not be detected.",
+        "valueConflict": "A value in the tax year differs from the one in the document."
+      },
+      "year": "Target tax year",
+      "yearHint": "Applying overwrites only the selected fields of the target year.",
+      "noFields": "No values could be read from this document.",
+      "apply": "Apply",
+      "dismiss": "Dismiss"
+    },
+    "table": {
+      "field": "Field",
+      "value": "Value",
+      "target": "Target",
+      "infoOnly": "info only"
+    }
   },
   "admin": {
     "products": {

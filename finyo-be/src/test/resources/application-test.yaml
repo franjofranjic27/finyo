@@ -1,3 +1,36 @@
+finyo:
+  graph:
+    # Explicit even though it is the production default: a scheduled sync starting
+    # inside every @SpringBootTest context and firing at a non-existent Graph
+    # endpoint would be a flaky-test factory.
+    enabled: false
+  sync:
+    # No scheduled job may fire during a test — it would reach for the network.
+    enabled: false
+  # Every market-data provider is off in tests. Without this, any integration test
+  # that creates a position would issue a live HTTP call to SIX or OpenFIGI: slow,
+  # flaky, dependent on the network, and rude to an endpoint we are only tolerated
+  # on. Adapter behaviour is covered by unit tests against a MockRestServiceServer;
+  # the chain itself is covered by wiring a stub provider.
+  marketdata:
+    reference-providers: []
+    quote-providers: []
+    history-providers: []
+    six:
+      enabled: false
+    openfigi:
+      enabled: false
+    eodhd:
+      enabled: false
+  # Both FX providers off, same reasoning: a test must never reach Frankfurter or BAZG. Adapter
+  # behaviour is unit-tested against a MockRestServiceServer; FxConverter is tested against stored
+  # rows. With them disabled neither adapter bean exists, so nothing can call out.
+  fx:
+    frankfurter:
+      enabled: false
+    bazg:
+      enabled: false
+
 spring:
   datasource:
     url: jdbc:tc:postgresql:17:///finyo

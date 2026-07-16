@@ -15,7 +15,6 @@
   "revokeRefreshToken": true,
   "refreshTokenMaxReuse": 0,
   "offlineSessionMaxLifespanEnabled": false,
-  "loginTheme": "finyo",
   "requiredActions": [],
   "roles": {
     "realm": [

@@ -11,11 +11,15 @@ const CHART_HEIGHT = 240;
 export function AllocationDonut({ positions }: Readonly<{ positions: PortfolioPosition[] }>) {
   const { t } = useTranslation();
 
-  const chartData = positions.map((position) => ({
-    id: position.id,
-    name: displayName(position),
-    value: position.value,
-  }));
+  // valueChf, not value: the donut is a CHF allocation, so a position is weighted by its converted
+  // value. One with no rate yet (valueChf null) has no place in a franc pie and is left out.
+  const chartData = positions
+    .filter((position) => position.valueChf !== null)
+    .map((position) => ({
+      id: position.id,
+      name: displayName(position),
+      value: position.valueChf as number,
+    }));
 
   return (
     <Card>
@@ -82,7 +86,7 @@ export function AllocationDonut({ positions }: Readonly<{ positions: PortfolioPo
                   />
                   <span className="min-w-0 truncate">{displayName(position)}</span>
                   <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
-                    {formatPercent(position.allocationPct)}
+                    {position.allocationPct === null ? '—' : formatPercent(position.allocationPct)}
                   </span>
                 </li>
               ))}

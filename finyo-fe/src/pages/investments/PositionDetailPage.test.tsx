@@ -11,7 +11,7 @@ import {
 import { portfolioApi } from '@/api/portfolio';
 import { positionDetailApi } from '@/api/positionDetail';
 import { renderWithProviders } from '@/test/test-utils';
-import { positionDetail } from '@/test/fixtures/portfolio';
+import { positionDetail, priceHistory } from '@/test/fixtures/portfolio';
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -42,6 +42,7 @@ vi.mock('@/api/positionDetail', () => ({
     uploadFactsheet: vi.fn(),
     fetchFactsheet: vi.fn(),
     deleteFactsheet: vi.fn(),
+    getPriceHistory: vi.fn(),
   },
 }));
 
@@ -89,6 +90,7 @@ describe('PositionDetailPage', () => {
     vi.mocked(positionDetailApi.updateInstrument).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.uploadFactsheet).mockResolvedValue(detail);
     vi.mocked(positionDetailApi.deleteFactsheet).mockResolvedValue(undefined);
+    vi.mocked(positionDetailApi.getPriceHistory).mockResolvedValue(priceHistory());
     vi.mocked(portfolioApi.deletePosition).mockResolvedValue(undefined);
   });
 
@@ -96,7 +98,7 @@ describe('PositionDetailPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Nestlé SA', level: 2 })).toBeInTheDocument();
-    expect(screen.getByText('Price live · SIX')).toBeInTheDocument();
+    expect(screen.getByText('Market')).toBeInTheDocument();
     expect(screen.getByText('CH0038863350 · CHF')).toBeInTheDocument();
 
     // Stat tiles
@@ -110,21 +112,61 @@ describe('PositionDetailPage', () => {
     expect(screen.getAllByText('Individual stocks')).toHaveLength(2);
     expect(screen.getByText('3886335')).toBeInTheDocument();
     expect(screen.getByText('0.15 %')).toBeInTheDocument();
-    expect(screen.getByText('Live (SIX)')).toBeInTheDocument();
+    expect(screen.getByText('Market price (15 min delayed)')).toBeInTheDocument();
+    expect(screen.getByText('10 Jul 2026')).toBeInTheDocument();
     expect(screen.getByText('60.0%')).toBeInTheDocument();
 
     expect(positionDetailApi.getPosition).toHaveBeenCalledWith('test-token', 'p1');
   });
 
-  it('hides the live chip when the price is not live', async () => {
+  it('renders the price-history chart for the loaded position', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Price history')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(positionDetailApi.getPriceHistory).toHaveBeenCalledWith('p1', 'test-token'),
+    );
+  });
+
+  it('warns with the trading day when the market price is stale', async () => {
     vi.mocked(positionDetailApi.getPosition).mockResolvedValue({
       ...detail,
-      priceSource: 'CACHE',
+      priceAsOf: '2026-07-03',
+      stale: true,
     });
     renderPage();
 
-    await screen.findByRole('heading', { name: 'Nestlé SA', level: 2 });
-    expect(screen.queryByText('Price live · SIX')).not.toBeInTheDocument();
+    expect(await screen.findByText('Price from 03 Jul 2026')).toBeInTheDocument();
+    expect(screen.getByText('Market price (15 min delayed)')).toBeInTheDocument();
+  });
+
+  it('labels a hand-typed price as manual', async () => {
+    vi.mocked(positionDetailApi.getPosition).mockResolvedValue({
+      ...detail,
+      priceSource: 'MANUAL',
+    });
+    renderPage();
+
+    expect(await screen.findByText('Manual')).toBeInTheDocument();
+    expect(screen.getByText('Entered manually')).toBeInTheDocument();
+  });
+
+  it('states that there is no price when the position is carried at purchase cost', async () => {
+    vi.mocked(positionDetailApi.getPosition).mockResolvedValue({
+      ...detail,
+      priceSource: 'PURCHASE',
+      priceAsOf: null,
+      currency: null,
+    });
+    renderPage();
+
+    expect(await screen.findByText('No price')).toBeInTheDocument();
+    expect(screen.getByText('No price — purchase cost')).toBeInTheDocument();
+    // No trading day exists for a purchase-cost valuation.
+    expect(screen.queryByText('Price As Of')).not.toBeInTheDocument();
+    // An unknown currency must never be shown as CHF.
+    expect(screen.getByText('unknown')).toBeInTheDocument();
+    expect(screen.queryByText('CH0038863350 · CHF')).not.toBeInTheDocument();
   });
 
   it('publishes the breadcrumb "Portfolio / Position – {name}"', async () => {

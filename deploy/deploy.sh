@@ -1,7 +1,17 @@
 #!/bin/bash
-# Deploys a release on the VPS. Piped over SSH by the release workflow's
+# Deploys a finyo release on the VPS. Piped over SSH by the release workflow's
 # deploy job, so the server always executes the version from the released tag:
 #   bash -s -- <tag> <version> <release_be> <release_fe>
+#
+# The shared services (Postgres, Keycloak, Caddy, monitoring) are operated
+# centrally by the vps-platform repo. finyo runs ONLY be/fe on the shared `edge`
+# network. A routine release just updates those two images.
+#
+# The platform registration artifacts — deploy/sites/finyo.caddy,
+# keycloak/finyo-realm.prod.json, deploy/finyo.yml — change rarely. When they
+# do, register them deliberately (not on every code deploy) by pushing them to
+# /opt/platform/{caddy/sites,keycloak/import,prometheus/targets} and running
+# ~/vps-platform/deploy/lib/onboard.sh finyo. See vps-platform docs/ONBOARD_APP.md.
 set -euo pipefail
 
 TAG="$1"
@@ -11,7 +21,7 @@ RELEASE_FE="$4"
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/finyo}"
 
 compose() {
-	docker compose -f compose.prod.yml --env-file .env.prod "$@"
+	docker compose -p finyo -f compose.prod.yml --env-file .env.prod "$@"
 }
 
 set_version() {
@@ -31,11 +41,13 @@ git checkout -f "$TAG"
 
 [ "$RELEASE_BE" = "true" ] && set_version FINYO_BE_VERSION
 [ "$RELEASE_FE" = "true" ] && set_version FINYO_FE_VERSION
+# be/fe need the shared IDP subdomain; ensure it is set (idempotent)
+grep -q '^AUTH_DOMAIN=' .env.prod || echo 'AUTH_DOMAIN=auth.frama-maschinenhandel.ch' >>.env.prod
 
-# shared reverse-proxy network (idempotent; used by the monitoring stack)
+# shared platform network (idempotent; created by the platform)
 docker network create edge 2>/dev/null || true
 
-echo "==> Pulling images and restarting"
+echo "==> Pulling images and restarting be/fe"
 compose pull --quiet
 compose up -d
 

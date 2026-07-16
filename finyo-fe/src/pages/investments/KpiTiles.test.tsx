@@ -32,4 +32,18 @@ describe('KpiTiles', () => {
     expect(screen.getByText('CHF -800.00')).toHaveClass('text-red-500');
     expect(screen.getByText('-8.0%')).toHaveClass('text-red-500');
   });
+
+  it('warns that the total is partial when a position could not be converted', () => {
+    renderTiles({ hasUnconverted: true });
+
+    expect(
+      screen.getByText(/no exchange rate yet and are not included in the total/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no partial-total warning when everything converted', () => {
+    renderTiles({ hasUnconverted: false });
+
+    expect(screen.queryByText(/not included in the total/i)).not.toBeInTheDocument();
+  });
 });

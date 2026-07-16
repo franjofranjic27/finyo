@@ -46,6 +46,18 @@ public class PositionDetailController {
         return ResponseEntity.ok(positionDetailService.getDetail(positionId, userId));
     }
 
+    @GetMapping("/price-history")
+    @Operation(summary = "Daily closing prices for the position's instrument",
+            description = "Stored market prices for the position's instrument, oldest first, for the "
+                    + "last three years. Read-only; empty when the instrument is unlisted or has no ISIN.")
+    @ApiResponse(responseCode = "200", description = "Price history returned")
+    @ApiResponse(responseCode = "404", description = "Position not found")
+    public ResponseEntity<PriceHistoryResponse> getPriceHistory(@PathVariable UUID positionId) {
+        String userId = userContextProvider.getUserId();
+        log.info("GET /api/v1/positions/{}/price-history user={}", positionId, userId);
+        return ResponseEntity.ok(positionDetailService.getPriceHistory(positionId, userId));
+    }
+
     @PatchMapping
     @Operation(summary = "Update a holding",
             description = "Partial update of the position itself: quantity, purchasePrice and currentPrice "

@@ -4,6 +4,8 @@ import ch.finyo.common.ResourceNotFoundException;
 import ch.finyo.common.SwissTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,11 +13,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Month;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.argThat;
@@ -60,6 +66,9 @@ class TaxYearServiceTest {
 
     @InjectMocks
     private TaxYearService service;
+
+    @Captor
+    private ArgumentCaptor<TaxYear> savedYear;
 
     // -------------------------------------------------------------------------
     // Builders / canned data
@@ -489,5 +498,248 @@ class TaxYearServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Tax payment");
         then(taxPaymentRepository).should(never()).delete(any(TaxPayment.class));
+    }
+
+    // =========================================================================
+    // applyExtractedFields() — merge semantics of the document ingestion path
+    //
+    // The rule that carries the most weight: without overwrite, a stored value
+    // that DIFFERS from the extracted one is reported as a conflict, never
+    // silently replaced. Anything else would let a mis-parsed document destroy
+    // figures the user entered by hand in a tax return.
+    // =========================================================================
+
+    private static final BigDecimal SALARY = new BigDecimal("52592.00");
+
+    /** An existing year whose extraction target fields are all still empty. */
+    private TaxYear yearWithEmptyFields() {
+        return incompleteYear(TaxYearStatus.OPEN);
+    }
+
+    @Test
+    void appliesAValueToAnEmptyField() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields()));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        assertThat(result.skipped()).isEmpty();
+        assertThat(result.hasConflicts()).isFalse();
+        then(taxYearRepository).should().save(savedYear.capture());
+        assertThat(savedYear.getValue().getGrossEmploymentIncome()).isEqualByComparingTo(SALARY);
+    }
+
+    @Test
+    void doesNotOverwriteAnExistingDifferentValue() {
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .grossEmploymentIncome(new BigDecimal("48000.00"))
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.skipped()).containsExactly("grossEmploymentIncome");
+        assertThat(result.applied()).isEmpty();
+        assertThat(result.hasConflicts()).isTrue();
+        // Nothing was applied and the year already exists — no write may reach the DB
+        then(taxYearRepository).should(never()).save(any());
+    }
+
+    /** Re-processing the same document must stay idempotent, not raise a conflict. */
+    @Test
+    void treatsAnIdenticalExistingValueAsAppliedRatherThanAConflict() {
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .grossEmploymentIncome(SALARY)
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        assertThat(result.skipped()).isEmpty();
+        then(taxYearRepository).should().save(savedYear.capture());
+        assertThat(savedYear.getValue().getGrossEmploymentIncome()).isEqualByComparingTo(SALARY);
+    }
+
+    /** BigDecimal.equals is scale-sensitive; 52592.0 vs 52592.00 is the same money, not a conflict. */
+    @Test
+    void treatsADifferentScaleOfTheSameAmountAsUnchanged() {
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .grossEmploymentIncome(new BigDecimal("52592.0"))
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", new BigDecimal("52592.00")), false);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        assertThat(result.skipped()).isEmpty();
+    }
+
+    @Test
+    void overwritesAnExistingDifferentValueWhenOverwriteIsRequested() {
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .grossEmploymentIncome(new BigDecimal("48000.00"))
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), true);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        assertThat(result.skipped()).isEmpty();
+        then(taxYearRepository).should().save(savedYear.capture());
+        assertThat(savedYear.getValue().getGrossEmploymentIncome()).isEqualByComparingTo(SALARY);
+    }
+
+    @Test
+    void createsTheTaxYearWhenItDoesNotExistYet() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.empty());
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should().save(savedYear.capture());
+        TaxYear created = savedYear.getValue();
+        assertThat(created.getUserId()).isEqualTo(USER_ID);
+        assertThat(created.getYear()).isEqualTo(YEAR);
+        assertThat(created.getStatus()).isEqualTo(TaxYearStatus.OPEN);
+        assertThat(created.getId()).isNull();
+        assertThat(created.getGrossEmploymentIncome()).isEqualByComparingTo(SALARY);
+    }
+
+    @Test
+    void appliesAllSupportedTargetFieldsInOneCall() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields()));
+        Map<String, BigDecimal> fields = new LinkedHashMap<>();
+        fields.put("grossEmploymentIncome", SALARY);
+        fields.put("investmentIncome", new BigDecimal("1200.00"));
+        fields.put("deductionInsurancePremiums", new BigDecimal("3600.00"));
+        fields.put("pillar3aContribution", new BigDecimal("7056.00"));
+        fields.put("netWealth", new BigDecimal("150000.00"));
+        fields.put("assessedAmount", new BigDecimal("8400.00"));
+
+        FieldApplyResult result = service.applyExtractedFields(USER_ID, YEAR, fields, false);
+
+        assertThat(result.applied()).containsExactlyInAnyOrderElementsOf(fields.keySet());
+        assertThat(result.skipped()).isEmpty();
+        then(taxYearRepository).should().save(savedYear.capture());
+        TaxYear saved = savedYear.getValue();
+        assertThat(saved.getGrossEmploymentIncome()).isEqualByComparingTo("52592.00");
+        assertThat(saved.getInvestmentIncome()).isEqualByComparingTo("1200.00");
+        assertThat(saved.getDeductionInsurancePremiums()).isEqualByComparingTo("3600.00");
+        assertThat(saved.getPillar3aContribution()).isEqualByComparingTo("7056.00");
+        assertThat(saved.getNetWealth()).isEqualByComparingTo("150000.00");
+        // assessedAmount is the only target that lives on TaxYear itself, not on TaxInputs
+        assertThat(saved.getAssessedAmount()).isEqualByComparingTo("8400.00");
+    }
+
+    @Test
+    void appliesEmptyFieldsAndReportsConflictingOnesFromTheSameCall() {
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .grossEmploymentIncome(new BigDecimal("48000.00"))
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+        Map<String, BigDecimal> fields = new LinkedHashMap<>();
+        fields.put("grossEmploymentIncome", SALARY);
+        fields.put("pillar3aContribution", new BigDecimal("7056.00"));
+
+        FieldApplyResult result = service.applyExtractedFields(USER_ID, YEAR, fields, false);
+
+        assertThat(result.applied()).containsExactly("pillar3aContribution");
+        assertThat(result.skipped()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should().save(savedYear.capture());
+        TaxYear saved = savedYear.getValue();
+        assertThat(saved.getPillar3aContribution()).isEqualByComparingTo("7056.00");
+        assertThat(saved.getGrossEmploymentIncome()).isEqualByComparingTo("48000.00");
+    }
+
+    /** Merge, not full replace: fields outside the payload must survive untouched. */
+    @Test
+    void leavesFieldsOutsideThePayloadUntouched() {
+        LocalDate filingDeadline = LocalDate.of(2026, Month.MARCH, 31);
+        TaxYear existing = yearWithEmptyFields().toBuilder()
+                .cantonCode("SG")
+                .civilStatus(TaxCivilStatus.MARRIED)
+                .rentalIncome(new BigDecimal("9600.00"))
+                .deductionDebtInterest(new BigDecimal("2400.00"))
+                .filingDeadline(filingDeadline)
+                .build();
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR)).willReturn(Optional.of(existing));
+
+        service.applyExtractedFields(USER_ID, YEAR, Map.of("netWealth", new BigDecimal("150000.00")), false);
+
+        then(taxYearRepository).should().save(savedYear.capture());
+        TaxYear saved = savedYear.getValue();
+        assertThat(saved.getRentalIncome()).isEqualByComparingTo("9600.00");
+        assertThat(saved.getDeductionDebtInterest()).isEqualByComparingTo("2400.00");
+        assertThat(saved.getCantonCode()).isEqualTo("SG");
+        assertThat(saved.getCivilStatus()).isEqualTo(TaxCivilStatus.MARRIED);
+        assertThat(saved.getFilingDeadline()).isEqualTo(filingDeadline);
+        assertThat(saved.getId()).isEqualTo(YEAR_ID);
+        assertThat(saved.getNetWealth()).isEqualByComparingTo("150000.00");
+    }
+
+    @Test
+    void rejectsAnUnknownTargetField() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields()));
+        Map<String, BigDecimal> fields = Map.of("selfEmploymentIncome", SALARY);
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> service.applyExtractedFields(USER_ID, YEAR, fields, false))
+                .withMessageContaining("selfEmploymentIncome");
+        then(taxYearRepository).should(never()).save(any());
+    }
+
+    @Test
+    void ignoresNullValuesInThePayload() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields()));
+        Map<String, BigDecimal> fields = new HashMap<>();
+        fields.put("grossEmploymentIncome", null);
+
+        FieldApplyResult result = service.applyExtractedFields(USER_ID, YEAR, fields, false);
+
+        assertThat(result.applied()).isEmpty();
+        assertThat(result.skipped()).isEmpty();
+        then(taxYearRepository).should(never()).save(any());
+    }
+
+    /** No background job edits a return that has already been submitted. */
+    @Test
+    void doesNotAutomaticallyTouchAYearThatIsNoLongerOpen() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields().toBuilder()
+                        .status(TaxYearStatus.FILED)
+                        .build()));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), false);
+
+        assertThat(result.applied()).isEmpty();
+        assertThat(result.skipped()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should(never()).save(any());
+    }
+
+    /** The user may still apply a document to a filed year deliberately. */
+    @Test
+    void stillAppliesToAFiledYearWhenTheUserAsksForIt() {
+        given(taxYearRepository.findByUserIdAndYear(USER_ID, YEAR))
+                .willReturn(Optional.of(yearWithEmptyFields().toBuilder()
+                        .status(TaxYearStatus.FILED)
+                        .build()));
+
+        FieldApplyResult result = service.applyExtractedFields(
+                USER_ID, YEAR, Map.of("grossEmploymentIncome", SALARY), true);
+
+        assertThat(result.applied()).containsExactly("grossEmploymentIncome");
+        then(taxYearRepository).should().save(any());
     }
 }

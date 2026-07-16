@@ -1,66 +1,78 @@
 # Deployment
 
-Production runs the released Docker Hub images on a single host via
-`compose.prod.yml`. Only Caddy is exposed (ports 80/443); it terminates TLS
-with automatic Let's Encrypt certificates and routes by path on one domain:
+finyo runs on a shared single-host **platform**: the reverse proxy (Caddy),
+identity provider (Keycloak), PostgreSQL and the observability stack are
+operated centrally by the [`vps-platform`](https://github.com/franjofranjic27/vps-platform)
+repo. finyo itself ships only its **backend and frontend** and plugs into that
+platform.
 
-| Path | Service |
+| Concern | Where |
 |---|---|
-| `/auth/*` | Keycloak (`KC_HTTP_RELATIVE_PATH=/auth`) |
-| `/api/*` | finyo-be |
-| everything else | finyo-fe |
+| Caddy (TLS, ingress on 80/443), Keycloak, Postgres, Grafana/Prometheus/Loki | `vps-platform` |
+| `finyo-be`, `finyo-fe` | this repo (`compose.prod.yml`) |
 
-Keycloak runs in production mode (`start`) with its own `keycloak` database
-in the shared Postgres instance — users and sessions survive restarts. The
-realm is imported on first start from `keycloak/finyo-realm.prod.json`;
-`${FINYO_DOMAIN}` placeholders in that file are resolved from the
-environment by Keycloak's importer.
+## Architecture
 
-> **Realm changes don't reach an existing installation.** `--import-realm`
-> skips realms that already exist, so edits to `finyo-realm.prod.json` only
-> apply to fresh installs. Apply them manually in the admin console
-> (`https://<domain>/auth/admin`) — e.g. for the session/theme settings
-> introduced together with the custom login theme:
-> Realm settings → Sessions → *SSO Session Idle* = 14 days, *SSO Session
-> Max* = 30 days; Realm settings → Tokens → *Revoke Refresh Token* = On,
-> *Refresh Token Max Reuse* = 0; Realm settings → Themes → *Login theme*
-> = `finyo`.
-> The theme files themselves (`keycloak/themes/finyo`) arrive with the
-> checked-out release tag and are volume-mounted; a `compose up -d` after
-> deploy makes the theme selectable.
-
-The frontend image is environment-agnostic: at container start an nginx
-entrypoint script (`finyo-fe/docker/40-runtime-config.sh`) writes
-`/config.js` from `KEYCLOAK_URL` / `KEYCLOAK_CLIENT_ID`, which the app reads
-before falling back to build-time defaults.
+- `finyo-be` / `finyo-fe` join the shared external `edge` Docker network and
+  **publish no ports**. They are reached only through the platform's Caddy.
+- The app is served at `finyo.frama-maschinenhandel.ch`; the platform Caddy
+  routes `/api/*` → `finyo-be`, everything else → `finyo-fe`, via finyo's site
+  snippet `deploy/sites/finyo.caddy`.
+- Auth lives on the **shared subdomain** `auth.frama-maschinenhandel.ch` (one
+  Keycloak, one realm per app — no `/auth` path prefix). The backend validates
+  the token issuer against that public URL and fetches keys internally over
+  `edge`:
+  - `KEYCLOAK_ISSUER_URI=https://auth.frama-maschinenhandel.ch/realms/finyo`
+  - `KEYCLOAK_JWK_URI=http://keycloak:8080/realms/finyo/protocol/openid-connect/certs`
+- The frontend image is environment-agnostic: at container start
+  `finyo-fe/docker/40-runtime-config.sh` writes `/config.js` from `KEYCLOAK_URL`,
+  and `finyo-fe/docker/30-csp.sh` substitutes the same URL's origin into the
+  CSP's `connect-src` (nginx serves the CSP; Caddy passes it through). Keycloak
+  is a foreign origin, so a wrong `KEYCLOAK_URL` blocks login at the browser.
+- finyo's Postgres data (its schema + the Keycloak database) lives in the shared
+  platform Postgres instance.
 
 ## Prerequisites
 
-- A host with Docker + Docker Compose (a 4 GB VPS is sufficient)
-- A DNS A/AAAA record for your domain pointing to the host
-- Released images on Docker Hub (see `release.yml`; requires the
-  `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repository secrets)
+- The `vps-platform` stack is deployed and running on the host (Caddy, Keycloak,
+  Postgres, monitoring, the `edge` network and the `/opt/platform/*` mount dirs).
+  See its `docs/ONBOARD_APP.md`.
+- Released `finyo-be` / `finyo-fe` images on Docker Hub (`release.yml`; requires
+  `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`).
+- A DNS A record for `finyo.frama-maschinenhandel.ch` pointing to the host.
 
-## First deployment
+## Onboarding finyo onto the platform (once, or when infra changes)
+
+finyo registers with the platform by pushing three artifacts to the platform
+mount dirs and running the platform's `onboard.sh` (reloads Caddy, syncs the
+realm, reloads Prometheus — no restarts):
 
 ```bash
-git clone https://github.com/franjofranjic27/finyo.git && cd finyo
-cp .env.prod.example .env.prod       # fill in domain, passwords, Docker Hub user
-docker compose -f compose.prod.yml --env-file .env.prod up -d
+# on the VPS
+cp deploy/sites/finyo.caddy       /opt/platform/caddy/sites/finyo.caddy
+cp deploy/finyo.yml               /opt/platform/prometheus/targets/finyo.yml
+cp keycloak/finyo-realm.prod.json /opt/platform/keycloak/import/finyo-realm.json
+~/vps-platform/deploy/lib/onboard.sh finyo
+
+# then bring up be/fe (env-file carries FINYO_DOMAIN, AUTH_DOMAIN, DB/versions)
+docker compose -p finyo -f compose.prod.yml --env-file .env.prod up -d
 ```
 
-Verify: `https://<domain>` serves the app, `https://<domain>/auth` serves
-Keycloak. Create application users in the Keycloak admin console
-(`https://<domain>/auth/admin`, bootstrap admin from `.env.prod`) and assign
-them the `user` realm role — without it the API rejects all requests.
+These artifacts change rarely, so this is a **deliberate step on infra change**,
+not part of every code deploy.
 
-## Automated deployment
+Create application users in the Keycloak admin console
+(`https://auth.frama-maschinenhandel.ch/admin`, realm `finyo`) and assign the
+`user` realm role — without it the API rejects all requests.
 
-Pushing a release tag deploys automatically: after building and publishing
-the images, the release workflow's `deploy` job connects to the VPS over
-SSH, checks out the tag, updates the version pins in `.env.prod`, pulls the
-images, restarts the stack (`deploy/deploy.sh`) and verifies the backend
-healthcheck plus the public URL.
+## Automated deployment (routine releases)
+
+Pushing a release tag deploys automatically: the release workflow builds and
+publishes the images, then over SSH runs `deploy/deploy.sh`, which checks out
+the tag, updates the `FINYO_BE_VERSION` / `FINYO_FE_VERSION` pins in `.env.prod`,
+ensures `AUTH_DOMAIN`, pulls the images and restarts **only be/fe** on `edge`,
+then verifies the backend healthcheck and the public URL. It does not touch the
+shared services.
 
 Required repository secrets:
 
@@ -71,44 +83,44 @@ Required repository secrets:
 | `VPS_SSH_KEY` | private ed25519 deploy key; public key in the server's `~/.ssh/authorized_keys` |
 
 The repository must be cloned at `~/finyo` on the server (override with
-`DEPLOY_DIR`).
+`DEPLOY_DIR`). `.env.prod` lives on the server (never committed) and must carry
+`FINYO_DOMAIN`, `AUTH_DOMAIN`, `DB_PASSWORD`, `DOCKERHUB_USERNAME` and the
+version pins.
 
 ## Monitoring
 
-`monitoring/` contains an independent compose project (Grafana, Prometheus,
-Loki, Alloy, node_exporter, cAdvisor) served through the same Caddy at its
-own subdomain — see `monitoring/README.md`.
+Operated centrally by `vps-platform` (Grafana, Prometheus, Loki, Alloy,
+node_exporter, cAdvisor). finyo only ships its scrape target
+`deploy/finyo.yml`; the backend exposes `/actuator/prometheus` on `edge`.
+Grafana: `https://grafana.frama-maschinenhandel.ch`.
 
 ## Operations
 
 ```bash
-# stop (data survives in the postgres_data volume)
-docker compose -f compose.prod.yml --env-file .env.prod down
-
-# start again
-docker compose -f compose.prod.yml --env-file .env.prod up -d
+# restart just finyo's be/fe (shared services are unaffected)
+docker compose -p finyo -f compose.prod.yml --env-file .env.prod up -d
+docker compose -p finyo -f compose.prod.yml --env-file .env.prod down
 
 # update to a new release
-docker compose -f compose.prod.yml --env-file .env.prod pull
-docker compose -f compose.prod.yml --env-file .env.prod up -d
-
-# backup the databases (finyo + keycloak)
-docker compose -f compose.prod.yml --env-file .env.prod exec postgres \
-  pg_dumpall -U finyo > finyo-backup-$(date +%F).sql
+docker compose -p finyo -f compose.prod.yml --env-file .env.prod pull
+docker compose -p finyo -f compose.prod.yml --env-file .env.prod up -d
 ```
 
-Pin `FINYO_BE_VERSION` / `FINYO_FE_VERSION` in `.env.prod` to a release tag
-for reproducible deploys; unset they default to `latest`.
+Database backups (finyo + keycloak) are handled at the platform level — see
+`vps-platform/backup/` (verified snapshot + off-site archiving). Pin
+`FINYO_BE_VERSION` / `FINYO_FE_VERSION` in `.env.prod` for reproducible deploys.
 
 ## Social login (Google)
 
-Login via Google is configured in Keycloak (Identity Brokering), no code
-changes needed:
+Login via Google is configured in Keycloak (Identity Brokering), no code changes
+needed:
 
-1. Google Cloud Console → create an OAuth 2.0 client, redirect URI:
-   `https://<domain>/auth/realms/finyo/broker/google/endpoint`
-2. Keycloak admin console → realm `finyo` → Identity Providers → Google →
-   enter client ID and secret.
+1. Google Cloud Console → OAuth 2.0 client, authorized redirect URI:
+   `https://auth.frama-maschinenhandel.ch/realms/finyo/broker/google/endpoint`
+2. Keycloak admin console → realm `finyo` → Identity Providers → Google → enter
+   client ID and secret.
 
-New broker users get no realm role by default; the API stays closed to them
-until an admin assigns the `user` role.
+The Google client secret lives only in Keycloak (not in the realm export), so a
+realm re-sync never deletes the Google provider (the platform onboard uses
+`managed=no-delete`). New broker users get no realm role by default; the API
+stays closed to them until an admin assigns the `user` role.

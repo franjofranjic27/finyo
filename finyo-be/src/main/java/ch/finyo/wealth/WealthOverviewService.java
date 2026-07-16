@@ -107,9 +107,14 @@ public class WealthOverviewService {
         if (!hasPortfolioBucket) {
             return Map.of();
         }
+        // valueChf, not value: net worth is a CHF figure, so a foreign position must be counted at
+        // its converted value, not its face value in another currency. A position with no rate yet
+        // (valueChf null) is skipped rather than added as though it were francs — the same choice
+        // the portfolio total makes.
         Map<AssetClass, BigDecimal> values = new EnumMap<>(AssetClass.class);
-        portfolioService.getPortfolio(userId).positions()
-                .forEach(position -> values.merge(position.assetClass(), position.value(), BigDecimal::add));
+        portfolioService.getPortfolio(userId).positions().stream()
+                .filter(position -> position.valueChf() != null)
+                .forEach(position -> values.merge(position.assetClass(), position.valueChf(), BigDecimal::add));
         return values;
     }
 

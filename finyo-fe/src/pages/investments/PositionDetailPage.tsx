@@ -12,10 +12,13 @@ import { useAuth } from '@/auth/useAuth';
 import { portfolioApi } from '@/api/portfolio';
 import { positionDetailApi } from '@/api/positionDetail';
 import type { PositionDetail } from '@/api/positionDetail';
-import { formatCHF, formatPercent, amountColour } from '@/lib/formatters';
+import { formatCHF, formatDate, formatPercent, amountColour } from '@/lib/formatters';
+import { formatHolding } from './priceFormat';
 import { EditInstrumentDialog } from './EditInstrumentDialog';
 import { EditPositionDialog } from './EditPositionDialog';
 import { FactsheetCard } from './FactsheetCard';
+import { PriceHistoryChart } from './PriceHistoryChart';
+import { PriceSourceBadge } from './PriceSourceBadge';
 
 function StatTile({ label, value, valueClass }: Readonly<{
   label: string;
@@ -47,7 +50,13 @@ function ProductInfoCard({ position, onEdit }: Readonly<{
   position: PositionDetail;
   onEdit: () => void;
 }>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // An unknown currency stays unknown — defaulting to CHF would invent a fact.
+  const currency = position.currency ?? t('investments.price.unknownCurrency');
+  const priceAsOf = position.priceAsOf
+    ? formatDate(position.priceAsOf, i18n.language)
+    : t('investments.price.asOfUnknown');
 
   return (
     <Card>
@@ -66,7 +75,7 @@ function ProductInfoCard({ position, onEdit }: Readonly<{
           />
           <InfoRow label={t('investments.position.product.valor')} value={position.valor ?? '—'} />
           <InfoRow label={t('investments.position.product.isin')} value={position.isin ?? '—'} />
-          <InfoRow label={t('investments.position.product.currency')} value={position.currency} />
+          <InfoRow label={t('investments.position.product.currency')} value={currency} />
           <InfoRow
             label={t('investments.position.product.ter')}
             value={position.ter != null ? `${position.ter.toFixed(2)} %` : '—'}
@@ -75,9 +84,12 @@ function ProductInfoCard({ position, onEdit }: Readonly<{
             label={t('investments.position.product.priceSource')}
             value={t(`investments.position.priceSourceValue.${position.priceSource}`)}
           />
+          {position.priceSource !== 'PURCHASE' && (
+            <InfoRow label={t('investments.position.product.priceAsOf')} value={priceAsOf} />
+          )}
           <InfoRow
             label={t('investments.position.product.portfolioShare')}
-            value={formatPercent(position.portfolioShare)}
+            value={position.portfolioShare === null ? '—' : formatPercent(position.portfolioShare)}
           />
         </dl>
       </CardContent>
@@ -103,7 +115,7 @@ function PositionDetailSkeleton() {
 }
 
 export function PositionDetailPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { positionId = '' } = useParams();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -143,7 +155,11 @@ export function PositionDetailPage() {
     return <p className="text-sm text-destructive">{t('investments.position.loadError')}</p>;
   }
 
-  const gainLossValue = `${formatCHF(position.gainLoss)} · ${formatPercent(position.returnPercent)}`;
+  // Gain/loss is in CHF; null when the currency has no rate yet, shown as a dash rather than a
+  // fabricated zero. The per-share prices and the value are in the position's own currency.
+  const gainLossValue = position.gainLoss === null || position.returnPercent === null
+    ? '—'
+    : `${formatCHF(position.gainLoss)} · ${formatPercent(position.returnPercent)}`;
 
   return (
     <div className="space-y-6">
@@ -153,11 +169,7 @@ export function PositionDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-semibold">{position.name}</h2>
             <Badge variant="secondary">{t(`assetClass.${position.assetClass}`)}</Badge>
-            {position.priceSource === 'LIVE' && (
-              <Badge variant="outline" className="text-emerald-500">
-                {t('investments.position.liveChip')}
-              </Badge>
-            )}
+            <PriceSourceBadge position={position} />
           </div>
           <Button variant="ghost" size="sm" onClick={() => setEditPositionOpen(true)}>
             <Pencil className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -171,23 +183,26 @@ export function PositionDetailPage() {
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <StatTile label={t('investments.position.stats.value')} value={formatCHF(position.value)} />
+        <StatTile
+          label={t('investments.position.stats.value')}
+          value={formatHolding(position.value, position.currency, i18n.language)}
+        />
         <StatTile
           label={t('investments.position.stats.quantity')}
           value={String(position.quantity)}
         />
         <StatTile
           label={t('investments.position.stats.avgPurchasePrice')}
-          value={formatCHF(position.avgPurchasePrice)}
+          value={formatHolding(position.avgPurchasePrice, position.currency, i18n.language)}
         />
         <StatTile
           label={t('investments.position.stats.currentPrice')}
-          value={formatCHF(position.currentPrice)}
+          value={formatHolding(position.currentPrice, position.currency, i18n.language)}
         />
         <StatTile
           label={t('investments.position.stats.gainLossReturn')}
           value={gainLossValue}
-          valueClass={amountColour(position.gainLoss)}
+          valueClass={amountColour(position.gainLoss ?? 0)}
         />
       </div>
 
@@ -196,6 +211,9 @@ export function PositionDetailPage() {
         <ProductInfoCard position={position} onEdit={() => setEditOpen(true)} />
         <FactsheetCard position={position} />
       </div>
+
+      {/* Price history */}
+      <PriceHistoryChart positionId={position.positionId} />
 
       {/* Danger zone */}
       <div className="flex justify-end">

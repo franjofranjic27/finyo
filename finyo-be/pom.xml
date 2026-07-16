@@ -29,6 +29,7 @@
     <properties>
         <java.version>25</java.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <resilience4j.version>2.3.0</resilience4j.version>
         <sonar.organization>franjofranjic27</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.coverage.jacoco.xmlReportPaths>
@@ -110,6 +111,47 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+          Boot 4 modularised the HTTP clients: spring-boot-starter-webmvc ships the server
+          side only, so without this there is no RestClientAutoConfiguration, no injectable
+          RestClient.Builder — and, crucially, spring.http.client.{connect,read}-timeout has
+          nothing to apply to. The old code hid that by calling the static RestClient.builder(),
+          which silently produces a client that waits forever.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
+        <!--
+          Resilience for external data sources (SIX, OpenFIGI, ESTV, ...).
+          Deliberately the plain Java libraries, not resilience4j-spring-boot3:
+          the starter ships its own AOP aspects and auto-configuration, whose
+          compatibility with Boot 4 / Spring 7 is not established. Decorating the
+          Supplier inside each adapter costs a few lines and sidesteps that risk
+          entirely. Metrics are bound to Micrometer in ResilienceConfig.
+        -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-ratelimiter</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
         <!-- CSV parsing -->
         <dependency>
             <groupId>com.univocity</groupId>
@@ -170,6 +212,18 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          Enforces the integration boundary as a test, not as review discipline:
+          vendor code (SIX field names, ESTV wire format) must never leak out of
+          ch.finyo.integration. See ArchitectureTest.
+        -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.4.1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

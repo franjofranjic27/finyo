@@ -8,6 +8,7 @@
     "budget": "Budget",
     "insurance": "Versicherungen",
     "accounts": "Konten",
+    "documents": "Dokumente",
     "settings": "Einstellungen",
     "admin": "Admin",
     "adminPillar3Products": "3a-Produkte",
@@ -123,7 +124,8 @@
       "totalValue": "Gesamtwert",
       "invested": "Investiert",
       "gainLoss": "Gewinn / Verlust",
-      "returnPct": "Rendite"
+      "returnPct": "Rendite",
+      "partialTotal": "Mindestens eine Position hat noch keinen Wechselkurs und ist nicht im Total enthalten."
     },
     "add": {
       "title": "Wertpapier hinzufügen",
@@ -138,7 +140,13 @@
       "csvImport": "CSV importieren",
       "csvHint": "CSV-Format: Name; ISIN; Anzahl; Kaufkurs; Kurs (optional) — Trennzeichen ; oder ,",
       "csvResult": "{{imported}} importiert, {{failed}} fehlgeschlagen",
-      "csvNoRows": "Keine gültigen Zeilen in der Datei gefunden"
+      "csvNoRows": "Keine gültigen Zeilen in der Datei gefunden",
+      "lookup": {
+        "searching": "Wertpapier wird gesucht …",
+        "priceAuto": "Kurs wird automatisch geholt",
+        "notFound": "Kein Marktpapier zu dieser ISIN/Valor gefunden — Name und Kurs manuell eingeben",
+        "unavailable": "Wertpapier-Suche momentan nicht erreichbar — du kannst trotzdem manuell erfassen"
+      }
     },
     "table": {
       "title": "Positionen",
@@ -150,10 +158,28 @@
       "gainLoss": "G/V",
       "returnPct": "Rendite",
       "allocation": "Anteil",
+      "fxMid": "EZB-Mittelkurs",
+      "fxOfficial": "Offizieller CH-Kurs",
       "edit": "Position bearbeiten",
       "remove": "Position entfernen",
       "confirmRemove": "Position «{{name}}» entfernen?",
       "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
+    },
+    "price": {
+      "badge": {
+        "MARKET": "Marktkurs",
+        "MANUAL": "Manuell",
+        "PURCHASE": "Kein Kurs",
+        "stale": "Kurs vom {{date}}",
+        "staleUnknown": "Kurs veraltet"
+      },
+      "asOf": "Kurs vom {{date}}",
+      "asOfUnknown": "Kursdatum unbekannt",
+      "marketHint": "Marktkurs, 15 Min. verzögert",
+      "staleHint": "Älter als erwartet — der Markt ist seither möglicherweise gelaufen",
+      "manualHint": "Von dir manuell erfasster Kurs",
+      "purchaseHint": "Kein Kurs verfügbar — die Position wird zum Einstandswert gezeigt",
+      "unknownCurrency": "unbekannt"
     },
     "allocation": {
       "title": "Allokation",
@@ -167,9 +193,14 @@
       "range3y": "3J",
       "notEnoughData": "Noch nicht genügend Daten — die Historie wächst mit jedem Portfolio-Abruf"
     },
+    "priceHistory": {
+      "title": "Kursverlauf",
+      "empty": "Noch keine Kursdaten",
+      "axisPrice": "Kurs",
+      "tooltipDate": "Datum"
+    },
     "position": {
       "loadError": "Position konnte nicht geladen werden",
-      "liveChip": "Kurs live · SIX",
       "stats": {
         "value": "Wert",
         "quantity": "Anzahl",
@@ -186,12 +217,13 @@
         "currency": "Währung",
         "ter": "TER",
         "priceSource": "Kursquelle",
+        "priceAsOf": "Kursstand",
         "portfolioShare": "Anteil am Portfolio"
       },
       "priceSourceValue": {
-        "LIVE": "Live (SIX)",
-        "CACHE": "Zwischengespeichert",
-        "PURCHASE": "Kaufkurs"
+        "MARKET": "Marktkurs (15 Min. verzögert)",
+        "MANUAL": "Manuell erfasst",
+        "PURCHASE": "Kein Kurs — Einstandswert"
       },
       "editDialog": {
         "title": "Produkt bearbeiten",
@@ -209,7 +241,7 @@
         "purchasePrice": "Ø Kaufkurs",
         "purchaseDate": "Kaufdatum",
         "currentPrice": "Aktueller Kurs (optional)",
-        "currentPriceHint": "Überschreibt den Marktkurs — ein Live-Kursabruf kann ihn wieder ersetzen",
+        "currentPriceHint": "Wird als «manuell erfasst» gespeichert und ersetzt den Marktkurs",
         "save": "Speichern",
         "quantityInvalid": "Anzahl muss grösser als 0 sein",
         "purchasePriceInvalid": "Kaufkurs muss 0 oder grösser sein",
@@ -721,6 +753,66 @@
       "submitEdit": "Speichern"
     },
     "privacyNote": "IBAN und Vertragsnummern werden pro Nutzer gespeichert; Kartennummern (PAN), CVV oder E-Banking-Zugangsdaten werden nicht erfasst."
+  },
+  "documents": {
+    "subtitle": "Steuerdokumente aus deinem SharePoint-Ordner. Eindeutige Dokumente übernimmt finyo selbst — sobald etwas nicht zusammenpasst, fragt es nach.",
+    "loadError": "Dokumente konnten nicht geladen werden",
+    "empty": {
+      "title": "Noch keine Dokumente",
+      "text": "Synchronisiere, um die Steuerdokumente aus deinem SharePoint-Ordner zu importieren."
+    },
+    "sync": {
+      "button": "Jetzt synchronisieren",
+      "pending": "Wird synchronisiert …",
+      "result": "{{autoApplied}} übernommen · {{needsReview}} zu prüfen · {{failed}} fehlgeschlagen"
+    },
+    "status": {
+      "DISCOVERED": "Gefunden",
+      "ANALYZED": "Analysiert",
+      "AUTO_APPLIED": "Automatisch übernommen",
+      "NEEDS_REVIEW": "Zu prüfen",
+      "APPLIED": "Übernommen",
+      "DISMISSED": "Verworfen",
+      "FAILED": "Fehlgeschlagen"
+    },
+    "types": {
+      "SALARY_CERTIFICATE": "Lohnausweis",
+      "HEALTH_INSURANCE": "Krankenkassen-Prämienübersicht",
+      "SECURITIES_STATEMENT": "Wertschriftenverzeichnis",
+      "PILLAR_3A": "Säule-3a-Bescheinigung",
+      "ASSESSMENT": "Veranlagungsverfügung",
+      "UNKNOWN": "Unbekannter Typ"
+    },
+    "meta": {
+      "detectedType": "Dokument: {{type}}",
+      "folderType": "Ordner: {{type}}",
+      "documentYear": "Dokumentjahr {{year}}",
+      "folderYear": "Ordnerjahr {{year}}",
+      "confidence": "{{pct}} % Konfidenz",
+      "deletedInDrive": "nicht mehr im Ordner"
+    },
+    "review": {
+      "title": "Warum finyo das nicht selbst übernommen hat",
+      "expand": "Prüfung anzeigen",
+      "collapse": "Prüfung ausblenden",
+      "reasons": {
+        "typeMismatch": "Der Ordner sagt {{folderType}}, das Dokument sieht aber nach {{detectedType}} aus.",
+        "yearMismatch": "Der Ordner sagt Steuerjahr {{folderYear}}, das Dokument nennt aber {{documentYear}}.",
+        "unknownType": "Der Dokumenttyp konnte nicht erkannt werden.",
+        "valueConflict": "Ein Wert im Steuerjahr weicht vom Wert im Dokument ab."
+      },
+      "year": "Zieljahr",
+      "yearHint": "Die Übernahme überschreibt nur die ausgewählten Felder des Zieljahres.",
+      "noFields": "Aus diesem Dokument konnten keine Werte gelesen werden.",
+      "apply": "Übernehmen",
+      "dismiss": "Verwerfen"
+    },
+    "table": {
+      "field": "Feld",
+      "value": "Wert",
+      "target": "Ziel",
+      "infoOnly": "nur zur Info"
+    }
   },
   "admin": {
     "products": {

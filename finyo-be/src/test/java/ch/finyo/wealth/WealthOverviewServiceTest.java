@@ -102,19 +102,23 @@ class WealthOverviewServiceTest {
 
     private static PortfolioPositionResponse position(AssetClass assetClass, String value) {
         UUID id = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal(value);
+        // value == valueChf: these are CHF positions, so the native value and the converted value
+        // are the same number — which is what keeps the expected sums unchanged now that the
+        // wealth overview aggregates valueChf.
         return new PortfolioPositionResponse(id, id, UUID.randomUUID(), assetClass,
-                "Position " + assetClass, null, null,
-                BigDecimal.ONE, BigDecimal.ONE, null, BigDecimal.ONE, PriceSource.CACHE,
-                new BigDecimal(value), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                "Position " + assetClass, null, null, "CHF",
+                BigDecimal.ONE, BigDecimal.ONE, null, BigDecimal.ONE, PriceSource.MARKET, null, false,
+                amount, amount, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null);
     }
 
     private void givenPortfolio(PortfolioPositionResponse... positions) {
         BigDecimal total = List.of(positions).stream()
-                .map(PortfolioPositionResponse::value)
+                .map(PortfolioPositionResponse::valueChf)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         given(portfolioService.getPortfolio(USER_ID)).willReturn(new PortfolioResponse(
                 List.of(positions), total, total, BigDecimal.ZERO, BigDecimal.ZERO,
-                OffsetDateTime.now(ZoneOffset.UTC)));
+                "CHF", false, OffsetDateTime.now(ZoneOffset.UTC)));
     }
 
     private void givenNoYtdBaseline() {

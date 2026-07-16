@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { AssetClass, PriceSource } from './portfolio';
+import type { AssetClass, FxRateType, PriceSource } from './portfolio';
 
 const BASE_URL = '/api/v1';
 
@@ -17,19 +17,49 @@ export interface PositionDetail {
   valor: string | null;
   assetClass: AssetClass;
   ter: number | null;
-  currency: string;
+  /** Trading currency — null when nobody established it. Never assume CHF. */
+  currency: string | null;
   quantity: number;
   avgPurchasePrice: number;
   purchaseDate: string | null;
   currentPrice: number;
   priceSource: PriceSource;
-  priceUpdatedAt: string | null;
+  /** The trading day the price belongs to (ISO date), not the day it was fetched. */
+  priceAsOf: string | null;
+  /** The price is older than a market price should be (> 4 days). */
+  stale: boolean;
+  /** Value in the position's own {@link currency}. */
   value: number;
-  gainLoss: number;
-  returnPercent: number;
-  portfolioShare: number;
+  /** Value in CHF, or null when the currency has no stored rate. The CHF figures below match. */
+  valueChf: number | null;
+  /** CHF gain/loss; null when unconvertible. */
+  gainLoss: number | null;
+  /** CHF return; null when unconvertible. */
+  returnPercent: number | null;
+  /** Share of the CHF total; null when unconvertible. */
+  portfolioShare: number | null;
+  /** CHF-per-unit rate applied to reach valueChf; null for a CHF or unknown-currency position. */
+  fxRate: number | null;
+  /** The day the applied rate belongs to (ISO date); null when no rate was applied. */
+  fxRateDate: string | null;
+  fxRateType: FxRateType | null;
   factsheetUrl: string | null;
   factsheet: FactsheetInfo | null;
+}
+
+/** A single trading day's closing price. */
+export interface PriceHistoryPoint {
+  /** ISO date (YYYY-MM-DD) the close belongs to. */
+  date: string;
+  close: number;
+}
+
+export interface PriceHistory {
+  isin: string | null;
+  /** Quote currency — null when unknown. Never assume CHF. */
+  currency: string | null;
+  /** Daily closes, oldest first. Empty when the instrument is unlisted or not yet backfilled. */
+  points: PriceHistoryPoint[];
 }
 
 export interface UpdateInstrumentRequest {
@@ -61,6 +91,9 @@ async function throwProblem(response: Response): Promise<never> {
 export const positionDetailApi = {
   getPosition: (token: string, positionId: string) =>
     apiRequest<PositionDetail>(`/positions/${positionId}`, {}, token),
+
+  getPriceHistory: (positionId: string, token: string) =>
+    apiRequest<PriceHistory>(`/positions/${positionId}/price-history`, {}, token),
 
   updatePosition: (token: string, positionId: string, data: UpdatePositionRequest) =>
     apiRequest<PositionDetail>(
