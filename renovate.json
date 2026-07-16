@@ -42,6 +42,13 @@
       "semanticCommitScope": "infra"
     },
     {
+      "description": "Temurin-Base-Image ist auf einen exakten Tag gepinnt, Patches bei gruenem CI automergen",
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
       "description": "Spring Boot nie automergen und 3 Tage abwarten (zieht das halbe Dependency-Management mit)",
       "matchPackageNames": ["org.springframework.boot:**"],
       "automerge": false,
