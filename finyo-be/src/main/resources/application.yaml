@@ -102,6 +102,20 @@ finyo:
       enabled: ${MARKETDATA_EODHD_ENABLED:false}
       base-url: ${MARKETDATA_EODHD_BASE_URL:https://eodhd.com/api}
       api-key: ${EODHD_API_KEY:}
+
+  fx:
+    # Two providers, two different kinds of rate — not a fallback chain. Frankfurter gives the ECB
+    # mid rate (for valuation), BAZG the official Swiss sell rate (for tax). Each is switched on by
+    # its own flag; there is nothing to fall back between.
+    #
+    # Frankfurter is self-hosted in compose (FX_FRANKFURTER_BASE_URL points at the container). The
+    # default here is the public instance, so a local run without Docker still works.
+    frankfurter:
+      enabled: ${FX_FRANKFURTER_ENABLED:true}
+      base-url: ${FX_FRANKFURTER_BASE_URL:https://api.frankfurter.dev/v1}
+    bazg:
+      enabled: ${FX_BAZG_ENABLED:true}
+      base-url: ${FX_BAZG_BASE_URL:https://www.backend-rates.bazg.admin.ch/api}
   sync:
     # Background jobs: prices at 22:30, portfolio snapshots at 23:00 (Europe/Zurich).
     # Off in tests — a scheduled job firing mid-test would reach for the network.

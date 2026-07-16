@@ -365,19 +365,23 @@ Migration **V34**: `instrument_price(isin, price_date, close, currency, source, 
 > aber halbfertig — mit diesem PR die Value-Spalte in der jeweiligen Währung formatieren und für
 > das gemischtwährige Total die Konvertierung nutzen.
 
-### PR 4 — FX-Modul (repariert eine falsche Zahl)
-Migration **V35**: `fx_rate(currency, rate_date, chf_per_unit, rate_type, source)`.
+### PR 4 — FX-Modul (repariert eine falsche Zahl) ✅ FERTIG
+Migration **V36**: `fx_rate(currency, rate_date, chf_per_unit, rate_type, source)` (V35 = instrument_price
+nach dem main-Merge, daher V36 statt V35).
 
-- [ ] `ch.finyo.common.money`: `Money`, `CurrencyCode`
-- [ ] `ch.finyo.fx`: `FxConverter`, `FxRate`, `FxRateType`
-- [ ] `FrankfurterFxAdapter` (invertiert!), `BazgFxAdapter` (Verkaufskurs, `OFFICIAL_CH`)
-- [ ] Frankfurter self-hosted in `compose.yml` (`lineofflight/frankfurter`)
-- [ ] `FxRateSyncJob` + Backfill (ein Call pro Jahr über den Range-Endpoint)
-- [ ] `PortfolioService` konvertiert an der Aggregationsgrenze, `MoneyConversion` in die Response
-- [ ] Fehlender Kurs (Wochenende/Feiertag) → **letzter Kurs ≤ Datum**, nie interpolieren
+- [x] `ch.finyo.common.money`: `Money` (neu, `plus()` wirft), `CurrencyCode` (existierte bereits — wiederverwendet)
+- [x] `ch.finyo.fx`: `FxConverter` (liest nur DB), `FxRate`, `FxRateType {MID, OFFICIAL_CH}`, `FxConversion`, `FxProperties`
+- [x] `FrankfurterFxAdapter` (invertiert `base=CHF`), `BazgFxAdapter` (Verkaufskurs, `OFFICIAL_CH`) — `ch.finyo.integration.{frankfurter,bazg}`
+- [x] Frankfurter self-hosted in `compose.yml` (`lineofflight/frankfurter`, `FX_FRANKFURTER_BASE_URL`)
+- [x] `FxRateSyncJob` (17:15 CET) + Backfill 3 Jahre (ein Range-Call pro Jahr, nur Frankfurter); `HeldCurrenciesQuery`-Port
+- [x] `PortfolioService` konvertiert an der Aggregationsgrenze (Wert@heute, Kosten@Kaufdatum); `valueChf`/`fxRate`/`fxRateDate`/`fxRateType` + `totalCurrency`/`hasUnconverted` in die Responses
+- [x] Fehlender Kurs (Wochenende/Feiertag) → **letzter Kurs ≤ Datum**, nie interpoliert; unkonvertierbar → aus Total ausgeschlossen + geflaggt
+- [x] FE: Positions-Spalten in Originalwährung (`formatHolding`), CHF-Aggregate/Donut auf `valueChf`, FX-Kurs im Tooltip, Partial-Total-Hinweis
+- [x] ArchUnit `fxIsStandalone`; ResilienceConfig `FRANKFURTER`/`BAZG`; ADR-009
+- [x] 348 IT + 700+ Unit + 698 FE grün; SyncAdmin kennt jetzt `fx-rates`
 
-**Nutzen für sich:** USD- und EUR-ETFs werden heute wie CHF summiert. Das Portfoliototal ist damit
-schlicht falsch — dieser PR repariert es.
+**Nutzen für sich:** USD- und EUR-ETFs wurden wie CHF summiert. Das Portfoliototal war damit
+schlicht falsch — dieser PR repariert es (auch das Reinvermögen im wealth-Modul).
 
 ### PR 5 — camt-Fremdwährung
 Migration **V36**: `transaction.original_amount`, `original_currency`, `fx_rate`.

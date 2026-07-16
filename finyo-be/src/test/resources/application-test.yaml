@@ -22,6 +22,14 @@ finyo:
       enabled: false
     eodhd:
       enabled: false
+  # Both FX providers off, same reasoning: a test must never reach Frankfurter or BAZG. Adapter
+  # behaviour is unit-tested against a MockRestServiceServer; FxConverter is tested against stored
+  # rows. With them disabled neither adapter bean exists, so nothing can call out.
+  fx:
+    frankfurter:
+      enabled: false
+    bazg:
+      enabled: false
 
 spring:
   datasource:

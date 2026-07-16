@@ -75,4 +75,27 @@ class ArchitectureTest {
 
         rule.check(productionClasses);
     }
+
+    @Test
+    @DisplayName("fx does not depend on feature modules")
+    void fxIsStandalone() {
+        // fx holds tenant-free exchange rates — an EUR/CHF rate is the same fact for everyone. It
+        // is consumed by investment now and by wealth, transaction and tax later, so the same
+        // reasoning as marketdata applies: a dependency back on a feature module would make it
+        // circular and unreusable. It reaches the investment-owned currency list through a port
+        // (HeldCurrenciesQuery), which is why that dependency runs the right way.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("ch.finyo.fx..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "ch.finyo.investment..",
+                        "ch.finyo.tax..",
+                        "ch.finyo.pillar3..",
+                        "ch.finyo.transaction..",
+                        "ch.finyo.account..",
+                        "ch.finyo.wealth..",
+                        "ch.finyo.budget..")
+                .because("fx is a standalone module — the dependency runs the other way");
+
+        rule.check(productionClasses);
+    }
 }

@@ -124,7 +124,8 @@
       "totalValue": "Gesamtwert",
       "invested": "Investiert",
       "gainLoss": "Gewinn / Verlust",
-      "returnPct": "Rendite"
+      "returnPct": "Rendite",
+      "partialTotal": "Mindestens eine Position hat noch keinen Wechselkurs und ist nicht im Total enthalten."
     },
     "add": {
       "title": "Wertpapier hinzufügen",
@@ -157,6 +158,8 @@
       "gainLoss": "G/V",
       "returnPct": "Rendite",
       "allocation": "Anteil",
+      "fxMid": "EZB-Mittelkurs",
+      "fxOfficial": "Offizieller CH-Kurs",
       "edit": "Position bearbeiten",
       "remove": "Position entfernen",
       "confirmRemove": "Position «{{name}}» entfernen?",

@@ -1,5 +1,6 @@
 package ch.finyo.config;
 
+import ch.finyo.fx.FxProperties;
 import ch.finyo.marketdata.MarketDataProperties;
 import ch.finyo.taxdocument.FolderConventionProperties;
 import ch.finyo.taxdocument.GraphProperties;
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties({
         MarketDataProperties.class,
+        FxProperties.class,
         GraphProperties.class,
         FolderConventionProperties.class
 })

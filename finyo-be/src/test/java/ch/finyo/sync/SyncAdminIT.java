@@ -62,7 +62,7 @@ class SyncAdminIT extends BaseIntegrationTest {
         // is a job nobody can rescue when it fails.
         assertThat(jobs)
                 .extracting(SyncJob::name)
-                .containsExactlyInAnyOrder("prices", "portfolio-snapshots");
+                .containsExactlyInAnyOrder("prices", "portfolio-snapshots", "fx-rates");
     }
 
     // =========================================================================

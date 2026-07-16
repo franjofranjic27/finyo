@@ -13,6 +13,7 @@ import { portfolioApi } from '@/api/portfolio';
 import { positionDetailApi } from '@/api/positionDetail';
 import type { PositionDetail } from '@/api/positionDetail';
 import { formatCHF, formatDate, formatPercent, amountColour } from '@/lib/formatters';
+import { formatHolding } from './priceFormat';
 import { EditInstrumentDialog } from './EditInstrumentDialog';
 import { EditPositionDialog } from './EditPositionDialog';
 import { FactsheetCard } from './FactsheetCard';
@@ -88,7 +89,7 @@ function ProductInfoCard({ position, onEdit }: Readonly<{
           )}
           <InfoRow
             label={t('investments.position.product.portfolioShare')}
-            value={formatPercent(position.portfolioShare)}
+            value={position.portfolioShare === null ? '—' : formatPercent(position.portfolioShare)}
           />
         </dl>
       </CardContent>
@@ -114,7 +115,7 @@ function PositionDetailSkeleton() {
 }
 
 export function PositionDetailPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { positionId = '' } = useParams();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -154,7 +155,11 @@ export function PositionDetailPage() {
     return <p className="text-sm text-destructive">{t('investments.position.loadError')}</p>;
   }
 
-  const gainLossValue = `${formatCHF(position.gainLoss)} · ${formatPercent(position.returnPercent)}`;
+  // Gain/loss is in CHF; null when the currency has no rate yet, shown as a dash rather than a
+  // fabricated zero. The per-share prices and the value are in the position's own currency.
+  const gainLossValue = position.gainLoss === null || position.returnPercent === null
+    ? '—'
+    : `${formatCHF(position.gainLoss)} · ${formatPercent(position.returnPercent)}`;
 
   return (
     <div className="space-y-6">
@@ -178,23 +183,26 @@ export function PositionDetailPage() {
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <StatTile label={t('investments.position.stats.value')} value={formatCHF(position.value)} />
+        <StatTile
+          label={t('investments.position.stats.value')}
+          value={formatHolding(position.value, position.currency, i18n.language)}
+        />
         <StatTile
           label={t('investments.position.stats.quantity')}
           value={String(position.quantity)}
         />
         <StatTile
           label={t('investments.position.stats.avgPurchasePrice')}
-          value={formatCHF(position.avgPurchasePrice)}
+          value={formatHolding(position.avgPurchasePrice, position.currency, i18n.language)}
         />
         <StatTile
           label={t('investments.position.stats.currentPrice')}
-          value={formatCHF(position.currentPrice)}
+          value={formatHolding(position.currentPrice, position.currency, i18n.language)}
         />
         <StatTile
           label={t('investments.position.stats.gainLossReturn')}
           value={gainLossValue}
-          valueClass={amountColour(position.gainLoss)}
+          valueClass={amountColour(position.gainLoss ?? 0)}
         />
       </div>
 

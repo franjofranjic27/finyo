@@ -29,19 +29,26 @@ export function KpiTiles({ portfolio }: Readonly<{ portfolio: Portfolio }>) {
   const { t } = useTranslation();
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <KpiTile label={t('investments.kpi.totalValue')} value={formatCHF(portfolio.totalValue)} />
-      <KpiTile label={t('investments.kpi.invested')} value={formatCHF(portfolio.totalCost)} />
-      <KpiTile
-        label={t('investments.kpi.gainLoss')}
-        value={signed(portfolio.gainLoss, formatCHF(portfolio.gainLoss))}
-        valueClass={amountColour(portfolio.gainLoss)}
-      />
-      <KpiTile
-        label={t('investments.kpi.returnPct')}
-        value={signed(portfolio.returnPct, formatPercent(portfolio.returnPct))}
-        valueClass={amountColour(portfolio.returnPct)}
-      />
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiTile label={t('investments.kpi.totalValue')} value={formatCHF(portfolio.totalValue)} />
+        <KpiTile label={t('investments.kpi.invested')} value={formatCHF(portfolio.totalCost)} />
+        <KpiTile
+          label={t('investments.kpi.gainLoss')}
+          value={signed(portfolio.gainLoss, formatCHF(portfolio.gainLoss))}
+          valueClass={amountColour(portfolio.gainLoss)}
+        />
+        <KpiTile
+          label={t('investments.kpi.returnPct')}
+          value={signed(portfolio.returnPct, formatPercent(portfolio.returnPct))}
+          valueClass={amountColour(portfolio.returnPct)}
+        />
+      </div>
+      {portfolio.hasUnconverted && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {t('investments.kpi.partialTotal')}
+        </p>
+      )}
     </div>
   );
 }

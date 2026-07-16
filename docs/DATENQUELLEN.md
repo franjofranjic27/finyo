@@ -152,6 +152,12 @@ offizielle Referenz kennzeichnen, nicht mit Mid-Kursen vermischen. Keine Range-A
 - **SNB-Faktor 100:** Die Dimension heisst `EUR1`, aber `JPY100`, `SEK100`, `DKK100` — die Werte
   sind pro 100 Einheiten. Blind übernehmen ergibt einen Faktor-100-Bug.
 
+> **Status: umgesetzt in PR 4** (`ch.finyo.fx`, Migration V36). Frankfurter self-hosted in
+> `compose.yml`, invertiert im Adapter; BAZG als `OFFICIAL_CH` gespeichert (noch ohne Konsument bis
+> zur Steuer-Strecke). Richtungs- und Faktor-Fallen sind im jeweiligen Adapter eingesperrt; die
+> Schema-Spalte `chf_per_unit` lässt strukturell nur eine Richtung zu. Siehe ADR-009. (SNB wurde
+> zugunsten von Frankfurter/BAZG nicht angebunden.)
+
 ### 3.4 ICTax — kein Weg hinein
 
 Die Steuerwerte von Wertschriften per ISIN wären der Volltreffer gewesen. Sie sind nicht

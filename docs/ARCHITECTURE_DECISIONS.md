@@ -130,3 +130,23 @@ The first cut of the market-data module rebuilt that failure one level up, which
 - **No file copies.** SharePoint is already the system of record and is backed up there. Storing a second copy of tax documents on the application server buys nothing and enlarges both the database and the blast radius.
 
 **Consequence:** Scanned PDFs without an OCR text layer cannot be processed at all — the extraction stack reads text, not pixels. Enabling OCR in the scanner software is a precondition, not a nice-to-have.
+
+---
+
+## ADR-009: Money, currency and FX — `plus()` throws, `FxRateType` has no default
+
+**Decision:** A foreign-currency portfolio is totalled in CHF by converting each position at one place — the aggregation boundary in `PortfolioService` — using rates stored in `fx_rate` and read from the database only. Currency conversion never happens implicitly: the `Money` value object's `plus()` refuses to add two currencies, and `FxConverter.toChf` takes the rate type (`MID` / `OFFICIAL_CH`) as a required argument with no default. Rates live in a tenant-free `fx` module behind a `FxRateProvider` port; Frankfurter (self-hosted, ECB mid) and BAZG (official Swiss sell rate) are adapters in `ch.finyo.integration`. A position whose currency has no stored rate is excluded from the CHF total and flagged, never counted at face value.
+
+**Context:** `PortfolioService` summed position values directly with `BigDecimal::add`, so a USD holding was added to the total as though its value were francs — a wrong number, not a rounding error. Instruments carry a nullable `currency` (ADR-008) but there was no conversion. Two vendors disagree on direction (Frankfurter returns units-per-CHF, BAZG CHF-per-unit) and on which rate is appropriate (mid for valuation, the ~1.2 %-higher sell rate for tax).
+
+**Rationale:**
+- **A type that refuses the bug.** `Money.plus()` throwing on a currency mismatch is the guardrail no review enforces as reliably — where FX is needed, the developer must convert first and say so. There is no implicit rate anywhere in the domain.
+- **`FxRateType` is required, never defaulted.** On the same day the ECB mid rate and the BAZG sell rate for EUR/CHF sat ~1.2 % apart; on a six-figure portfolio that is real money. A default overload would hide exactly the decision that must be made deliberately. Portfolio valuation uses `MID`; the official rate is stored for the tax strand and can never be picked up for valuation.
+- **Direction is fixed by the schema, not by convention.** `fx_rate` stores only `chf_per_unit` — CHF per one unit of the foreign currency. Frankfurter's units-per-CHF is inverted inside its adapter; BAZG already speaks CHF-per-unit. Both fallible directions are sealed in the adapters and never reach the domain.
+- **Reads never touch the network.** Like prices (ADR-004/007), a conversion is a database lookup; `fx_rate` is filled by the nightly `FxRateSyncJob`. A dead Frankfurter cannot slow a portfolio page — at worst the newest rate is a day old, which for a daily reference rate is no loss.
+- **Value at today's rate, cost at the purchase-day rate.** The CHF gain/loss then reflects the real return including the currency move, not just the price move. The nearest rate at or before the date is used; a weekend gap is filled with the last real rate, never interpolated.
+- **Convert once, at the aggregation boundary.** Stored always in the original currency, converted only where values are summed (`PortfolioService`, and the wealth net-worth roll-up which now reads `valueChf`). The applied rate is returned in the response so the user can reconstruct the number rather than trust it.
+- **Unconvertible is excluded, not guessed.** A currency with no stored rate yet makes the position `Unconvertible`: kept out of the CHF total, its native value still shown, and the total flagged partial. Folding in a made-up rate would rebuild the very bug this ADR exists to prevent.
+- **No entity retrofit (yet).** `Money` is used as a value object at the boundary, not mapped onto `Instrument`/`Position`/`Transaction`/`Account` with `@Embedded`. That retrofit is larger than the fix warrants and is deliberately deferred.
+
+**Consequence:** Frankfurter is a new runtime dependency (self-hosted in `compose.yml`, so no quota or third-party runtime coupling). BAZG's `OFFICIAL_CH` rates are stored but have no consumer until the tax strand (PR 6–9). The `Money.plus()` guardrail only covers code paths that route through it — budget, tax and 3a remain plain `BigDecimal` (all CHF by law).

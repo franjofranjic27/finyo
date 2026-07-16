@@ -124,7 +124,8 @@
       "totalValue": "Total Value",
       "invested": "Invested",
       "gainLoss": "Gain / Loss",
-      "returnPct": "Return"
+      "returnPct": "Return",
+      "partialTotal": "One or more positions have no exchange rate yet and are not included in the total."
     },
     "add": {
       "title": "Add Security",
@@ -157,6 +158,8 @@
       "gainLoss": "G/L",
       "returnPct": "Return",
       "allocation": "Share",
+      "fxMid": "ECB mid rate",
+      "fxOfficial": "Official CH rate",
       "edit": "Edit position",
       "remove": "Remove position",
       "confirmRemove": "Remove position \"{{name}}\"?",

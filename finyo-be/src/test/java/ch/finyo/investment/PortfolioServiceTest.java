@@ -2,14 +2,18 @@ package ch.finyo.investment;
 
 import ch.finyo.common.SwissTime;
 import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.fx.FxConverter;
+import ch.finyo.fx.FxRate;
+import ch.finyo.fx.FxRateRepository;
+import ch.finyo.fx.FxRateType;
 import ch.finyo.marketdata.MarketDataService;
 import ch.finyo.marketdata.PricePoint;
 import ch.finyo.marketdata.spi.DataSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,6 +31,7 @@ import static org.mockito.BDDMockito.any;
 import static org.mockito.BDDMockito.anyCollection;
 import static org.mockito.BDDMockito.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.lenient;
 import static org.mockito.BDDMockito.never;
 import static org.mockito.BDDMockito.then;
 
@@ -76,8 +81,36 @@ class PortfolioServiceTest {
     @Mock
     private MarketDataService marketData;
 
-    @InjectMocks
+    @Mock
+    private FxRateRepository fxRateRepository;
+
     private PortfolioService portfolioService;
+
+    @BeforeEach
+    void wireService() {
+        // A real FxConverter over a mocked rate repository, not a mocked converter: a CHF or
+        // unknown-currency amount converts by identity without ever touching the repository, so
+        // every CHF test here needs no stubbing at all — only the mixed-currency ones store a rate.
+        FxConverter fxConverter = new FxConverter(fxRateRepository);
+        portfolioService = new PortfolioService(positionRepository, instrumentRepository,
+                factsheetRepository, snapshotRepository, marketData, fxConverter);
+    }
+
+    /** Makes the repository return a MID rate of chfPerUnit for a currency at or before any date. */
+    private void givenRate(String currency, String chfPerUnit) {
+        FxRate rate = FxRate.builder()
+                .currency(currency)
+                .rateDate(LocalDate.of(2026, 1, 1))
+                .chfPerUnit(new BigDecimal(chfPerUnit))
+                .rateType(FxRateType.MID)
+                .source("frankfurter")
+                .retrievedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                .build();
+        lenient().when(fxRateRepository
+                        .findTopByCurrencyAndRateTypeAndRateDateLessThanEqualOrderByRateDateDesc(
+                                eq(currency), eq(FxRateType.MID), any()))
+                .thenReturn(Optional.of(rate));
+    }
 
     // -------------------------------------------------------------------------
     // Builders & stubbing helpers
@@ -463,6 +496,107 @@ class PortfolioServiceTest {
 
             assertThat(result.totalValue()).isEqualByComparingTo("0");
             assertThat(result.positions().getFirst().allocationPct()).isEqualByComparingTo("0");
+        }
+    }
+
+    // =========================================================================
+    // Foreign currency — the wrong number this PR exists to fix
+    // =========================================================================
+
+    @Nested
+    @DisplayName("converts foreign currency to CHF at the aggregation boundary")
+    class ForeignCurrency {
+
+        @Test
+        void converts_a_usd_position_to_chf_rather_than_summing_it_as_francs() {
+            // The regression test for the bug. The value is shown in USD (its own currency) and
+            // converted to CHF for the total, with the rate carried so the number can be checked.
+            UUID instrumentId = UUID.randomUUID();
+            givenRate("USD", "0.80");
+            stubPortfolio(
+                    List.of(position(instrumentId, "10", "100.00")),
+                    List.of(instrument(instrumentId)
+                            .currency(new CurrencyCode("USD"))
+                            .lastPrice(new BigDecimal("120.00"))
+                            .build()));
+            stubNoMarketPrices();
+
+            PortfolioResponse result = portfolioService.getPortfolio(USER_ID);
+            PortfolioPositionResponse row = result.positions().getFirst();
+
+            assertThat(row.currency()).isEqualTo("USD");
+            assertThat(row.value()).isEqualByComparingTo("1200.00");     // native USD
+            assertThat(row.valueChf()).isEqualByComparingTo("960.00");   // 1200 × 0.80
+            assertThat(row.fxRate()).isEqualByComparingTo("0.80");
+            assertThat(row.fxRateType()).isEqualTo(FxRateType.MID);
+            assertThat(result.totalValue()).isEqualByComparingTo("960.00");
+            assertThat(result.totalCurrency()).isEqualTo("CHF");
+            assertThat(result.hasUnconverted()).isFalse();
+        }
+
+        @Test
+        void sums_a_chf_and_a_usd_position_in_chf_not_by_face_value() {
+            // 1000 CHF + 1000 USD is not 2000 of anything. At 0.80 the total is 1800 CHF — the
+            // single assertion that would have caught the original bug.
+            UUID chf = UUID.randomUUID();
+            UUID usd = UUID.randomUUID();
+            givenRate("USD", "0.80");
+            stubPortfolio(
+                    List.of(position(chf, "10", "100.00"), position(usd, "10", "100.00")),
+                    List.of(
+                            instrument(chf).lastPrice(new BigDecimal("100.00")).build(),          // 1000 CHF
+                            instrument(usd).currency(new CurrencyCode("USD"))
+                                    .lastPrice(new BigDecimal("100.00")).build()));                // 1000 USD → 800 CHF
+            stubNoMarketPrices();
+
+            PortfolioResponse result = portfolioService.getPortfolio(USER_ID);
+
+            assertThat(result.totalValue()).isEqualByComparingTo("1800.00");
+            assertThat(result.hasUnconverted()).isFalse();
+        }
+
+        @Test
+        void excludes_a_position_whose_currency_has_no_rate_and_flags_the_total() {
+            // No rate stored for GBP yet. The honest move is to keep it out of the CHF total and
+            // say the total is partial — never to add its face value as though it were francs.
+            UUID instrumentId = UUID.randomUUID();
+            stubPortfolio(
+                    List.of(position(instrumentId, "10", "100.00")),
+                    List.of(instrument(instrumentId)
+                            .currency(new CurrencyCode("GBP"))
+                            .lastPrice(new BigDecimal("100.00"))
+                            .build()));
+            stubNoMarketPrices();
+
+            PortfolioResponse result = portfolioService.getPortfolio(USER_ID);
+            PortfolioPositionResponse row = result.positions().getFirst();
+
+            assertThat(row.value()).isEqualByComparingTo("1000.00");   // native value still shown
+            assertThat(row.valueChf()).isNull();
+            assertThat(row.gainLoss()).isNull();
+            assertThat(row.allocationPct()).isNull();
+            assertThat(row.fxRate()).isNull();
+            assertThat(result.totalValue()).isEqualByComparingTo("0");
+            assertThat(result.hasUnconverted()).isTrue();
+        }
+
+        @Test
+        void applies_no_rate_and_no_lookup_to_a_chf_position() {
+            // The common case: a CHF position converts by identity, so no rate is attached and the
+            // repository is never even consulted — the read stays a pure database read.
+            UUID instrumentId = UUID.randomUUID();
+            stubPortfolio(
+                    List.of(position(instrumentId, "10", "100.00")),
+                    List.of(instrument(instrumentId).lastPrice(new BigDecimal("110.00")).build()));
+            stubNoMarketPrices();
+
+            PortfolioPositionResponse row = portfolioService.getPortfolio(USER_ID).positions().getFirst();
+
+            assertThat(row.currency()).isEqualTo("CHF");
+            assertThat(row.valueChf()).isEqualByComparingTo("1100.00");
+            assertThat(row.fxRate()).isNull();
+            assertThat(row.fxRateDate()).isNull();
+            then(fxRateRepository).shouldHaveNoInteractions();
         }
     }
 
