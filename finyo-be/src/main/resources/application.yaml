@@ -25,6 +25,18 @@ spring:
     type: caffeine
     caffeine:
       spec: maximumSize=500,expireAfterWrite=900s
+  # Timeouts for every outgoing RestClient. Without these the JDK HttpClient waits
+  # forever: a source that accepts the connection and then goes quiet would pin a
+  # Tomcat thread until the OS gives up. The circuit breaker does not save us there —
+  # it counts failures, and a hanging call never fails, it just never finishes. All
+  # our sources are unofficial endpoints with no stability promise, which is exactly
+  # the kind that hangs instead of erroring.
+  # Keep the read timeout below the rate limiters' timeoutDuration in ResilienceConfig,
+  # otherwise the two waits add up per call.
+  http:
+    client:
+      connect-timeout: ${HTTP_CONNECT_TIMEOUT:3s}
+      read-timeout: ${HTTP_READ_TIMEOUT:5s}
 
 # Behind the TLS-terminating reverse proxy Spring must honor X-Forwarded-*,
 # otherwise same-origin browser POSTs (Origin: https://…) look cross-origin
@@ -55,6 +67,46 @@ finyo:
   six:
     base-url: ${SIX_API_BASE_URL:https://api.six-group.com/api/findata/v1}
     api-key: ${SIX_API_KEY:}
+
+  marketdata:
+    # Fallback chain, tried in this order. A provider missing from this list is
+    # ignored even when its bean exists, so "enabled" and "in the chain" cannot
+    # disagree.
+    #
+    # SIX first: it is the only free source that resolves a Swiss valor number and
+    # covers SIX-listed instruments. OpenFIGI second: it has no valor and no
+    # currency, but it is MIT-licensed (storing and redistributing the data is
+    # explicitly permitted) and it resolves the unlisted 3a funds — the CSIF share
+    # classes behind VIAC and finpension — that SIX does not know at all.
+    #
+    # The day finyo gets a second user, SIX's "personal use only" terms no longer
+    # hold. That switch is this file, not a code change:
+    #   six.enabled: false / eodhd.enabled: true / reference-providers: [eodhd, openfigi]
+    # SixLicenceCheck logs an error on start if it is forgotten.
+    reference-providers: ${MARKETDATA_REFERENCE_PROVIDERS:six,openfigi}
+    # Only SIX quotes. OpenFIGI is a symbology service and has no prices at all — asking it for
+    # one would be a guaranteed miss on a rate-limited endpoint.
+    quote-providers: ${MARKETDATA_QUOTE_PROVIDERS:six}
+    # SIX serves history via charts.json; OpenFIGI has none.
+    history-providers: ${MARKETDATA_HISTORY_PROVIDERS:six}
+    six:
+      enabled: ${MARKETDATA_SIX_ENABLED:true}
+      base-url: ${MARKETDATA_SIX_BASE_URL:https://www.six-group.com/fqs}
+    openfigi:
+      enabled: ${MARKETDATA_OPENFIGI_ENABLED:true}
+      base-url: ${MARKETDATA_OPENFIGI_BASE_URL:https://api.openfigi.com}
+      # Optional. Without a key OpenFIGI allows 25 requests/minute, with one 25 per 6 s.
+      api-key: ${OPENFIGI_API_KEY:}
+    eodhd:
+      # The licensed fallback — wired, deliberately not enabled. See docs/DATENQUELLEN.md.
+      enabled: ${MARKETDATA_EODHD_ENABLED:false}
+      base-url: ${MARKETDATA_EODHD_BASE_URL:https://eodhd.com/api}
+      api-key: ${EODHD_API_KEY:}
+  sync:
+    # Background jobs: prices at 22:30, portfolio snapshots at 23:00 (Europe/Zurich).
+    # Off in tests — a scheduled job firing mid-test would reach for the network.
+    enabled: ${SYNC_ENABLED:true}
+
   graph:
     # Off by default: without credentials nothing may talk to Microsoft Graph,
     # and no test context may start a sync against a non-existent endpoint.

@@ -58,6 +58,48 @@ This document records key architectural decisions made for the finyo project, in
 - 15-minute TTL is appropriate for market data and news: data is stale on that timescale regardless, and it aligns with typical rate-limit windows on free-tier financial APIs.
 - When horizontal scaling becomes necessary, the cache layer can be swapped to Redis by changing `spring.cache.type` and adding the Redis starter — no application code changes required because all cache interactions go through the Spring `@Cacheable` abstraction.
 
+**Amended (2026-07-14, ADR-007):** The `news` cache no longer exists — the RSS module was removed. The rationale above also over-reaches on one point: an in-process cache with a 15-minute TTL is the right tool for *responses*, but it is the wrong tool for *data*. Reference data and prices must survive a restart and an outage of the source, because the sources are unofficial and will be unavailable at some point. Those therefore live in Postgres (`security_reference`, and `instrument_price` from PR 2), with Caffeine only in front of them as a hot-path cache. The rule going forward: **Caffeine caches answers, Postgres stores data** — if losing an entry while the source is down breaks the feature, it does not belong in Caffeine.
+
+---
+
+## ADR-007: Ports and adapters for external data sources
+
+**Decision:** External data sources live behind ports. The **port** (interface plus vendor-neutral DTOs) belongs to the consuming module (`ch.finyo.marketdata.spi`, later `ch.finyo.fx.spi` and `ch.finyo.tax.spi`); the **adapter** that speaks HTTP to a vendor belongs to `ch.finyo.integration.<vendor>`. Market data and FX rates get their own top-level modules (`ch.finyo.marketdata`, `ch.finyo.fx`) rather than living inside `investment`. An ArchUnit test enforces that nothing outside `ch.finyo.integration` depends on it.
+
+**Context:** finyo needs security master data and prices (SIX, OpenFIGI, EODHD), exchange rates (Frankfurter, BAZG) and Swiss tax data (ESTV). The research in `docs/DATENQUELLEN.md` established that the three most valuable sources are all *unofficial*: SIX FQS and the ESTV calculator have no contract, no documentation and no stability promise, and SIX's terms of use permit personal use only — which stops being true the moment finyo has a second user.
+
+**Rationale:**
+- **The sources will change; the domain should not.** A vendor breaking its wire format, or becoming legally unusable, must be a configuration change, not a refactoring. That only holds if a SIX field name (`ProductLine`, `TradingBaseCurrency`) or an ESTV request quirk never escapes the adapter that produced it.
+- **Market data is tenant-free; `Instrument` is not.** The closing price of `IE00B4L5Y983` is identical for every user, while `instrument` carries a `user_id` under ADR-001. Storing prices per user would be duplication with a consistency risk, and it would make a shared price cache impossible. That asymmetry is what justifies a separate module rather than a package inside `investment`.
+- **Several modules need the same data.** FX is needed by `investment`, `transaction`, `wealth` and `tax`; ESTV by `tax` and `pillar3`. Homing those clients in any one feature module would point the dependency the wrong way.
+- **A single fat `MarketDataProvider` interface was rejected.** The providers are asymmetric: SIX resolves master data *and* prices, OpenFIGI only master data. One interface would force OpenFIGI to answer `latestQuote()` with `Optional.empty()` — an interface-segregation violation that disguises itself as "the provider just returned nothing" and poisons debugging. Instead the ports are split by capability, and a `supports(SecurityId)` predicate expresses what each provider can resolve (OpenFIGI has no concept of a Swiss valor number).
+- **The chain order lives in configuration, not in `@Order` annotations.** Which vendor answers first is an operational decision. `finyo.marketdata.reference-providers: [six, openfigi]` is the whole switch; the multi-user migration to a licensed provider is three YAML lines. Spring profiles were rejected for this: they describe environments, and provider choice is orthogonal — one may well want to test EODHD in dev. Abusing profiles as feature switches multiplies the test matrix.
+- **ArchUnit rather than review discipline.** The boundary decays silently under normal maintenance — someone imports an FQS record into a service "just to read the ProductLine", and a year later SIX is wired through half the codebase. The rule costs seconds to run and is the reason the boundary still exists in six months.
+
+**Consequences:** Three new packages and one `spi` sub-package per consuming module. In exchange, the day SIX has to be switched off is a config change. `SixLicenceCheck` makes the personal-use threshold an executable assertion instead of a footnote: it logs an error on every start if SIX is enabled while more than one user exists.
+
+---
+
+## ADR-008: Provenance — "unknown", "unavailable" and "verified" are different things
+
+**Decision:** Every externally derived value carries where it came from, and the type system keeps the three possible states apart:
+
+- A lookup returns `LookupResult.Found` / `NotFound` / `Unavailable` — never an `Optional`.
+- `Instrument.currency` is **nullable**. `NULL` means unknown, and that is not the same as a verified `CHF`.
+- `Instrument.source` distinguishes `SIX` / `OPENFIGI` (verified), `MANUAL` (the user), `HEURISTIC` (asked, nobody knew — the asset class was guessed from the name) and `UNRESOLVED` (could not ask; needs another attempt, and gets one on the next touch).
+
+**Context:** This project already had the bug this ADR exists to prevent, twice. When the SIX API key was absent — its default state — `PortfolioService` silently fell back to the *purchase price*, so every position showed a gain/loss of exactly 0.00 and nothing said the number was not a market price. Separately, `Instrument` had no currency column at all, so a USD-quoted ETF was summed into the portfolio total as though it were francs. Both are the same failure: a guess presented as a fact.
+
+The first cut of the market-data module rebuilt that failure one level up, which is why this ADR exists. `Optional.empty()` was returned both when a provider did not know a security and when it could not be reached; and the missing currency from OpenFIGI (which publishes none) was defaulted to CHF while being stamped `source = OPENFIGI`. A USD ETF resolved through the fallback path — exactly the path taken when SIX does not know it or is down — would have been stored as a Swiss-franc instrument with authoritative-looking provenance.
+
+**Rationale:**
+- **`Optional` is the wrong type for a lookup against an unreliable source.** "The catalogue does not contain this security" is a durable fact about the world and licenses a fallback. "The network was down" is a fact about us and licenses nothing. Collapsing them means a provider outage during an import freezes guesses into the database permanently: the instrument then exists, is found by ISIN on every subsequent import, and is never re-resolved.
+- **A default value is a lie with good posture.** `NOT NULL DEFAULT 'CHF'` makes an unknown currency indistinguishable from a verified one and hands the FX converter (PR 4) a guess it will treat as data. Nullable is uncomfortable and correct — it forces the consumer to decide what to do about not knowing.
+- **Record provenance is not field provenance.** `source = OPENFIGI` says the master data came from OpenFIGI. It says nothing about the currency, which OpenFIGI does not publish. Conflating the two turns the provenance flag itself into a false assurance.
+- The cost is real: three states to handle instead of two, and a nullable column that every consumer must think about. That is the price of not being confidently wrong.
+
+**Consequences:** `ResilientCall` returns a typed `CallOutcome` instead of swallowing failures into an empty `Optional`, and re-throws `Error` and `InterruptedException` rather than reporting them as "the vendor had nothing" — a broken JVM must not quietly write master data. `PositionService` re-resolves `UNRESOLVED` instruments the next time it touches them, so an outage degrades the data rather than corrupting it.
+
 ---
 
 ## ADR-005: Spring Shell version alignment

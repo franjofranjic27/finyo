@@ -2,6 +2,9 @@ package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
 import ch.finyo.common.SwissTime;
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.MarketDataService;
+import ch.finyo.marketdata.PricePoint;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -13,7 +16,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,22 +32,27 @@ public class PortfolioService {
     private static final int MONEY_SCALE = 4;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final String POSITION_RESOURCE = "Position";
-    /** All SIX prices and stored purchase prices are in CHF; no per-instrument currency yet. */
-    private static final String CURRENCY_CHF = "CHF";
 
     private final PositionRepository positionRepository;
     private final InstrumentRepository instrumentRepository;
     private final InstrumentFactsheetRepository factsheetRepository;
     private final PortfolioSnapshotRepository snapshotRepository;
-    private final SixMarketDataClient sixClient;
+    private final MarketDataService marketData;
 
     /**
-     * Aggregates all positions of the user with live prices where available
-     * and upserts today's snapshot so the performance history grows over time.
+     * Aggregates the user's positions.
      *
-     * Deliberately NOT transactional: the SIX HTTP calls must not run inside
-     * a database transaction, and the snapshot upsert is a single atomic
-     * ON CONFLICT statement in its own repository-level transaction.
+     * <p>Two things this method no longer does, and both were bugs rather than features.
+     *
+     * <p>It no longer calls SIX. Prices come from {@code instrument_price} in Postgres, filled by
+     * the nightly {@link ch.finyo.marketdata.PriceSyncJob}. Before, a portfolio read issued one
+     * synchronous HTTP call per distinct instrument, inside the user's request — so a vendor that
+     * accepted the connection and then went quiet would pin a Tomcat thread per position, and a
+     * slow SIX made every page slow, including those with nothing to do with investments.
+     *
+     * <p>And it no longer writes a snapshot. A GET that mutates state is bad enough; worse, it
+     * meant the performance history had a gap on every day the user did not log in, so the chart
+     * was really a record of their visits. {@link PortfolioSnapshotJob} writes it nightly now.
      */
     public PortfolioResponse getPortfolio(String userId) {
         log.debug("Building portfolio for user={}", userId);
@@ -57,13 +64,7 @@ public class PortfolioService {
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, asOf);
         }
 
-        Map<UUID, Instrument> instruments = loadInstruments(positions, userId);
-        Map<String, BigDecimal> livePrices = fetchLivePrices(instruments.values());
-
-        List<PricedPosition> priced = positions.stream()
-                .map(position -> price(position, instruments, livePrices))
-                .toList();
-
+        List<PricedPosition> priced = priceAll(positions, userId);
         BigDecimal totalValue = sum(priced, PricedPosition::value);
         BigDecimal totalCost = sum(priced, PricedPosition::cost);
         BigDecimal gainLoss = totalValue.subtract(totalCost);
@@ -72,33 +73,22 @@ public class PortfolioService {
                 .map(p -> toResponse(p, totalValue))
                 .toList();
 
-        upsertSnapshot(userId, totalValue, totalCost);
         return new PortfolioResponse(rows, totalValue, totalCost, gainLoss,
                 percentOf(gainLoss, totalCost), asOf);
     }
 
     /**
-     * Builds the detail view of a single position using the same price
-     * fallback chain as the aggregated portfolio. Prices ALL positions of the
-     * user because the portfolio share needs the total portfolio value; the
-     * Caffeine cache absorbs the repeated SIX lookups. Deliberately does NOT
-     * upsert a snapshot — only the aggregated portfolio read does.
+     * Builds the detail view of a single position. Prices every position of the user, because the
+     * portfolio share needs the total — which is a database read now, not a fan-out of HTTP calls.
      *
-     * @throws ResourceNotFoundException when the position does not exist or
-     *         belongs to another user
+     * @throws ResourceNotFoundException when the position does not exist or belongs to someone else
      */
     public PositionDetailResponse getPositionDetail(UUID positionId, String userId) {
         log.debug("Building position detail id={} for user={}", positionId, userId);
         positionRepository.findByIdAndUserId(positionId, userId)
                 .orElseThrow(() -> ResourceNotFoundException.of(POSITION_RESOURCE, positionId));
 
-        List<Position> positions = positionRepository.findByUserId(userId);
-        Map<UUID, Instrument> instruments = loadInstruments(positions, userId);
-        Map<String, BigDecimal> livePrices = fetchLivePrices(instruments.values());
-
-        List<PricedPosition> priced = positions.stream()
-                .map(position -> price(position, instruments, livePrices))
-                .toList();
+        List<PricedPosition> priced = priceAll(positionRepository.findByUserId(userId), userId);
         BigDecimal totalValue = sum(priced, PricedPosition::value);
 
         PricedPosition target = priced.stream()
@@ -108,11 +98,17 @@ public class PortfolioService {
         return toDetail(target, totalValue, loadFactsheetInfo(target.instrument().getId(), userId));
     }
 
-    /** Metadata-only projection — the factsheet blob itself is never fetched here. */
-    private PositionDetailResponse.@Nullable FactsheetInfo loadFactsheetInfo(UUID instrumentId, String userId) {
-        return factsheetRepository.findMetadataByInstrumentIdAndUserId(instrumentId, userId)
-                .map(PositionDetailResponse.FactsheetInfo::from)
-                .orElse(null);
+    /** Called by {@link PortfolioSnapshotJob}; at most one snapshot per user and day. */
+    public void writeSnapshot(String userId) {
+        List<Position> positions = positionRepository.findByUserId(userId);
+        if (positions.isEmpty()) {
+            return;
+        }
+        List<PricedPosition> priced = priceAll(positions, userId);
+        snapshotRepository.upsert(userId,
+                LocalDate.now(SwissTime.ZONE),
+                sum(priced, PricedPosition::value).setScale(MONEY_SCALE, RoundingMode.HALF_UP),
+                sum(priced, PricedPosition::cost).setScale(MONEY_SCALE, RoundingMode.HALF_UP));
     }
 
     public PortfolioHistoryResponse getHistory(String userId, int months) {
@@ -126,6 +122,22 @@ public class PortfolioService {
         return new PortfolioHistoryResponse(points);
     }
 
+    private List<PricedPosition> priceAll(List<Position> positions, String userId) {
+        Map<UUID, Instrument> instruments = loadInstruments(positions, userId);
+        Map<String, PricePoint> prices = marketData.latestPrices(isinsOf(instruments.values()));
+        return positions.stream()
+                .map(position -> price(position, instruments, prices))
+                .toList();
+    }
+
+    private static Collection<String> isinsOf(Collection<Instrument> instruments) {
+        return instruments.stream()
+                .map(Instrument::getIsin)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
     /** User-scoped batch load: a foreign instrument id can never leak into the portfolio. */
     private Map<UUID, Instrument> loadInstruments(List<Position> positions, String userId) {
         List<UUID> instrumentIds = positions.stream()
@@ -136,47 +148,67 @@ public class PortfolioService {
                 .collect(Collectors.toMap(Instrument::getId, Function.identity()));
     }
 
-    /** One SIX call per distinct identifier; the Caffeine cache absorbs repeats across requests. */
-    private Map<String, BigDecimal> fetchLivePrices(Collection<Instrument> instruments) {
-        Map<String, BigDecimal> prices = new HashMap<>();
-        instruments.stream()
-                .map(Instrument::preferredIdentifier)
-                .filter(Objects::nonNull)
-                .distinct()
-                .forEach(identifier -> sixClient.fetchByValorOrIsin(identifier)
-                        .map(MarketDataResponse::lastPrice)
-                        .ifPresent(price -> prices.put(identifier, price)));
-        return prices;
-    }
-
-    /** Price fallback chain: SIX live -> persisted instrument price -> purchase price. */
+    /**
+     * Market price, else the user's own, else the purchase price.
+     *
+     * The order is not arbitrary. A market price is a fact and beats an opinion. A manual price is
+     * the only thing available for the unlisted funds that no provider quotes — which, for a Swiss
+     * 3a portfolio, is most of it. And the purchase price is the last resort, valued honestly: the
+     * position is shown at cost and labelled as such, rather than passed off as a market that has
+     * not moved.
+     */
     private PricedPosition price(Position position, Map<UUID, Instrument> instruments,
-                                 Map<String, BigDecimal> livePrices) {
+                                 Map<String, PricePoint> prices) {
         Instrument instrument = instruments.get(position.getInstrumentId());
         if (instrument == null) {
             throw new IllegalStateException(
                     "Instrument " + position.getInstrumentId() + " missing for position " + position.getId());
         }
 
-        String identifier = instrument.preferredIdentifier();
-        BigDecimal livePrice = identifier != null ? livePrices.get(identifier) : null;
+        PricePoint market = instrument.getIsin() == null ? null : prices.get(instrument.getIsin());
 
         BigDecimal currentPrice;
-        PriceSource priceSource;
-        if (livePrice != null) {
-            currentPrice = livePrice;
-            priceSource = PriceSource.LIVE;
+        PriceSource source;
+        LocalDate priceAsOf;
+        boolean stale;
+        // The currency the currentPrice — and therefore the value — is actually in. For a market
+        // price that is the quote's own currency, not the instrument's: the two normally agree
+        // (both come from SIX), but if they ever diverge the honest thing is to label the value
+        // with the currency it was computed in, not the one we hoped for. FX to a common currency
+        // is PR 4; until then a foreign-currency value is shown as such rather than mislabelled.
+        CurrencyCode currency;
+
+        if (market != null) {
+            currentPrice = market.price();
+            source = PriceSource.MARKET;
+            priceAsOf = market.asOf();
+            stale = market.stale();
+            currency = market.currency();
         } else if (instrument.getLastPrice() != null) {
             currentPrice = instrument.getLastPrice();
-            priceSource = PriceSource.CACHE;
+            source = PriceSource.MANUAL;
+            priceAsOf = instrument.getLastPriceUpdatedAt() == null
+                    ? null : instrument.getLastPriceUpdatedAt().atZoneSameInstant(SwissTime.ZONE).toLocalDate();
+            stale = false;
+            currency = instrument.getCurrency();
         } else {
             currentPrice = position.getPurchasePrice();
-            priceSource = PriceSource.PURCHASE;
+            source = PriceSource.PURCHASE;
+            priceAsOf = position.getPurchaseDate();
+            stale = false;
+            currency = instrument.getCurrency();
         }
 
         BigDecimal value = position.getQuantity().multiply(currentPrice);
         BigDecimal cost = position.getQuantity().multiply(position.getPurchasePrice());
-        return new PricedPosition(position, instrument, currentPrice, priceSource, value, cost);
+        return new PricedPosition(position, instrument, currentPrice, source, priceAsOf, stale, currency, value, cost);
+    }
+
+    /** Metadata-only projection — the factsheet blob itself is never fetched here. */
+    private PositionDetailResponse.@Nullable FactsheetInfo loadFactsheetInfo(UUID instrumentId, String userId) {
+        return factsheetRepository.findMetadataByInstrumentIdAndUserId(instrumentId, userId)
+                .map(PositionDetailResponse.FactsheetInfo::from)
+                .orElse(null);
     }
 
     private PortfolioPositionResponse toResponse(PricedPosition priced, BigDecimal totalValue) {
@@ -189,11 +221,14 @@ public class PortfolioService {
                 priced.instrument().getName(),
                 priced.instrument().getIsin(),
                 priced.instrument().getValor(),
+                asString(priced.currency()),
                 priced.position().getQuantity(),
                 priced.position().getPurchasePrice(),
                 priced.position().getPurchaseDate(),
                 priced.currentPrice(),
                 priced.priceSource(),
+                priced.priceAsOf(),
+                priced.stale(),
                 priced.value(),
                 gainLoss,
                 percentOf(gainLoss, priced.cost()),
@@ -212,13 +247,14 @@ public class PortfolioService {
                 instrument.getValor(),
                 instrument.getAssetClass(),
                 instrument.getTer(),
-                CURRENCY_CHF,
+                asString(priced.currency()),
                 priced.position().getQuantity(),
                 priced.position().getPurchasePrice(),
                 priced.position().getPurchaseDate(),
                 priced.currentPrice(),
                 priced.priceSource(),
-                priceUpdatedAt(priced),
+                priced.priceAsOf(),
+                priced.stale(),
                 priced.value(),
                 gainLoss,
                 percentOf(gainLoss, priced.cost()),
@@ -227,21 +263,13 @@ public class PortfolioService {
                 factsheet);
     }
 
-    /** LIVE prices were fetched during this request; CACHE carries the persisted timestamp. */
-    private static OffsetDateTime priceUpdatedAt(PricedPosition priced) {
-        return switch (priced.priceSource()) {
-            case LIVE -> OffsetDateTime.now(ZoneOffset.UTC);
-            case CACHE -> priced.instrument().getLastPriceUpdatedAt();
-            case PURCHASE -> null;
-        };
-    }
-
-    /** At most one snapshot per user and day — atomic upsert, safe under concurrent reads. */
-    private void upsertSnapshot(String userId, BigDecimal totalValue, BigDecimal totalCost) {
-        snapshotRepository.upsert(userId,
-                LocalDate.now(SwissTime.ZONE),
-                totalValue.setScale(MONEY_SCALE, RoundingMode.HALF_UP),
-                totalCost.setScale(MONEY_SCALE, RoundingMode.HALF_UP));
+    /**
+     * Null when nobody has established it — OpenFIGI publishes no currency, and an unlisted fund
+     * may never have been resolved at all. Shown as unknown rather than asserted to be francs;
+     * conversion to a common currency arrives with the FX module.
+     */
+    private static @Nullable String asString(@Nullable CurrencyCode currency) {
+        return currency == null ? null : currency.value();
     }
 
     private static BigDecimal sum(List<PricedPosition> priced, Function<PricedPosition, BigDecimal> amount) {
@@ -261,6 +289,9 @@ public class PortfolioService {
             Instrument instrument,
             BigDecimal currentPrice,
             PriceSource priceSource,
+            @Nullable LocalDate priceAsOf,
+            boolean stale,
+            @Nullable CurrencyCode currency,
             BigDecimal value,
             BigDecimal cost
     ) {}

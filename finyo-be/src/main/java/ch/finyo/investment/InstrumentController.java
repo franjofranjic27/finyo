@@ -18,7 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/instruments")
 @RequiredArgsConstructor
-@Tag(name = "Investments", description = "Track financial instruments and market data")
+@Tag(name = "Investments", description = "Track financial instruments")
 public class InstrumentController {
 
     private final InstrumentService instrumentService;
@@ -33,6 +33,21 @@ public class InstrumentController {
         return ResponseEntity.ok(instrumentService.getAll(userId));
     }
 
+    @GetMapping("/lookup")
+    @Operation(summary = "Preview an instrument by ISIN or valor",
+            description = "Resolves master data (name, ticker, currency, asset class) from the provider "
+                    + "chain without creating anything, for the add-position form's live lookup. "
+                    + "status is FOUND (listed), NOT_FOUND (unknown — e.g. an unlisted 3a fund) or "
+                    + "UNAVAILABLE (providers unreachable).")
+    @ApiResponse(responseCode = "200", description = "Lookup result returned")
+    public ResponseEntity<InstrumentLookupResponse> lookup(@RequestParam(required = false) String isin,
+                                                           @RequestParam(required = false) String valor) {
+        // Read-only market data; no userId needed for the lookup itself, but the endpoint stays
+        // behind the same authentication as the rest of /instruments.
+        log.info("GET /api/v1/instruments/lookup isin={} valor={}", isin, valor);
+        return ResponseEntity.ok(instrumentService.lookup(isin, valor));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get instrument by ID")
     @ApiResponse(responseCode = "200", description = "Instrument found")
@@ -43,15 +58,6 @@ public class InstrumentController {
         return ResponseEntity.ok(instrumentService.getById(id, userId));
     }
 
-    @GetMapping("/{id}/market-data")
-    @Operation(summary = "Get live market data for an instrument from SIX Swiss Exchange")
-    @ApiResponse(responseCode = "200", description = "Market data returned")
-    @ApiResponse(responseCode = "404", description = "Instrument not found")
-    public ResponseEntity<MarketDataResponse> getMarketData(@PathVariable UUID id) {
-        String userId = userContextProvider.getUserId();
-        log.info("GET /api/v1/instruments/{}/market-data user={}", id, userId);
-        return ResponseEntity.ok(instrumentService.getMarketData(id, userId));
-    }
 
     @PostMapping
     @Operation(summary = "Add a new instrument to track")

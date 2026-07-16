@@ -139,7 +139,13 @@
       "csvImport": "Import CSV",
       "csvHint": "CSV format: Name; ISIN; Quantity; Purchase price; Price (optional) — delimiter ; or ,",
       "csvResult": "{{imported}} imported, {{failed}} failed",
-      "csvNoRows": "No valid rows found in the file"
+      "csvNoRows": "No valid rows found in the file",
+      "lookup": {
+        "searching": "Looking up the security …",
+        "priceAuto": "price fetched automatically",
+        "notFound": "No listed security for this ISIN/valor — enter name and price by hand",
+        "unavailable": "Security lookup is currently unavailable — you can still enter it manually"
+      }
     },
     "table": {
       "title": "Positions",
@@ -156,6 +162,22 @@
       "confirmRemove": "Remove position \"{{name}}\"?",
       "empty": "No positions yet — add your first security above"
     },
+    "price": {
+      "badge": {
+        "MARKET": "Market",
+        "MANUAL": "Manual",
+        "PURCHASE": "No price",
+        "stale": "Price from {{date}}",
+        "staleUnknown": "Price outdated"
+      },
+      "asOf": "Price from {{date}}",
+      "asOfUnknown": "Price date unknown",
+      "marketHint": "Market price, 15 min delayed",
+      "staleHint": "Older than expected — the market may have moved since",
+      "manualHint": "A price you entered manually",
+      "purchaseHint": "No price available — the position is shown at its purchase cost",
+      "unknownCurrency": "unknown"
+    },
     "allocation": {
       "title": "Allocation",
       "positions": "Positions",
@@ -168,9 +190,14 @@
       "range3y": "3Y",
       "notEnoughData": "Not enough data yet — the history grows with every portfolio view"
     },
+    "priceHistory": {
+      "title": "Price history",
+      "empty": "No price data yet",
+      "axisPrice": "Price",
+      "tooltipDate": "Date"
+    },
     "position": {
       "loadError": "Failed to load the position",
-      "liveChip": "Price live · SIX",
       "stats": {
         "value": "Value",
         "quantity": "Quantity",
@@ -187,12 +214,13 @@
         "currency": "Currency",
         "ter": "TER",
         "priceSource": "Price Source",
+        "priceAsOf": "Price As Of",
         "portfolioShare": "Portfolio Share"
       },
       "priceSourceValue": {
-        "LIVE": "Live (SIX)",
-        "CACHE": "Cached",
-        "PURCHASE": "Purchase price"
+        "MARKET": "Market price (15 min delayed)",
+        "MANUAL": "Entered manually",
+        "PURCHASE": "No price — purchase cost"
       },
       "editDialog": {
         "title": "Edit product",
@@ -210,7 +238,7 @@
         "purchasePrice": "Avg. Purchase Price",
         "purchaseDate": "Purchase Date",
         "currentPrice": "Current Price (optional)",
-        "currentPriceHint": "Overrides the market price — a live price refresh may replace it again",
+        "currentPriceHint": "Stored as a manual price and shown instead of the market price",
         "save": "Save",
         "quantityInvalid": "Quantity must be greater than 0",
         "purchasePriceInvalid": "Purchase price must be 0 or greater",

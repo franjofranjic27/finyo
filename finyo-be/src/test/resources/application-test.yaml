@@ -4,6 +4,24 @@ finyo:
     # inside every @SpringBootTest context and firing at a non-existent Graph
     # endpoint would be a flaky-test factory.
     enabled: false
+  sync:
+    # No scheduled job may fire during a test — it would reach for the network.
+    enabled: false
+  # Every market-data provider is off in tests. Without this, any integration test
+  # that creates a position would issue a live HTTP call to SIX or OpenFIGI: slow,
+  # flaky, dependent on the network, and rude to an endpoint we are only tolerated
+  # on. Adapter behaviour is covered by unit tests against a MockRestServiceServer;
+  # the chain itself is covered by wiring a stub provider.
+  marketdata:
+    reference-providers: []
+    quote-providers: []
+    history-providers: []
+    six:
+      enabled: false
+    openfigi:
+      enabled: false
+    eodhd:
+      enabled: false
 
 spring:
   datasource:

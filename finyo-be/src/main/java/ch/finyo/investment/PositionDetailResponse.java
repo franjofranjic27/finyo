@@ -23,7 +23,11 @@ public record PositionDetailResponse(
         LocalDate purchaseDate,
         BigDecimal currentPrice,
         PriceSource priceSource,
-        OffsetDateTime priceUpdatedAt,
+        // The trading day the price belongs to, not the day we fetched it — a Friday close read
+        // on a Sunday is three days old, and saying "updated just now" would be a small lie told
+        // very often. Replaces the old priceUpdatedAt, which reported the fetch time.
+        LocalDate priceAsOf,
+        boolean stale,
         BigDecimal value,
         BigDecimal gainLoss,
         BigDecimal returnPercent,

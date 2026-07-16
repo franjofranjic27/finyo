@@ -17,19 +17,38 @@ export interface PositionDetail {
   valor: string | null;
   assetClass: AssetClass;
   ter: number | null;
-  currency: string;
+  /** Trading currency — null when nobody established it. Never assume CHF. */
+  currency: string | null;
   quantity: number;
   avgPurchasePrice: number;
   purchaseDate: string | null;
   currentPrice: number;
   priceSource: PriceSource;
-  priceUpdatedAt: string | null;
+  /** The trading day the price belongs to (ISO date), not the day it was fetched. */
+  priceAsOf: string | null;
+  /** The price is older than a market price should be (> 4 days). */
+  stale: boolean;
   value: number;
   gainLoss: number;
   returnPercent: number;
   portfolioShare: number;
   factsheetUrl: string | null;
   factsheet: FactsheetInfo | null;
+}
+
+/** A single trading day's closing price. */
+export interface PriceHistoryPoint {
+  /** ISO date (YYYY-MM-DD) the close belongs to. */
+  date: string;
+  close: number;
+}
+
+export interface PriceHistory {
+  isin: string | null;
+  /** Quote currency — null when unknown. Never assume CHF. */
+  currency: string | null;
+  /** Daily closes, oldest first. Empty when the instrument is unlisted or not yet backfilled. */
+  points: PriceHistoryPoint[];
 }
 
 export interface UpdateInstrumentRequest {
@@ -61,6 +80,9 @@ async function throwProblem(response: Response): Promise<never> {
 export const positionDetailApi = {
   getPosition: (token: string, positionId: string) =>
     apiRequest<PositionDetail>(`/positions/${positionId}`, {}, token),
+
+  getPriceHistory: (positionId: string, token: string) =>
+    apiRequest<PriceHistory>(`/positions/${positionId}/price-history`, {}, token),
 
   updatePosition: (token: string, positionId: string, data: UpdatePositionRequest) =>
     apiRequest<PositionDetail>(
