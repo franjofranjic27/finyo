@@ -13,7 +13,7 @@
   "ssoSessionIdleTimeout": 1209600,
   "ssoSessionMaxLifespan": 2592000,
   "revokeRefreshToken": true,
-  "refreshTokenMaxReuse": 0,
+  "refreshTokenMaxReuse": 3,
   "offlineSessionMaxLifespanEnabled": false,
   "requiredActions": [],
   "roles": {
