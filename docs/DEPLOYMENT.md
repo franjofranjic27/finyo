@@ -25,7 +25,10 @@ platform.
   - `KEYCLOAK_ISSUER_URI=https://auth.frama-maschinenhandel.ch/realms/finyo`
   - `KEYCLOAK_JWK_URI=http://keycloak:8080/realms/finyo/protocol/openid-connect/certs`
 - The frontend image is environment-agnostic: at container start
-  `finyo-fe/docker/40-runtime-config.sh` writes `/config.js` from `KEYCLOAK_URL`.
+  `finyo-fe/docker/40-runtime-config.sh` writes `/config.js` from `KEYCLOAK_URL`,
+  and `finyo-fe/docker/30-csp.sh` substitutes the same URL's origin into the
+  CSP's `connect-src` (nginx serves the CSP; Caddy passes it through). Keycloak
+  is a foreign origin, so a wrong `KEYCLOAK_URL` blocks login at the browser.
 - finyo's Postgres data (its schema + the Keycloak database) lives in the shared
   platform Postgres instance.
 
