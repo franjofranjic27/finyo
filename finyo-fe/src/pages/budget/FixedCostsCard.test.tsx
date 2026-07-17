@@ -61,8 +61,12 @@ describe('FixedCostsCard', () => {
     expect(yearlyBadge).toHaveClass('text-violet-500');
     expect(within(activeFitness as HTMLElement).getByText('CHF 58.25')).toBeInTheDocument();
 
-    const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).not.toBeNull();
+    // "Total" renders twice (mobile list + table) — the table row is the one with a <tr>.
+    const totalRow = screen
+      .getAllByText('Total')
+      .map((element) => element.closest('tr'))
+      .find((row) => row !== null);
+    expect(totalRow).toBeDefined();
     expect(within(totalRow as HTMLElement).getByText("CHF 3'774.60")).toBeInTheDocument();
     expect(within(totalRow as HTMLElement).getByText('CHF 314.55')).toBeInTheDocument();
   });

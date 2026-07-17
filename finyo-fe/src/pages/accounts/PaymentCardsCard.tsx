@@ -60,6 +60,51 @@ function CardRow({ card, onEdit, onRemove, removing }: Readonly<{
   );
 }
 
+/** Mobile list row: card name with secondary details below, actions on the right. */
+function CardListItem({ card, onEdit, onRemove, removing }: Readonly<{
+  card: PaymentCard;
+  onEdit: (card: PaymentCard) => void;
+  onRemove: (card: PaymentCard) => void;
+  removing: boolean;
+}>) {
+  const { t } = useTranslation();
+
+  const details = [t(scopeLabelKey(card.scope)), card.provider, card.accountName, card.feeNote]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className="flex items-start gap-3 border-b border-border py-3 first:pt-0 last:border-0 last:pb-0">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{card.name}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{details}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {card.currency && <Badge variant="secondary">{card.currency}</Badge>}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label={t('accounts.cards.editTitle')}
+          onClick={() => onEdit(card)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+          aria-label={t('accounts.cards.deleteLabel')}
+          disabled={removing}
+          onClick={() => onRemove(card)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 export function PaymentCardsCard({ cards, accounts }: Readonly<{
   cards: PaymentCard[];
   accounts: Account[];
@@ -111,31 +156,46 @@ export function PaymentCardsCard({ cards, accounts }: Readonly<{
             {t('accounts.cards.empty')}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">{t('accounts.cards.card')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.cards.provider')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.cards.account')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.cards.currency')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.cards.fees')}</th>
-                  <th className="py-2" aria-hidden="true" />
-                </tr>
-              </thead>
-              <tbody>
-                {cards.map((card) => (
-                  <CardRow
-                    key={card.id}
-                    card={card}
-                    onEdit={openEdit}
-                    onRemove={confirmRemove}
-                    removing={deleteCard.isPending}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile: list rows — the table does not fit on 390 px. */}
+            <ul className="md:hidden">
+              {cards.map((card) => (
+                <CardListItem
+                  key={card.id}
+                  card={card}
+                  onEdit={openEdit}
+                  onRemove={confirmRemove}
+                  removing={deleteCard.isPending}
+                />
+              ))}
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">{t('accounts.cards.card')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.cards.provider')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.cards.account')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.cards.currency')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.cards.fees')}</th>
+                    <th className="py-2" aria-hidden="true" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {cards.map((card) => (
+                    <CardRow
+                      key={card.id}
+                      card={card}
+                      onEdit={openEdit}
+                      onRemove={confirmRemove}
+                      removing={deleteCard.isPending}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </CardContent>
       {dialogOpen && (

@@ -311,7 +311,8 @@ export function CalculatorCard({
             <Label>{t('tax.children')}</Label>
             <Input type="number" value={children} onChange={(e) => setChildren(e.target.value)} min={0} max={20} />
           </div>
-          <div className="space-y-2">
+          {/* Church and the money fields span the full width on mobile (jahresdetail design). */}
+          <div className="col-span-2 space-y-2 md:col-span-1">
             <Label>{t('tax.churchAffiliation')}</Label>
             <Select value={church} onValueChange={(v) => setChurch(v as ChurchAffiliation)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -322,7 +323,7 @@ export function CalculatorCard({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="col-span-2 space-y-2 md:col-span-1">
             <Label>{t('tax.grossIncome')} (CHF) *</Label>
             <Input
               type="number"
@@ -337,11 +338,11 @@ export function CalculatorCard({
               <p className="text-xs text-muted-foreground">{t('tax.prefill.fromSalary')}</p>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="col-span-2 space-y-2 md:col-span-1">
             <Label>{t('tax.investmentIncome')} (CHF)</Label>
             <Input type="number" value={investmentIncome} onChange={(e) => setInvestmentIncome(e.target.value)} />
           </div>
-          <div className="space-y-2">
+          <div className="col-span-2 space-y-2 md:col-span-1">
             <Label>
               <Link to="/pillar3" className="underline-offset-2 hover:underline">
                 {t('tax.pillar3')} ↗
@@ -388,7 +389,7 @@ export function CalculatorCard({
               </Select>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="col-span-2 space-y-2 md:col-span-1">
             <Label>{t('tax.netWealth')} (CHF)</Label>
             <Input
               type="number"
@@ -424,14 +425,20 @@ export function CalculatorCard({
         )}
 
         <div className="mt-4 space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => mutate()} disabled={!grossIncomeValue || isPending}>
+          {/* Mobile: stacked full-width action buttons; sm+: original inline row. */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => mutate()}
+              disabled={!grossIncomeValue || isPending}
+            >
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculateForYear', { year })}
             </Button>
             {selectedScenario ? (
               <Button
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={!grossIncomeValue || isPending || updateScenario.isPending}
                 onClick={() => updateScenario.mutate(selectedScenario)}
               >
@@ -442,6 +449,7 @@ export function CalculatorCard({
               onSaveScenarioRequested && (
                 <Button
                   variant="outline"
+                  className="w-full sm:w-auto"
                   disabled={!grossIncomeValue || isPending}
                   onClick={() =>
                     mutate(undefined, { onSuccess: () => onSaveScenarioRequested() })

@@ -20,13 +20,14 @@ import { FactsheetCard } from './FactsheetCard';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceSourceBadge } from './PriceSourceBadge';
 
-function StatTile({ label, value, valueClass }: Readonly<{
+function StatTile({ label, value, valueClass, className }: Readonly<{
   label: string;
   value: string;
   valueClass?: string;
+  className?: string;
 }>) {
   return (
-    <Card>
+    <Card className={className}>
       <CardContent className="pt-4">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className={`mt-1 text-xl font-bold tabular-nums ${valueClass ?? 'text-foreground'}`}>
@@ -171,7 +172,12 @@ export function PositionDetailPage() {
             <Badge variant="secondary">{t(`assetClass.${position.assetClass}`)}</Badge>
             <PriceSourceBadge position={position} />
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setEditPositionOpen(true)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full border border-border sm:w-auto sm:border-0"
+            onClick={() => setEditPositionOpen(true)}
+          >
             <Pencil className="mr-1 h-4 w-4" aria-hidden="true" />
             {t('investments.position.editPositionDialog.title')}
           </Button>
@@ -203,6 +209,8 @@ export function PositionDetailPage() {
           label={t('investments.position.stats.gainLossReturn')}
           value={gainLossValue}
           valueClass={amountColour(position.gainLoss ?? 0)}
+          // On the 2-column phone grid the fifth tile would leave a hole — it spans the row.
+          className="col-span-2 md:col-span-1"
         />
       </div>
 
@@ -219,7 +227,7 @@ export function PositionDetailPage() {
       <div className="flex justify-end">
         <Button
           variant="ghost"
-          className="text-destructive hover:text-destructive"
+          className="w-full border border-border text-destructive hover:text-destructive sm:w-auto sm:border-0"
           onClick={confirmDelete}
           disabled={deletePosition.isPending}
         >

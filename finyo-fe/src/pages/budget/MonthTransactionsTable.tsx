@@ -174,45 +174,83 @@ export function MonthTransactionsTable({
 
         {data && data.totalElements > 0 && (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('budget.import.colDate')}</TableHead>
-                  <TableHead>{t('budget.import.colDescription')}</TableHead>
-                  <TableHead className="text-right">{t('budget.import.colAmount')}</TableHead>
-                  <TableHead>{t('budget.rules.category')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.content.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {formatDate(transaction.date, i18n.language)}
-                    </TableCell>
-                    <TableCell className="max-w-72 truncate">
+            {/* Mobile: list rows — description + amount, date and category as a secondary line. */}
+            <div className="md:hidden">
+              {data.content.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="border-b border-border py-3 last:border-0"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {transaction.description}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${amountColour(transaction.amount)}`}
+                    </span>
+                    <span
+                      className={`shrink-0 text-sm tabular-nums ${amountColour(transaction.amount)}`}
                     >
                       {formatCHF(transaction.amount)}
-                    </TableCell>
-                    <TableCell>
-                      <CategoryCell
-                        transaction={transaction}
-                        categories={categories.data ?? []}
-                        hint={ruleHint}
-                        pending={updateCategory.isPending}
-                        onChange={(categoryId) =>
-                          updateCategory.mutate({ transaction, categoryId })
-                        }
-                        onRememberRule={() => setRuleDialog(ruleHint)}
-                      />
-                    </TableCell>
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(transaction.date, i18n.language)}
+                    </span>
+                    <CategoryCell
+                      transaction={transaction}
+                      categories={categories.data ?? []}
+                      hint={ruleHint}
+                      pending={updateCategory.isPending}
+                      onChange={(categoryId) =>
+                        updateCategory.mutate({ transaction, categoryId })
+                      }
+                      onRememberRule={() => setRuleDialog(ruleHint)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('budget.import.colDate')}</TableHead>
+                    <TableHead>{t('budget.import.colDescription')}</TableHead>
+                    <TableHead className="text-right">{t('budget.import.colAmount')}</TableHead>
+                    <TableHead>{t('budget.rules.category')}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {data.content.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDate(transaction.date, i18n.language)}
+                      </TableCell>
+                      <TableCell className="max-w-72 truncate">
+                        {transaction.description}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${amountColour(transaction.amount)}`}
+                      >
+                        {formatCHF(transaction.amount)}
+                      </TableCell>
+                      <TableCell>
+                        <CategoryCell
+                          transaction={transaction}
+                          categories={categories.data ?? []}
+                          hint={ruleHint}
+                          pending={updateCategory.isPending}
+                          onChange={(categoryId) =>
+                            updateCategory.mutate({ transaction, categoryId })
+                          }
+                          onRememberRule={() => setRuleDialog(ruleHint)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
             {updateCategory.isError && (
               <p className="mt-2 text-sm text-destructive">{updateCategory.error.message}</p>

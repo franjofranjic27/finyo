@@ -211,10 +211,12 @@ function SalaryInputsCard({ form, setForm, onSubmit, saving, error }: Readonly<S
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label>{t('budget.salary.inputs.mode')}</Label>
+          {/* Mobile: full-width segmented control; desktop keeps the compact buttons. */}
           <div className="flex gap-1">
             <Button
               variant={form.inputMode === 'MONTHLY' ? 'default' : 'outline'}
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => setInputMode('MONTHLY')}
             >
               {t('budget.salary.inputs.modeMonthly')}
@@ -222,6 +224,7 @@ function SalaryInputsCard({ form, setForm, onSubmit, saving, error }: Readonly<S
             <Button
               variant={form.inputMode === 'YEARLY' ? 'default' : 'outline'}
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => setInputMode('YEARLY')}
             >
               {t('budget.salary.inputs.modeYearly')}
@@ -346,50 +349,156 @@ function SalaryResultCard({ result }: Readonly<{ result: SalaryResult }>) {
         <p className="text-xs text-muted-foreground">{t('budget.salary.result.subtitle')}</p>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('budget.salary.result.position')}</TableHead>
-              <TableHead className="text-right">{t('budget.salary.result.rate')}</TableHead>
-              <TableHead className="text-right">{t('budget.salary.result.perMonth')}</TableHead>
-              <TableHead className="text-right">{t('budget.salary.result.perYear')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="tabular-nums">
-            <TableRow className="bg-secondary/50 font-semibold">
-              <TableCell>{t('budget.salary.result.gross')}</TableCell>
-              <TableCell />
-              <TableCell className="text-right">{formatCHF(result.grossMonthly)}</TableCell>
-              <TableCell className="text-right">{formatCHF(result.grossYearly)}</TableCell>
-            </TableRow>
-            {result.deductions.map((deduction) => (
-              <DeductionRow key={deduction.type} deduction={deduction} />
-            ))}
-            <TableRow className="bg-secondary/50 font-semibold">
-              <TableCell>{t('budget.salary.result.totalDeductions')}</TableCell>
-              <TableCell className="text-right">
-                {formatPercent(result.totalDeductionsPct)}
-              </TableCell>
-              <TableCell className="text-right text-red-500">
-                −{formatCHF(result.totalPerMonth)}
-              </TableCell>
-              <TableCell className="text-right text-red-500">
-                −{formatCHF(result.totalPerYear)}
-              </TableCell>
-            </TableRow>
-            <TableRow className="font-bold text-emerald-500">
-              <TableCell>{t('budget.salary.result.net')}</TableCell>
-              <TableCell />
-              <TableCell className="text-right">{formatCHF(result.netMonthly)}</TableCell>
-              <TableCell className="text-right">{formatCHF(result.netYearly)}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+        <SalaryResultList result={result} />
+
+        <div className="hidden sm:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('budget.salary.result.position')}</TableHead>
+                <TableHead className="text-right">{t('budget.salary.result.rate')}</TableHead>
+                <TableHead className="text-right">{t('budget.salary.result.perMonth')}</TableHead>
+                <TableHead className="text-right">{t('budget.salary.result.perYear')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="tabular-nums">
+              <TableRow className="bg-secondary/50 font-semibold">
+                <TableCell>{t('budget.salary.result.gross')}</TableCell>
+                <TableCell />
+                <TableCell className="text-right">{formatCHF(result.grossMonthly)}</TableCell>
+                <TableCell className="text-right">{formatCHF(result.grossYearly)}</TableCell>
+              </TableRow>
+              {result.deductions.map((deduction) => (
+                <DeductionRow key={deduction.type} deduction={deduction} />
+              ))}
+              <TableRow className="bg-secondary/50 font-semibold">
+                <TableCell>{t('budget.salary.result.totalDeductions')}</TableCell>
+                <TableCell className="text-right">
+                  {formatPercent(result.totalDeductionsPct)}
+                </TableCell>
+                <TableCell className="text-right text-red-500">
+                  −{formatCHF(result.totalPerMonth)}
+                </TableCell>
+                <TableCell className="text-right text-red-500">
+                  −{formatCHF(result.totalPerYear)}
+                </TableCell>
+              </TableRow>
+              <TableRow className="font-bold text-emerald-500">
+                <TableCell>{t('budget.salary.result.net')}</TableCell>
+                <TableCell />
+                <TableCell className="text-right">{formatCHF(result.netMonthly)}</TableCell>
+                <TableCell className="text-right">{formatCHF(result.netYearly)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
 
         <DistributionBar result={result} />
         <ApplyNetButton result={result} />
       </CardContent>
     </Card>
+  );
+}
+
+interface ResultListRowProps {
+  label: string;
+  rate?: string;
+  perMonth: number;
+  perYear: number;
+  negative?: boolean;
+  emphasis?: 'group' | 'net';
+}
+
+function resultAmountColour(negative: boolean, net: boolean): string {
+  if (net) return 'text-emerald-500';
+  return negative ? 'text-red-500' : '';
+}
+
+function ResultListRow({
+  label,
+  rate,
+  perMonth,
+  perYear,
+  negative = false,
+  emphasis,
+}: Readonly<ResultListRowProps>) {
+  const { t } = useTranslation();
+  const isGroup = emphasis === 'group';
+  const isNet = emphasis === 'net';
+  const sign = negative ? '−' : '';
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 border-b border-border py-2.5 last:border-0 ${
+        isGroup ? '-mx-2 rounded-md border-transparent bg-secondary/50 px-2' : ''
+      }`}
+    >
+      <span className="min-w-0">
+        <span
+          className={`block truncate text-sm ${isGroup || isNet ? 'font-semibold' : 'font-medium'} ${
+            isNet ? 'text-emerald-500' : ''
+          }`}
+        >
+          {label}
+        </span>
+        {rate && <span className="block text-xs text-muted-foreground">{rate}</span>}
+      </span>
+      <span className="shrink-0 text-right">
+        <span
+          className={`block text-sm font-semibold ${resultAmountColour(negative, isNet)}`}
+        >
+          {sign}
+          {formatCHF(perMonth)}
+        </span>
+        <span className={`block text-xs ${isNet ? 'text-emerald-500/75' : 'text-muted-foreground'}`}>
+          {t('budget.amountPerYear', { amount: `${sign}${formatCHF(perYear)}` })}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** Mobile representation of the result: list rows with monthly and yearly amounts. */
+function SalaryResultList({ result }: Readonly<{ result: SalaryResult }>) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="tabular-nums sm:hidden">
+      <ResultListRow
+        label={t('budget.salary.result.gross')}
+        perMonth={result.grossMonthly}
+        perYear={result.grossYearly}
+        emphasis="group"
+      />
+      {result.deductions.map((deduction) => (
+        <ResultListRow
+          key={deduction.type}
+          label={t(`budget.salary.deduction.${deduction.type}`)}
+          rate={
+            deduction.pct === null
+              ? t('budget.salary.result.fixed')
+              : formatRate(deduction.pct)
+          }
+          perMonth={deduction.perMonth}
+          perYear={deduction.perYear}
+          negative
+        />
+      ))}
+      <ResultListRow
+        label={t('budget.salary.result.totalDeductions')}
+        rate={formatPercent(result.totalDeductionsPct)}
+        perMonth={result.totalPerMonth}
+        perYear={result.totalPerYear}
+        negative
+        emphasis="group"
+      />
+      <ResultListRow
+        label={t('budget.salary.result.net')}
+        perMonth={result.netMonthly}
+        perYear={result.netYearly}
+        emphasis="net"
+      />
+    </div>
   );
 }
 
@@ -479,7 +588,13 @@ function ApplyNetButton({ result }: Readonly<{ result: SalaryResult }>) {
   };
 
   return (
-    <Button variant="ghost" size="sm" className="mt-4" disabled={disabled} onClick={handleApply}>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="mt-4 w-full sm:w-auto"
+      disabled={disabled}
+      onClick={handleApply}
+    >
       {applied ? (
         <>
           <Check className="mr-1 h-4 w-4 text-emerald-500" />

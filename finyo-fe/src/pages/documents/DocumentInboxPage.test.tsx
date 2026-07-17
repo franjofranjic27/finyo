@@ -133,12 +133,18 @@ describe('DocumentInboxPage', () => {
 
     renderWithProviders(<DocumentInboxPage />);
 
-    // Info-only values have no checkbox and cannot be applied.
-    expect(await screen.findByRole('checkbox', { name: 'Steuerwert total' })).toBeChecked();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
-    expect(screen.getByText('info only')).toBeInTheDocument();
+    // Info-only values have no checkbox and cannot be applied. The fields render
+    // as a mobile list and a desktop table in parallel (CSS-only visibility), so
+    // every checkbox exists twice and both instances share the selection state.
+    const wealthCheckboxes = await screen.findAllByRole('checkbox', { name: 'Steuerwert total' });
+    for (const checkbox of wealthCheckboxes) expect(checkbox).toBeChecked();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(4);
+    expect(screen.getAllByText('info only').length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole('checkbox', { name: 'Bruttoertrag total' }));
+    await user.click(screen.getAllByRole('checkbox', { name: 'Bruttoertrag total' })[0]);
+    for (const checkbox of screen.getAllByRole('checkbox', { name: 'Bruttoertrag total' })) {
+      expect(checkbox).not.toBeChecked();
+    }
 
     const yearInput = screen.getByLabelText('Target tax year');
     await user.clear(yearInput);

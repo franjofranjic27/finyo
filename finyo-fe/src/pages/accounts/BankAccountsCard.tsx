@@ -127,6 +127,63 @@ function AccountRow({ account, onEdit, onRemove, removing }: Readonly<{
   );
 }
 
+/** Mobile list row: name + IBAN chip, secondary details below, actions on the right. */
+function AccountListItem({ account, onEdit, onRemove, removing }: Readonly<{
+  account: Account;
+  onEdit: (account: Account) => void;
+  onRemove: (account: Account) => void;
+  removing: boolean;
+}>) {
+  const { t } = useTranslation();
+
+  const details = [t(`accountType.${account.type}`), account.bic, account.contractNumber, account.feeNote]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className="flex items-start gap-3 border-b border-border py-3 last:border-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2 font-medium">
+          {account.name}
+          {account.toClose && (
+            <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/15">
+              {t('accounts.list.toClose')}
+            </Badge>
+          )}
+        </div>
+        {account.iban && (
+          <p className="mt-1">
+            <IbanChip iban={account.iban} />
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">{details}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Badge variant="secondary">{account.currency}</Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label={t('accounts.list.editTitle')}
+          onClick={() => onEdit(account)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+          aria-label={t('accounts.list.deleteLabel')}
+          disabled={removing}
+          onClick={() => onRemove(account)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
 export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -168,7 +225,7 @@ export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+      <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <CardTitle className="text-base">{t('accounts.list.title')}</CardTitle>
           <CardDescription className="text-xs">{t('accounts.list.subtitle')}</CardDescription>
@@ -193,26 +250,17 @@ export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>
             {t('accounts.list.empty')}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.account')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.currency')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.iban')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.bic')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.contractNumber')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.fees')}</th>
-                  <th className="py-2 pr-4 font-medium">{t('accounts.list.status')}</th>
-                  <th className="py-2" aria-hidden="true" />
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((group) => (
-                  <Fragment key={group.scope}>
-                    <ScopeHeaderRow labelKey={scopeLabelKey(group.scope)} />
+          <>
+            {/* Mobile: grouped list rows — the table does not fit on 390 px. */}
+            <div className="md:hidden">
+              {groups.map((group) => (
+                <div key={group.scope}>
+                  <p className="border-b border-border pb-1.5 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground first:pt-0">
+                    {t(scopeLabelKey(group.scope))}
+                  </p>
+                  <ul>
                     {group.accounts.map((account) => (
-                      <AccountRow
+                      <AccountListItem
                         key={account.id}
                         account={account}
                         onEdit={openEdit}
@@ -220,11 +268,44 @@ export function BankAccountsCard({ accounts }: Readonly<{ accounts: Account[] }>
                         removing={deleteAccount.isPending}
                       />
                     ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.account')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.currency')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.iban')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.bic')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.contractNumber')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.fees')}</th>
+                    <th className="py-2 pr-4 font-medium">{t('accounts.list.status')}</th>
+                    <th className="py-2" aria-hidden="true" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((group) => (
+                    <Fragment key={group.scope}>
+                      <ScopeHeaderRow labelKey={scopeLabelKey(group.scope)} />
+                      {group.accounts.map((account) => (
+                        <AccountRow
+                          key={account.id}
+                          account={account}
+                          onEdit={openEdit}
+                          onRemove={confirmRemove}
+                          removing={deleteAccount.isPending}
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </CardContent>
       {dialogOpen && (

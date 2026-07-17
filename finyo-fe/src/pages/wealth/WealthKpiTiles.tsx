@@ -17,9 +17,11 @@ function KpiTile({ label, value, sub, valueClass, subClass }: Readonly<{
 }>) {
   return (
     <Card>
-      <CardContent className="pt-4">
+      <CardContent className="px-4 pb-4 pt-3 lg:px-6 lg:pb-6 lg:pt-4">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-xl font-bold tabular-nums ${valueClass ?? 'text-foreground'}`}>
+        <p
+          className={`mt-1 break-words text-lg font-bold tabular-nums lg:text-xl ${valueClass ?? 'text-foreground'}`}
+        >
           {value}
         </p>
         {sub && <p className={`mt-0.5 text-xs ${subClass ?? 'text-muted-foreground'}`}>{sub}</p>}
@@ -33,7 +35,7 @@ export function WealthKpiTiles({ overview }: Readonly<{ overview: WealthOverview
   const { ytdChange, ytdChangePct } = overview;
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
       <KpiTile
         label={t('wealth.kpi.total')}
         value={formatCHF(overview.total)}

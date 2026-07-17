@@ -86,7 +86,7 @@ export function AccountDialog({ account, onClose }: Readonly<AccountDialogProps>
             <Label htmlFor="account-name">{t('accounts.list.name')}</Label>
             <Input id="account-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="account-type">{t('accounts.list.type')}</Label>
               <Select value={type} onValueChange={(value) => setType(value as AccountType)}>
@@ -121,7 +121,7 @@ export function AccountDialog({ account, onClose }: Readonly<AccountDialogProps>
               onChange={(e) => setIban(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="account-bic">{t('accounts.list.bic')}</Label>
               <Input id="account-bic" value={bic} onChange={(e) => setBic(e.target.value)} />
@@ -143,7 +143,7 @@ export function AccountDialog({ account, onClose }: Readonly<AccountDialogProps>
               onChange={(e) => setFeeNote(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-2 items-end gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
             <div className="space-y-2">
               <Label htmlFor="account-scope">{t('accounts.list.scope')}</Label>
               <Select value={scope} onValueChange={(value) => setScope(value as AccountScope)}>

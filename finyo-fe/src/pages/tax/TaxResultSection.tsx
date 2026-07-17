@@ -128,9 +128,16 @@ export function TaxResultSection({
           <CardTitle className="text-base">{title}</CardTitle>
           <div className="flex shrink-0 items-center gap-1">
             {scenarioActions}
-            <Button variant="outline" size="sm" className="print:hidden" onClick={exportPdf}>
-              <Printer className="mr-2 h-4 w-4" />
-              {t('tax.exportPdf')}
+            {/* Icon-only on mobile so the header fits next to the long breakdown title. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="print:hidden"
+              aria-label={t('tax.exportPdf')}
+              onClick={exportPdf}
+            >
+              <Printer className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('tax.exportPdf')}</span>
             </Button>
           </div>
         </CardHeader>

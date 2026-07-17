@@ -1,4 +1,4 @@
-import { Menu, Sun, Moon, LogOut, User } from 'lucide-react';
+import { Sun, Moon, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,7 @@ import { useAuth } from '@/auth/useAuth';
 import { profileApi, PROFILE_QUERY_KEY } from '@/api/profile';
 import type { PreferencesInput, PreferredLanguage } from '@/api/profile';
 
-interface HeaderProps {
-  onMenuClick: () => void;
-}
-
-export function Header({ onMenuClick }: Readonly<HeaderProps>) {
+export function Header() {
   const { t, i18n } = useTranslation();
   const { isDark, setTheme } = useTheme();
   const { user, accessToken, logout } = useAuth();
@@ -58,13 +54,8 @@ export function Header({ onMenuClick }: Readonly<HeaderProps>) {
 
   return (
     <header className="flex h-16 items-center gap-4 border-b bg-background px-4 lg:px-6">
-      {/* Mobile hamburger */}
-      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenuClick}>
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">{t('common.toggleMenu')}</span>
-      </Button>
-
-      {/* App wordmark — the page breadcrumb lives in the content area */}
+      {/* App wordmark — the page breadcrumb lives in the content area;
+          mobile navigation happens in the bottom tab bar */}
       <span className="text-xl font-bold tracking-tight">finyo</span>
       <div className="flex-1" />
 

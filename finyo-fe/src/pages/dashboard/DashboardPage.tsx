@@ -19,7 +19,7 @@ function MonthKpiRow() {
 
   if (summary.isLoading || breakdown.isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         {SUMMARY_SKELETON_KEYS.map((key) => (
           <SummaryCardSkeleton key={key} />
         ))}
@@ -35,7 +35,7 @@ function MonthKpiRow() {
   const topCategory = biggestCategory(breakdown.data);
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
       <SummaryCard
         title={t('dashboard.netThisMonth')}
         value={formatCHF(netAmount)}

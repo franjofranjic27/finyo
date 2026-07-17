@@ -42,19 +42,20 @@ describe('WealthPage', () => {
   it('renders the KPI tiles, bucket rows and chart from the overview query', async () => {
     renderWithProviders(<WealthPage />);
 
-    // Total appears in the KPI tile and in the table footer row.
-    expect(await screen.findAllByText("CHF 99'719.00")).toHaveLength(2);
+    // Total appears in the KPI tile, the mobile total line and the table footer row.
+    expect(await screen.findAllByText("CHF 99'719.00")).toHaveLength(3);
     expect(screen.getByText('Total wealth')).toBeInTheDocument();
     expect(screen.getByText("+CHF 12'340.00")).toBeInTheDocument();
     expect(screen.getByText('Monthly savings rate')).toBeInTheDocument();
 
-    expect(screen.getByText('Sparen')).toBeInTheDocument();
-    expect(screen.getByText('Wertschriftendepot')).toBeInTheDocument();
-    expect(screen.getByText('Krypto')).toBeInTheDocument();
-    expect(screen.getAllByText('Portfolio')).toHaveLength(2);
-    expect(screen.getByText('manual')).toBeInTheDocument();
-    // Krypto has no monthly rate → dash instead of CHF 0.00.
-    expect(screen.getByText('—')).toBeInTheDocument();
+    // Buckets render twice: once as mobile list rows, once as the desktop table.
+    expect(screen.getAllByText('Sparen')).toHaveLength(2);
+    expect(screen.getAllByText('Wertschriftendepot')).toHaveLength(2);
+    expect(screen.getAllByText('Krypto')).toHaveLength(2);
+    expect(screen.getAllByText('Portfolio')).toHaveLength(4);
+    expect(screen.getAllByText('manual')).toHaveLength(2);
+    // Krypto has no monthly rate → dash instead of CHF 0.00 (list row + table row).
+    expect(screen.getAllByText('—')).toHaveLength(2);
 
     expect(screen.getByText('History & forecast')).toBeInTheDocument();
     expect(wealthApi.getOverview).toHaveBeenCalledWith('test-token');
@@ -105,7 +106,7 @@ describe('WealthPage', () => {
     });
     const user = userEvent.setup();
     renderWithProviders(<WealthPage />);
-    await screen.findByText('Sparen');
+    await screen.findAllByText('Sparen');
 
     await user.click(screen.getByRole('button', { name: 'Add bucket' }));
     await user.type(screen.getByLabelText('Name'), 'Notgroschen');
@@ -134,7 +135,7 @@ describe('WealthPage', () => {
     });
     const user = userEvent.setup();
     renderWithProviders(<WealthPage />);
-    await screen.findByText('Sparen');
+    await screen.findAllByText('Sparen');
 
     await user.click(screen.getByRole('button', { name: 'Add bucket' }));
     // MANUAL is the default: balance visible, asset classes hidden.
@@ -169,7 +170,7 @@ describe('WealthPage', () => {
     });
     const user = userEvent.setup();
     renderWithProviders(<WealthPage />);
-    await screen.findByText('Sparen');
+    await screen.findAllByText('Sparen');
 
     await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
     expect(screen.getByText('Edit bucket')).toBeInTheDocument();
@@ -193,7 +194,7 @@ describe('WealthPage', () => {
     vi.mocked(wealthApi.deleteBucket).mockResolvedValue(undefined);
     const user = userEvent.setup();
     renderWithProviders(<WealthPage />);
-    await screen.findByText('Sparen');
+    await screen.findAllByText('Sparen');
 
     await user.click(screen.getAllByRole('button', { name: 'Remove bucket' })[0]);
 
@@ -207,7 +208,7 @@ describe('WealthPage', () => {
     vi.spyOn(globalThis, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
     renderWithProviders(<WealthPage />);
-    await screen.findByText('Sparen');
+    await screen.findAllByText('Sparen');
 
     await user.click(screen.getAllByRole('button', { name: 'Remove bucket' })[0]);
 

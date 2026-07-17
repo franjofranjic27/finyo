@@ -52,9 +52,10 @@ export function ScenarioChipBar({
     <div
       role="group"
       aria-label={label}
-      className={cn('flex flex-wrap items-center gap-2', className)}
+      // Mobile: one scrollable row; sm+ keeps the original wrapping layout.
+      className={cn('flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-x-visible', className)}
     >
-      <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       {items.map((item) => {
@@ -66,7 +67,7 @@ export function ScenarioChipBar({
             aria-pressed={active}
             onClick={() => onSelect(active ? null : item.id)}
             className={cn(
-              'inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+              'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border bg-card px-3.5 py-1.5 text-[13px] font-medium transition-colors sm:whitespace-normal',
               active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-secondary',
             )}
           >
@@ -97,7 +98,7 @@ export function ScenarioChipBar({
         type="button"
         onClick={onNew}
         disabled={newDisabled}
-        className="inline-flex items-center rounded-full border border-dashed bg-card px-3.5 py-1.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-50"
+        className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-dashed bg-card px-3.5 py-1.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-50 sm:whitespace-normal"
       >
         + {newLabel}
       </button>

@@ -11,11 +11,14 @@ export function Pillar3Page() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{t('nav.pillar3')}</h1>
       <Tabs defaultValue="calculator">
-        <TabsList>
-          <TabsTrigger value="calculator">{t('pillar3.tabs.calculator')}</TabsTrigger>
-          <TabsTrigger value="compare">{t('pillar3.tabs.compare')}</TabsTrigger>
-          <TabsTrigger value="scenarios">{t('pillar3.tabs.scenarios')}</TabsTrigger>
-        </TabsList>
+        {/* On narrow screens the tab pills scroll horizontally instead of wrapping. */}
+        <div className="overflow-x-auto">
+          <TabsList>
+            <TabsTrigger value="calculator">{t('pillar3.tabs.calculator')}</TabsTrigger>
+            <TabsTrigger value="compare">{t('pillar3.tabs.compare')}</TabsTrigger>
+            <TabsTrigger value="scenarios">{t('pillar3.tabs.scenarios')}</TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="calculator" className="mt-4">
           <CalculatorTab />
         </TabsContent>

@@ -69,7 +69,8 @@ describe('MonthTransactionsTable', () => {
       <MonthTransactionsTable from={FROM} to={TO} onImportClick={vi.fn()} />,
     );
 
-    expect(await screen.findByText('MIGROS ZUERICH')).toBeInTheDocument();
+    // The row renders twice: as a mobile list row and as a table row.
+    expect(await screen.findAllByText('MIGROS ZUERICH')).toHaveLength(2);
     expect(transactionsApi.getAll).toHaveBeenCalledWith('test-token', {
       from: FROM,
       to: TO,
@@ -77,7 +78,9 @@ describe('MonthTransactionsTable', () => {
       size: 50,
     });
 
-    await user.click(screen.getByRole('combobox', { name: 'Category: MIGROS ZUERICH' }));
+    await user.click(
+      screen.getAllByRole('combobox', { name: 'Category: MIGROS ZUERICH' })[0],
+    );
     await user.click(await screen.findByRole('option', { name: 'Lebensmittel' }));
 
     await waitFor(() =>
@@ -109,11 +112,13 @@ describe('MonthTransactionsTable', () => {
     );
 
     await user.click(
-      await screen.findByRole('combobox', { name: 'Category: MIGROS ZUERICH' }),
+      (await screen.findAllByRole('combobox', { name: 'Category: MIGROS ZUERICH' }))[0],
     );
     await user.click(await screen.findByRole('option', { name: 'Lebensmittel' }));
 
-    await user.click(await screen.findByRole('button', { name: 'Remember as rule?' }));
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'Remember as rule?' }))[0],
+    );
 
     const keywordInput = await screen.findByLabelText('Keyword');
     expect(keywordInput).toHaveValue('MIGROS ZUERICH');

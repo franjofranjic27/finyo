@@ -53,7 +53,7 @@ describe('BudgetPage', () => {
     vi.mocked(budgetApi.getMonthlyBudget).mockResolvedValue(monthlyBudget());
     renderWithProviders(<BudgetPage />);
 
-    expect(await screen.findByText('Krankenkasse')).toBeInTheDocument();
+    expect((await screen.findAllByText('Krankenkasse'))[0]).toBeInTheDocument();
     // Card title and the derived flow row share the same label.
     expect(screen.getAllByText('Fixed costs & subscriptions').length).toBeGreaterThan(0);
     // Tab trigger and card title share the same label.
@@ -71,7 +71,7 @@ describe('BudgetPage', () => {
     expect(screen.getByRole('tab', { name: 'Monthly budget' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Month view' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Salary calculator' })).toBeInTheDocument();
-    expect(await screen.findByText('Krankenkasse')).toBeInTheDocument();
+    expect((await screen.findAllByText('Krankenkasse'))[0]).toBeInTheDocument();
     expect(screen.queryByText('Inputs')).not.toBeInTheDocument();
     expect(screen.queryByText('month-tab-content')).not.toBeInTheDocument();
   });
@@ -95,7 +95,7 @@ describe('BudgetPage', () => {
     expect(await screen.findByText('month-tab-content')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Monthly budget' }));
-    expect(await screen.findByText('Krankenkasse')).toBeInTheDocument();
+    expect((await screen.findAllByText('Krankenkasse'))[0]).toBeInTheDocument();
   });
 
   it('switches to the salary calculator tab', async () => {

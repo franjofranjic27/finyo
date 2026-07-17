@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SalaryTab } from './SalaryTab';
 import { salaryApi } from '@/api/salary';
@@ -73,19 +73,23 @@ describe('SalaryTab', () => {
   it('renders the result table with gross, deductions, total and net', async () => {
     renderWithProviders(<SalaryTab />);
 
-    expect(await screen.findByText("CHF 5'787.00")).toBeInTheDocument();
-    expect(screen.getByText("CHF 69'444.00")).toBeInTheDocument();
-    expect(screen.getByText('−CHF 306.70')).toBeInTheDocument();
-    expect(screen.getByText('−CHF 63.65')).toBeInTheDocument();
-    expect(screen.getByText('−CHF 26.35')).toBeInTheDocument();
-    expect(screen.getByText('−CHF 9.85')).toBeInTheDocument();
-    expect(screen.getByText('−CHF 85.35')).toBeInTheDocument();
-    expect(screen.getByText('−CHF 502.90')).toBeInTheDocument();
-    expect(screen.getByText("CHF 5'284.10")).toBeInTheDocument();
+    // The amounts render twice (mobile list + desktop table) — assert within the table.
+    const result = within(await screen.findByRole('table'));
+    expect(result.getByText("CHF 5'787.00")).toBeInTheDocument();
+    expect(result.getByText("CHF 69'444.00")).toBeInTheDocument();
+    expect(result.getByText('−CHF 306.70')).toBeInTheDocument();
+    expect(result.getByText('−CHF 63.65')).toBeInTheDocument();
+    expect(result.getByText('−CHF 26.35')).toBeInTheDocument();
+    expect(result.getByText('−CHF 9.85')).toBeInTheDocument();
+    expect(result.getByText('−CHF 85.35')).toBeInTheDocument();
+    expect(result.getByText('−CHF 502.90')).toBeInTheDocument();
+    expect(result.getByText("CHF 5'284.10")).toBeInTheDocument();
     // Rate column: percentages for social deductions, "fixed" for amounts, total pct.
-    expect(screen.getByText('5.3%')).toBeInTheDocument();
-    expect(screen.getAllByText('fixed')).toHaveLength(2);
-    expect(screen.getByText('8.7%')).toBeInTheDocument();
+    expect(result.getByText('5.3%')).toBeInTheDocument();
+    expect(result.getAllByText('fixed')).toHaveLength(2);
+    expect(result.getByText('8.7%')).toBeInTheDocument();
+    // The mobile list mirrors the key figures with the yearly value as a secondary line.
+    expect(screen.getByText("CHF 63'409.35 / year")).toBeInTheDocument();
     // Distribution legend with the shares of the gross salary.
     expect(screen.getByText('Net 91.3%')).toBeInTheDocument();
     expect(screen.getByText('Social insurance 7.0%')).toBeInTheDocument();

@@ -81,6 +81,14 @@ function renderTable(items: PortfolioPosition[] = positions) {
   );
 }
 
+/**
+ * Scopes a query to the desktop table. Positions render twice — once as the mobile
+ * list (hidden ≥ lg) and once as the table — so bare getByText would find both.
+ */
+function desktopTable(): HTMLElement {
+  return screen.getByRole('table');
+}
+
 describe('PositionsTable', () => {
   beforeEach(() => {
     vi.mocked(portfolioApi.deletePosition).mockResolvedValue(undefined);
@@ -110,7 +118,7 @@ describe('PositionsTable', () => {
   it('shows group total and share in the subheader and hides empty groups', () => {
     renderTable();
 
-    const stockHeader = screen.getByText('Individual stocks').closest('tr');
+    const stockHeader = within(desktopTable()).getByText('Individual stocks').closest('tr');
     expect(stockHeader).not.toBeNull();
     // 1000 + 400 of 2000 total → CHF 1'400.00 and 70.0%
     expect(within(stockHeader as HTMLElement).getByText("CHF 1'400.00")).toBeInTheDocument();
@@ -122,13 +130,31 @@ describe('PositionsTable', () => {
     expect(screen.queryByText('Fixed deposits & bonds')).not.toBeInTheDocument();
   });
 
-  it('navigates to the position detail page when a row is clicked', async () => {
+  it('navigates to the position detail page when a table row is clicked', async () => {
     const user = userEvent.setup();
     renderTable();
 
-    await user.click(screen.getByText('Nestlé SA'));
+    await user.click(within(desktopTable()).getByText('Nestlé SA'));
 
     expect(screen.getByText('detail-page')).toBeInTheDocument();
+  });
+
+  it('navigates to the position detail page when a mobile list row is tapped', async () => {
+    const user = userEvent.setup();
+    renderTable();
+
+    await user.click(screen.getByRole('button', { name: /Nestlé SA/ }));
+
+    expect(screen.getByText('detail-page')).toBeInTheDocument();
+  });
+
+  it('summarises quantity, price and return on the mobile list row', () => {
+    renderTable();
+
+    const row = screen.getByRole('button', { name: /Nestlé SA/ });
+    expect(row).toHaveTextContent('10 pcs · price CHF 100.00');
+    expect(row).toHaveTextContent("CHF 1'000.00");
+    expect(row).toHaveTextContent('11.1%');
   });
 
   it('shows the empty state when there are no positions', () => {
@@ -203,7 +229,7 @@ describe('PositionsTable', () => {
 
     /** The row cell that carries the price and its provenance badge. */
     function priceCell(name: string): HTMLElement {
-      const row = screen.getByText(name).closest('tr') as HTMLElement;
+      const row = within(desktopTable()).getByText(name).closest('tr') as HTMLElement;
       return row.querySelectorAll('td')[PRICE_COLUMN_INDEX];
     }
 
@@ -290,7 +316,7 @@ describe('PositionsTable', () => {
       ]);
 
       // The value cell shows USD, not francs.
-      const usdValue = screen.getByText('$1,000.00');
+      const usdValue = within(desktopTable()).getByText('$1,000.00');
       expect(usdValue).toBeInTheDocument();
 
       // Hovering reveals the CHF figure and the exact rate, so the total is checkable.
@@ -317,7 +343,7 @@ describe('PositionsTable', () => {
         }),
       ]);
 
-      const row = screen.getByText('Unpriced GBP fund').closest('tr') as HTMLElement;
+      const row = within(desktopTable()).getByText('Unpriced GBP fund').closest('tr') as HTMLElement;
       // Native value still shown; the CHF gain/loss, return and share are dashes, not zeros.
       expect(within(row).getByText('£500.00')).toBeInTheDocument();
       expect(within(row).getAllByText('—').length).toBeGreaterThanOrEqual(3);

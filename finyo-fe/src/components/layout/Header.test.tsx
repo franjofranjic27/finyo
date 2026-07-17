@@ -35,20 +35,20 @@ describe('Header', () => {
   });
 
   it('shows the finyo wordmark', () => {
-    renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/investments' });
+    renderWithProviders(<Header />, { route: '/investments' });
 
     expect(screen.getByText('finyo')).toBeInTheDocument();
   });
 
   it('shows the user initials in the avatar', () => {
-    renderWithProviders(<Header onMenuClick={() => {}} />);
+    renderWithProviders(<Header />);
 
     expect(screen.getByText('AN')).toBeInTheDocument();
   });
 
   it('switches the language with the EN/DE buttons and persists it as a partial patch', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Header onMenuClick={() => {}} />, { route: '/dashboard' });
+    renderWithProviders(<Header />, { route: '/dashboard' });
 
     await user.click(screen.getByRole('button', { name: 'DE' }));
     expect(i18n.language).toBe('de');
@@ -68,7 +68,7 @@ describe('Header', () => {
 
   it('toggles the theme between light and dark and persists it as a partial patch', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Header onMenuClick={() => {}} />);
+    renderWithProviders(<Header />);
 
     await user.click(screen.getByRole('button', { name: 'Dark Mode' }));
 
@@ -79,19 +79,9 @@ describe('Header', () => {
     expect(screen.getByRole('button', { name: 'Light Mode' })).toBeInTheDocument();
   });
 
-  it('invokes the menu callback from the hamburger button', async () => {
-    const onMenuClick = vi.fn();
-    const user = userEvent.setup();
-    renderWithProviders(<Header onMenuClick={onMenuClick} />);
-
-    await user.click(screen.getByRole('button', { name: 'Toggle menu' }));
-
-    expect(onMenuClick).toHaveBeenCalledTimes(1);
-  });
-
   it('logs out via the avatar dropdown', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Header onMenuClick={() => {}} />);
+    renderWithProviders(<Header />);
 
     await user.click(screen.getByText('AN'));
     await user.click(await screen.findByRole('menuitem', { name: 'Log out' }));
