@@ -71,26 +71,45 @@ describe('ScenariosTab', () => {
     vi.mocked(pillar3Api.getScenarios).mockResolvedValue(scenarios);
     renderWithProviders(<ScenariosTab />);
 
-    const productRow = (await screen.findByText('With product')).closest('tr') as HTMLElement;
+    // The desktop table and the mobile list render the same data, so all
+    // table assertions are scoped to the table element.
+    const table = await screen.findByRole('table');
+    const productRow = within(table).getByText('With product').closest('tr') as HTMLElement;
     expect(within(productRow).getByText('Alpha Fund')).toBeInTheDocument();
     expect(within(productRow).getByText("CHF 7'258.00")).toBeInTheDocument();
     expect(within(productRow).getByText("CHF 350'000.00")).toBeInTheDocument();
     expect(within(productRow).getByText("CHF 1'200.00")).toBeInTheDocument();
     expect(within(productRow).getByText("CHF 332'000.00")).toBeInTheDocument();
 
-    const manualRow = screen.getByText('Aggressive').closest('tr') as HTMLElement;
+    const manualRow = within(table).getByText('Aggressive').closest('tr') as HTMLElement;
     expect(within(manualRow).getByText('6.5 %')).toBeInTheDocument();
     expect(within(manualRow).getByText("CHF 500'000.00")).toBeInTheDocument();
+  });
+
+  it('renders the mobile list with the same key figures per scenario', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue(scenarios);
+    renderWithProviders(<ScenariosTab />);
+
+    const list = await screen.findByRole('list');
+    const productItem = within(list).getByText('With product').closest('li') as HTMLElement;
+    expect(within(productItem).getByText('Alpha Fund')).toBeInTheDocument();
+    expect(within(productItem).getByText("CHF 350'000.00")).toBeInTheDocument();
+    expect(within(productItem).getByText(/Default/)).toBeInTheDocument();
+
+    const manualItem = within(list).getByText('Aggressive').closest('li') as HTMLElement;
+    expect(within(manualItem).getByText('6.5 %')).toBeInTheDocument();
+    expect(within(manualItem).getByText('–')).toBeInTheDocument();
   });
 
   it('marks the default scenario with a badge and dashes a zero tax saving', async () => {
     vi.mocked(pillar3Api.getScenarios).mockResolvedValue(scenarios);
     renderWithProviders(<ScenariosTab />);
 
-    const productRow = (await screen.findByText('With product')).closest('tr') as HTMLElement;
+    const table = await screen.findByRole('table');
+    const productRow = within(table).getByText('With product').closest('tr') as HTMLElement;
     expect(within(productRow).getByText(/Default/)).toBeInTheDocument();
 
-    const manualRow = screen.getByText('Aggressive').closest('tr') as HTMLElement;
+    const manualRow = within(table).getByText('Aggressive').closest('tr') as HTMLElement;
     expect(within(manualRow).queryByText(/Default/)).not.toBeInTheDocument();
     expect(within(manualRow).getByText('–')).toBeInTheDocument();
   });
@@ -99,8 +118,9 @@ describe('ScenariosTab', () => {
     vi.mocked(pillar3Api.getScenarios).mockResolvedValue(scenarios);
     renderWithProviders(<ScenariosTab />);
 
-    await screen.findByText('With product');
-    expect(screen.getAllByRole('button', { name: 'Scenario actions' })).toHaveLength(2);
+    // One menu per scenario in each of the two layout variants (table + mobile list).
+    await screen.findByRole('table');
+    expect(screen.getAllByRole('button', { name: 'Scenario actions' })).toHaveLength(4);
     expect(screen.getByText('Balance Growth')).toBeInTheDocument();
   });
 });

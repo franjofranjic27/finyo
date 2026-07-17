@@ -88,9 +88,9 @@ describe('CompareTab', () => {
     await selectProduct(user, 'Alpha Fund');
     await selectProduct(user, 'Beta Fund');
 
-    // Both products appear as table rows.
-    expect(await screen.findByText('Beta Fund')).toBeInTheDocument();
-    expect(screen.getByText('Alpha Fund')).toBeInTheDocument();
+    // Both products appear in the desktop table and in the mobile card list.
+    expect(await screen.findAllByText('Beta Fund')).toHaveLength(2);
+    expect(screen.getAllByText('Alpha Fund')).toHaveLength(2);
 
     // Defaults are sent with both product ids (sorted for a stable key).
     await waitFor(() =>
@@ -103,10 +103,16 @@ describe('CompareTab', () => {
     );
 
     // The «Top» badge sits in the row of the highest final capital.
-    const topBadge = await screen.findByText('Top');
-    const topRow = topBadge.closest('tr');
+    const table = screen.getByRole('table');
+    const topRow = within(table).getByText('Top').closest('tr');
     expect(topRow).not.toBeNull();
     expect(within(topRow as HTMLElement).getByText('Beta Fund')).toBeInTheDocument();
+
+    // …and in the matching mobile card.
+    const list = screen.getByRole('list');
+    const topItem = within(list).getByText('Top').closest('li');
+    expect(topItem).not.toBeNull();
+    expect(within(topItem as HTMLElement).getByText('Beta Fund')).toBeInTheDocument();
 
     expect(screen.getByText(/Total paid in: CHF 145'160\.00/)).toBeInTheDocument();
     expect(screen.getByText(/Maximum annual contribution: CHF 7'258\.00/)).toBeInTheDocument();
@@ -121,16 +127,17 @@ describe('CompareTab', () => {
     await screen.findByText(/Search for 3a products above/);
     await selectProduct(user, 'Alpha Fund');
     await selectProduct(user, 'Beta Fund');
-    await screen.findByText('Top');
+    await screen.findAllByText('Top');
 
-    await user.click(screen.getByRole('button', { name: 'Remove Alpha Fund' }));
+    // The remove action exists once per layout variant (table + mobile card).
+    await user.click(screen.getAllByRole('button', { name: 'Remove Alpha Fund' })[0]);
 
     await waitFor(() => expect(screen.queryByText('Alpha Fund')).not.toBeInTheDocument());
     expect(pillar3Api.compare).toHaveBeenLastCalledWith(
       'test-token',
       expect.objectContaining({ productIds: ['b'] }),
     );
-    expect(screen.getByText('Beta Fund')).toBeInTheDocument();
+    expect(screen.getAllByText('Beta Fund').length).toBeGreaterThan(0);
   });
 
   it('returns to the empty-selection state when the last product is removed', async () => {
@@ -141,9 +148,9 @@ describe('CompareTab', () => {
 
     await screen.findByText(/Search for 3a products above/);
     await selectProduct(user, 'Alpha Fund');
-    await screen.findByText('Top');
+    await screen.findAllByText('Top');
 
-    await user.click(screen.getByRole('button', { name: 'Remove Alpha Fund' }));
+    await user.click(screen.getAllByRole('button', { name: 'Remove Alpha Fund' })[0]);
 
     expect(await screen.findByText(/Search for 3a products above/)).toBeInTheDocument();
     expect(screen.queryByText('Top')).not.toBeInTheDocument();

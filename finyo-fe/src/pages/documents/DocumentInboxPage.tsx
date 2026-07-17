@@ -204,7 +204,7 @@ function ReviewForm({ doc, pending, errorMessage, onApply, onDismiss }: Readonly
         <p className="text-sm text-muted-foreground">{t('documents.review.noFields')}</p>
       )}
 
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="space-y-1">
           <Label htmlFor={yearInputId}>{t('documents.review.year')}</Label>
           <Input
@@ -215,14 +215,20 @@ function ReviewForm({ doc, pending, errorMessage, onApply, onDismiss }: Readonly
             onChange={(event) => setYear(Number(event.target.value))}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Button
+            className="w-full sm:w-auto"
             disabled={!canApply}
             onClick={() => onApply({ id: doc.id, year, fieldNames: selectedFieldNames })}
           >
             {pending ? t('common.loading') : t('documents.review.apply')}
           </Button>
-          <Button variant="outline" disabled={pending} onClick={() => onDismiss(doc.id)}>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={pending}
+            onClick={() => onDismiss(doc.id)}
+          >
             <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
             {t('documents.review.dismiss')}
           </Button>
@@ -356,9 +362,9 @@ export function DocumentInboxPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <p className="max-w-2xl text-sm text-muted-foreground">{t('documents.subtitle')}</p>
-        <Button disabled={sync.isPending} onClick={() => sync.mutate()}>
+        <Button className="w-full sm:w-auto" disabled={sync.isPending} onClick={() => sync.mutate()}>
           <RefreshCw
             className={cn('mr-2 h-4 w-4', sync.isPending && 'animate-spin')}
             aria-hidden="true"

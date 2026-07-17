@@ -17,7 +17,9 @@ describe('MonthlyPaymentsCard', () => {
 
     expect(screen.getByText('Monthly Payments')).toBeInTheDocument();
     expect(screen.getByText(/50 % paid/)).toBeInTheDocument();
-    expect(screen.getByText(/CHF 5'000\.00/)).toBeInTheDocument();
+    // Paid total appears twice: mobile KPI tile and the open-amount line.
+    expect(screen.getAllByText(/CHF 5'000\.00/)).toHaveLength(2);
+    expect(screen.getByText(/CHF 10'000\.00/)).toBeInTheDocument();
   });
 
   it('shows 0 % paid when the expected tax is unknown', () => {

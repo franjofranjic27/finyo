@@ -89,15 +89,21 @@ export function TaxPage() {
         </div>
 
         {/* Screen header: year title, status badge and year actions */}
-        <div className="flex items-center gap-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
           <h1 className="text-2xl font-semibold">{t('tax.taxYear')} {year}</h1>
           {detail && (
             <>
               <YearStatusBadge status={detail.status} />
               <YearActionsMenu year={year} status={detail.status} />
-              <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
-                <Upload className="mr-1 h-4 w-4" />
-                {t('tax.upload.button')}
+              {/* Icon-only on mobile so the header row fits on 390 px screens. */}
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={t('tax.upload.button')}
+                onClick={() => setUploadOpen(true)}
+              >
+                <Upload className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">{t('tax.upload.button')}</span>
               </Button>
               <TaxDocumentUploadDialog
                 year={year}

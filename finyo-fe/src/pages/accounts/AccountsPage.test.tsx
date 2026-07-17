@@ -43,9 +43,10 @@ describe('AccountsPage', () => {
     renderWithProviders(<AccountsPage />);
 
     expect(await screen.findByText('Bank accounts')).toBeInTheDocument();
-    expect(screen.getByText('Privatkonto')).toBeInTheDocument();
+    // Names appear in the mobile list and the desktop table (CSS-only visibility).
+    expect(screen.getAllByText('Privatkonto').length).toBeGreaterThan(0);
     expect(screen.getByText('Cards')).toBeInTheDocument();
-    expect(screen.getByText('Debit Mastercard')).toBeInTheDocument();
+    expect(screen.getAllByText('Debit Mastercard').length).toBeGreaterThan(0);
     expect(
       screen.getByText(
         'IBANs and contract numbers are stored per user; card numbers (PAN), CVV or e-banking credentials are never captured.',

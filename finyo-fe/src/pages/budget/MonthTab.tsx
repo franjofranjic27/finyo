@@ -112,14 +112,15 @@ function MonthSummaryCards({ summary }: Readonly<{ summary: SpendingSummary }>) 
   ] as const;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {/* Mobile: income/expenses side by side, the balance tile takes the full width. */}
       {tiles.map(({ key, value, colour, prefix }) => (
-        <Card key={key}>
+        <Card key={key} className={key === 'balance' ? 'col-span-2 sm:col-span-1' : undefined}>
           <CardContent className="pt-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t(`budget.month.${key}`)}
             </p>
-            <p className={`mt-1 text-2xl font-bold tabular-nums ${colour}`}>
+            <p className={`mt-1 text-xl font-bold tabular-nums sm:text-2xl ${colour}`}>
               {prefix}
               {formatCHF(Math.abs(value))}
             </p>

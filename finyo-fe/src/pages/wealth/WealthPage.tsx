@@ -12,7 +12,7 @@ const KPI_SKELETON_KEYS = ['total', 'ytd', 'rate', 'forecast'];
 function WealthSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         {KPI_SKELETON_KEYS.map((key) => (
           <Skeleton key={key} className="h-20 w-full" />
         ))}

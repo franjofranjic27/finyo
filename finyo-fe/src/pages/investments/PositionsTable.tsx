@@ -51,25 +51,76 @@ function groupByAssetClass(positions: PortfolioPosition[]): AssetClassGroup[] {
   }).filter((group) => group.positions.length > 0);
 }
 
-function GroupHeaderRow({ group }: Readonly<{ group: AssetClassGroup }>) {
+function GroupHeaderContent({ group }: Readonly<{ group: AssetClassGroup }>) {
   const { t } = useTranslation();
 
   return (
+    <div className="flex items-baseline gap-3">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {t(`assetClass.${group.assetClass}`)}
+      </span>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {formatCHF(group.value)}
+      </span>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {formatPercent(group.sharePct)}
+      </span>
+    </div>
+  );
+}
+
+function GroupHeaderRow({ group }: Readonly<{ group: AssetClassGroup }>) {
+  return (
     <tr className="border-b border-border">
       <td colSpan={9} className="pb-1 pt-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t(`assetClass.${group.assetClass}`)}
-          </span>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {formatCHF(group.value)}
-          </span>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {formatPercent(group.sharePct)}
-          </span>
-        </div>
+        <GroupHeaderContent group={group} />
       </td>
     </tr>
+  );
+}
+
+/**
+ * The compact list row shown instead of the table below lg. It carries only the figures that fit a
+ * phone (quantity, price, native value, return); everything else lives on the detail page the row
+ * navigates to — which is also where editing and removing remain reachable on mobile.
+ */
+function MobilePositionRow({ position, index, onOpen }: Readonly<{
+  position: PortfolioPosition;
+  index: number;
+  onOpen: (position: PortfolioPosition) => void;
+}>) {
+  const { t, i18n } = useTranslation();
+
+  return (
+    <button
+      type="button"
+      className="flex min-h-[52px] w-full items-center gap-3 border-b border-border py-2.5 text-left last:border-0"
+      onClick={() => onOpen(position)}
+    >
+      <span
+        className="h-8 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: CHART_COLOURS[index % CHART_COLOURS.length] }}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{displayName(position)}</span>
+        <span className="block truncate text-xs tabular-nums text-muted-foreground">
+          {t('investments.table.mobileSummary', {
+            quantity: position.quantity,
+            price: formatHolding(position.currentPrice, position.currency, i18n.language),
+          })}
+        </span>
+      </span>
+      <span className="shrink-0 text-right tabular-nums">
+        <span className="block text-sm font-medium">
+          {formatHolding(position.value, position.currency, i18n.language)}
+        </span>
+        <span className={`block text-xs ${amountColour(position.returnPct ?? 0)}`}>
+          {position.returnPct === null ? NO_VALUE : formatPercent(position.returnPct)}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -253,43 +304,65 @@ export function PositionsTable({ positions }: Readonly<{ positions: PortfolioPos
             {t('investments.table.empty')}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">{t('investments.table.security')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.quantity')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.purchasePrice')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.currentPrice')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.value')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.gainLoss')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.returnPct')}</th>
-                  <th className="py-2 pr-4 text-right font-medium">{t('investments.table.allocation')}</th>
-                  <th className="py-2" aria-hidden="true" />
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((group) => (
-                  <Fragment key={group.assetClass}>
-                    <GroupHeaderRow group={group} />
-                    {group.positions.map((position) => (
-                      <PositionRow
-                        key={position.id}
-                        position={position}
-                        // Colour index from the original array keeps the dot in
-                        // sync with the allocation donut slice colours.
-                        index={positions.indexOf(position)}
-                        onOpen={openDetail}
-                        onEdit={setEditing}
-                        onRemove={confirmRemove}
-                        removing={deletePosition.isPending}
-                      />
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Below lg the nine-column table cannot fit — positions become tappable list rows. */}
+            <div className="lg:hidden">
+              {groups.map((group) => (
+                <Fragment key={group.assetClass}>
+                  <div className="border-b border-border pb-1 pt-4 first:pt-0">
+                    <GroupHeaderContent group={group} />
+                  </div>
+                  {group.positions.map((position) => (
+                    <MobilePositionRow
+                      key={position.id}
+                      position={position}
+                      // Colour index from the original array keeps the swatch in
+                      // sync with the allocation donut slice colours.
+                      index={positions.indexOf(position)}
+                      onOpen={openDetail}
+                    />
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">{t('investments.table.security')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.quantity')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.purchasePrice')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.currentPrice')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.value')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.gainLoss')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.returnPct')}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t('investments.table.allocation')}</th>
+                    <th className="py-2" aria-hidden="true" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((group) => (
+                    <Fragment key={group.assetClass}>
+                      <GroupHeaderRow group={group} />
+                      {group.positions.map((position) => (
+                        <PositionRow
+                          key={position.id}
+                          position={position}
+                          // Colour index from the original array keeps the dot in
+                          // sync with the allocation donut slice colours.
+                          index={positions.indexOf(position)}
+                          onOpen={openDetail}
+                          onEdit={setEditing}
+                          onRemove={confirmRemove}
+                          removing={deletePosition.isPending}
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {editing && (
           <EditPositionDialog

@@ -99,7 +99,8 @@ function PositionRow({ position, onEdit, onDelete, deleting }: Readonly<{
         <span className="font-semibold tabular-nums text-red-500">
           −{formatCHF(position.amount)}
         </span>
-        <span className="inline-flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        {/* Touch devices have no hover — keep the actions visible below md. */}
+        <span className="inline-flex items-center transition-opacity md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"
@@ -231,7 +232,7 @@ export function MonthlyBudgetCard({ budget, fixedCosts }: Readonly<{
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+      <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base">{t('budget.monthly.title')}</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">{t('budget.monthly.subtitle')}</p>

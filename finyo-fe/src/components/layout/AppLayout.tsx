@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { BottomTabBar } from './BottomTabBar';
 import { PageBreadcrumb } from './Breadcrumb';
 import { BreadcrumbProvider } from './BreadcrumbContext';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useProfileSync } from '@/hooks/useProfileSync';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +13,6 @@ const SIDEBAR_COLLAPSED_KEY = 'finyo.sidebar.collapsed';
 export function AppLayout() {
   useProfileSync();
 
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
   );
@@ -38,21 +37,15 @@ export function AppLayout() {
           <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
         </aside>
 
-        {/* Mobile sidebar — slide-in sheet (never collapsed) */}
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="w-60 p-0">
-            <Sidebar onClose={() => setMobileOpen(false)} />
-          </SheetContent>
-        </Sheet>
-
         {/* Main area */}
         <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
           <div className="print:hidden">
-            <Header onMenuClick={() => setMobileOpen(true)} />
+            <Header />
           </div>
 
           <main className="flex-1 overflow-y-auto print:overflow-visible">
-            <div className="mx-auto max-w-[1400px] p-4 lg:p-6">
+            {/* Extra bottom padding on mobile keeps content clear of the tab bar */}
+            <div className="mx-auto max-w-[1400px] p-4 pb-24 lg:p-6 print:pb-4">
               <div className="mb-4 print:hidden">
                 <PageBreadcrumb />
               </div>
@@ -60,6 +53,9 @@ export function AppLayout() {
             </div>
           </main>
         </div>
+
+        {/* Mobile bottom navigation — replaces the sidebar below lg */}
+        <BottomTabBar />
       </div>
     </BreadcrumbProvider>
   );

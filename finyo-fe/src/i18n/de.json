@@ -9,11 +9,13 @@
     "insurance": "Versicherungen",
     "accounts": "Konten",
     "documents": "Dokumente",
+    "more": "Mehr",
     "settings": "Einstellungen",
     "admin": "Admin",
     "adminPillar3Products": "3a-Produkte",
     "collapseSidebar": "Seitenleiste einklappen",
-    "expandSidebar": "Seitenleiste ausklappen"
+    "expandSidebar": "Seitenleiste ausklappen",
+    "mobileNavigation": "Mobile Navigation"
   },
   "breadcrumb": {
     "portfolio": "Portfolio",
@@ -91,7 +93,9 @@
       "sourcePillar3": "Säule 3a",
       "empty": "Noch keine Töpfe erfasst — lege deinen ersten Vermögenstopf an",
       "confirmDelete": "Topf «{{name}}» entfernen?",
-      "deleteLabel": "Topf entfernen"
+      "deleteLabel": "Topf entfernen",
+      "monthlyRateShort": "{{amount}} mtl.",
+      "forecastShort": "Prognose {{amount}}"
     },
     "form": {
       "createTitle": "Topf hinzufügen",
@@ -163,7 +167,8 @@
       "edit": "Position bearbeiten",
       "remove": "Position entfernen",
       "confirmRemove": "Position «{{name}}» entfernen?",
-      "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu"
+      "empty": "Noch keine Positionen erfasst — füge oben dein erstes Wertpapier hinzu",
+      "mobileSummary": "{{quantity}} Stk. · Kurs {{price}}"
     },
     "price": {
       "badge": {
@@ -319,6 +324,8 @@
     "monthlyPayments": "Monatliche Zahlungen",
     "percentPaid": "{{pct}} % einbezahlt",
     "openAmount": "Offener Betrag",
+    "paidTotal": "Einbezahlt",
+    "expectedTaxBurden": "Erwartete Steuerlast",
     "deadlines": "Fristen",
     "payments": "Zahlungen",
     "addPayment": "Zahlung erfassen",
@@ -335,6 +342,8 @@
     "comparison": "Jahresvergleich",
     "income": "Einkommen",
     "taxBurden": "Steuerlast",
+    "avgTaxBurden": "Steuerlast Ø {{from}}–{{to}}",
+    "vsPreviousYear": "{{year}} vs. {{previous}}",
     "done": "Erledigt",
     "noDeadlines": "Keine Fristen",
     "noPayments": "Noch keine Zahlungen erfasst",
@@ -514,6 +523,8 @@
   },
   "budget": {
     "loadError": "Budget konnte nicht geladen werden",
+    "amountPerMonth": "{{amount}} / Monat",
+    "amountPerYear": "{{amount}} / Jahr",
     "tabs": {
       "plan": "Monatsbudget",
       "month": "Monatsansicht",

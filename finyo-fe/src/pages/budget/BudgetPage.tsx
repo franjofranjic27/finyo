@@ -58,10 +58,17 @@ export function BudgetPage() {
         setSearchParams(value === 'plan' ? {} : { tab: value }, { replace: true })
       }
     >
-      <TabsList>
-        <TabsTrigger value="plan">{t('budget.tabs.plan')}</TabsTrigger>
-        <TabsTrigger value="month">{t('budget.tabs.month')}</TabsTrigger>
-        <TabsTrigger value="salary">{t('budget.tabs.salary')}</TabsTrigger>
+      {/* max-w + overflow keep the tab bar horizontally scrollable on narrow screens. */}
+      <TabsList className="max-w-full justify-start overflow-x-auto">
+        <TabsTrigger value="plan" className="shrink-0">
+          {t('budget.tabs.plan')}
+        </TabsTrigger>
+        <TabsTrigger value="month" className="shrink-0">
+          {t('budget.tabs.month')}
+        </TabsTrigger>
+        <TabsTrigger value="salary" className="shrink-0">
+          {t('budget.tabs.salary')}
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="plan" className="mt-4">
         <div className="space-y-6">

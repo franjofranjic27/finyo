@@ -77,6 +77,19 @@ function renderCard(items: Account[] = accounts) {
   return renderWithProviders(<BankAccountsCard accounts={items} />);
 }
 
+/**
+ * The card renders a mobile list and a desktop table in parallel (CSS-only
+ * visibility) — resolve the table row of an account through its name cell.
+ */
+function tableRowByText(text: string): HTMLElement {
+  const row = screen
+    .getAllByText(text)
+    .map((element) => element.closest('tr'))
+    .find((element) => element !== null);
+  if (!row) throw new Error(`no table row containing “${text}”`);
+  return row;
+}
+
 describe('BankAccountsCard', () => {
   beforeEach(() => {
     vi.mocked(accountsApi.delete).mockResolvedValue(undefined);
@@ -95,23 +108,23 @@ describe('BankAccountsCard', () => {
     expect(privateHeaderIndex).toBeLessThan(privatkontoIndex);
     expect(privatkontoIndex).toBeLessThan(businessHeaderIndex);
     expect(businessHeaderIndex).toBeLessThan(kontokorrentIndex);
-    // Account type is shown below the name.
-    expect(screen.getByText('Other')).toBeInTheDocument();
+    // Account type is shown below the name — in the table cell and the mobile row.
+    expect(screen.getAllByText('Other').length).toBeGreaterThan(0);
     expect(screen.getByText('CHF 5 / Monat')).toBeInTheDocument();
   });
 
   it('hides a scope group without accounts', () => {
     renderCard([bankAccount({ id: 'a1' })]);
 
-    expect(screen.getByText('Private')).toBeInTheDocument();
+    expect(screen.getAllByText('Private').length).toBeGreaterThan(0);
     expect(screen.queryByText('Business')).not.toBeInTheDocument();
   });
 
   it('shows the IBAN formatted in groups of four', () => {
     renderCard();
 
-    expect(screen.getByText(/CH93 0076 2011 6238 5295 7/)).toBeInTheDocument();
-    expect(screen.getByText(/CH37 0078 1000 0000 0030 5/)).toBeInTheDocument();
+    expect(screen.getAllByText(/CH93 0076 2011 6238 5295 7/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/CH37 0078 1000 0000 0030 5/).length).toBeGreaterThan(0);
   });
 
   it('copies the raw normalized IBAN and shows the copied feedback', async () => {
@@ -129,7 +142,7 @@ describe('BankAccountsCard', () => {
   it('renders a dash instead of an IBAN chip when the IBAN is missing', () => {
     renderCard();
 
-    const row = screen.getByText('Crypto.com').closest('tr') as HTMLElement;
+    const row = tableRowByText('Crypto.com');
     expect(within(row).queryByRole('button', { name: 'Copy IBAN' })).not.toBeInTheDocument();
     expect(within(row).getAllByText('—').length).toBeGreaterThan(0);
   });
@@ -137,10 +150,10 @@ describe('BankAccountsCard', () => {
   it('shows the amber status badge for accounts marked to close', () => {
     renderCard();
 
-    const row = screen.getByText('Crypto.com').closest('tr') as HTMLElement;
+    const row = tableRowByText('Crypto.com');
     expect(within(row).getByText('To close')).toBeInTheDocument();
     // Accounts without the flag have no status badge.
-    const privatkontoRow = screen.getByText('Privatkonto').closest('tr') as HTMLElement;
+    const privatkontoRow = tableRowByText('Privatkonto');
     expect(within(privatkontoRow).queryByText('To close')).not.toBeInTheDocument();
   });
 

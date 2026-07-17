@@ -23,8 +23,35 @@ import {
   formatTooltipCHF,
   renderLegendText,
 } from '@/components/charts/chartStyle';
+import { KeyValueRow } from './KeyValueRow';
 import { productColor } from './productColors';
 import { ScenarioActionsMenu } from './ScenarioActionsMenu';
+
+/** Product name/provider, or the manual return rate a scenario was saved with. */
+function ScenarioReturnSource({ scenario }: Readonly<{ scenario: Pillar3Scenario }>) {
+  const { t } = useTranslation();
+
+  if (scenario.product) {
+    return (
+      <div className="min-w-0">
+        <p className="truncate font-medium">{scenario.product.name}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {scenario.product.provider}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <p className="font-medium tabular-nums">
+        {scenario.effectiveReturnPercent.toFixed(1)} %
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {t('pillar3.scenarios.manualReturn')}
+      </p>
+    </div>
+  );
+}
 
 /** One chart row per calendar year: shorter horizons simply end (no connectNulls). */
 function mergeProjections(
@@ -79,78 +106,115 @@ export function ScenariosTab() {
           <CardTitle className="text-base">{t('pillar3.scenarios.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('pillar3.scenarios.colName')}</TableHead>
-                <TableHead>{t('pillar3.scenarios.colProduct')}</TableHead>
-                <TableHead className="text-right">{t('pillar3.scenarios.colContribution')}</TableHead>
-                <TableHead className="text-right">{t('pillar3.scenarios.colFinalBalance')}</TableHead>
-                <TableHead className="text-right">{t('pillar3.scenarios.colTaxSaving')}</TableHead>
-                <TableHead className="text-right">{t('pillar3.scenarios.colNetAfterTax')}</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((scenario, index) => (
-                <TableRow key={scenario.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: productColor(index) }}
-                        aria-hidden
-                      />
-                      <span className="inline-flex items-center gap-2 font-medium">
-                        {scenario.name}
-                        {scenario.isDefault && (
-                          <Badge variant="secondary">
-                            ★ {t('pillar3.scenarios.default')}
-                          </Badge>
-                        )}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {scenario.product ? (
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{scenario.product.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {scenario.product.provider}
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="font-medium tabular-nums">
-                          {scenario.effectiveReturnPercent.toFixed(1)} %
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {t('pillar3.scenarios.manualReturn')}
-                        </p>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCHF(scenario.inputs.annualContribution)}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCHF(scenario.calculation.projectedBalanceAtRetirement)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {scenario.calculation.annualTaxSaving > 0
-                      ? formatCHF(scenario.calculation.annualTaxSaving)
-                      : '–'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCHF(scenario.calculation.netValueAfterPayoutTax)}
-                  </TableCell>
-                  <TableCell className="w-10 text-right">
+          {/* Mobile: one stacked list block per scenario instead of the wide table. */}
+          <ul className="divide-y md:hidden">
+            {items.map((scenario, index) => (
+              <li key={scenario.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: productColor(index) }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 truncate font-semibold">{scenario.name}</span>
+                  {scenario.isDefault && (
+                    <Badge variant="secondary" className="shrink-0">
+                      ★ {t('pillar3.scenarios.default')}
+                    </Badge>
+                  )}
+                  <span className="ml-auto shrink-0">
                     <ScenarioActionsMenu scenario={scenario} />
-                  </TableCell>
+                  </span>
+                </div>
+                <div className="mt-0.5 pl-6">
+                  <ScenarioReturnSource scenario={scenario} />
+                </div>
+                <dl className="mt-2.5 space-y-1.5 pl-6">
+                  <KeyValueRow
+                    label={t('pillar3.scenarios.colContribution')}
+                    value={formatCHF(scenario.inputs.annualContribution)}
+                  />
+                  <KeyValueRow
+                    label={t('pillar3.scenarios.colFinalBalance')}
+                    value={formatCHF(scenario.calculation.projectedBalanceAtRetirement)}
+                    emphasized
+                  />
+                  <KeyValueRow
+                    label={t('pillar3.scenarios.colTaxSaving')}
+                    value={
+                      scenario.calculation.annualTaxSaving > 0
+                        ? formatCHF(scenario.calculation.annualTaxSaving)
+                        : '–'
+                    }
+                  />
+                  <KeyValueRow
+                    label={t('pillar3.scenarios.colNetAfterTax')}
+                    value={formatCHF(scenario.calculation.netValueAfterPayoutTax)}
+                  />
+                </dl>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop: unchanged comparison table. */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('pillar3.scenarios.colName')}</TableHead>
+                  <TableHead>{t('pillar3.scenarios.colProduct')}</TableHead>
+                  <TableHead className="text-right">{t('pillar3.scenarios.colContribution')}</TableHead>
+                  <TableHead className="text-right">{t('pillar3.scenarios.colFinalBalance')}</TableHead>
+                  <TableHead className="text-right">{t('pillar3.scenarios.colTaxSaving')}</TableHead>
+                  <TableHead className="text-right">{t('pillar3.scenarios.colNetAfterTax')}</TableHead>
+                  <TableHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((scenario, index) => (
+                  <TableRow key={scenario.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: productColor(index) }}
+                          aria-hidden
+                        />
+                        <span className="inline-flex items-center gap-2 font-medium">
+                          {scenario.name}
+                          {scenario.isDefault && (
+                            <Badge variant="secondary">
+                              ★ {t('pillar3.scenarios.default')}
+                            </Badge>
+                          )}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <ScenarioReturnSource scenario={scenario} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCHF(scenario.inputs.annualContribution)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCHF(scenario.calculation.projectedBalanceAtRetirement)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {scenario.calculation.annualTaxSaving > 0
+                        ? formatCHF(scenario.calculation.annualTaxSaving)
+                        : '–'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCHF(scenario.calculation.netValueAfterPayoutTax)}
+                    </TableCell>
+                    <TableCell className="w-10 text-right">
+                      <ScenarioActionsMenu scenario={scenario} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

@@ -102,7 +102,13 @@ export function DeadlinesPaymentsSection({ year, detail, className }: Readonly<D
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">{t('tax.deadlines')}</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setDeadlineDialogOpen(true)}>
+          {/* sm+: compact header button; mobile: full-width button below the list. */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={() => setDeadlineDialogOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" />
             {t('tax.addDeadline')}
           </Button>
@@ -136,6 +142,14 @@ export function DeadlinesPaymentsSection({ year, detail, className }: Readonly<D
               </button>
             </div>
           ))}
+          <Button
+            variant="outline"
+            className="w-full sm:hidden"
+            onClick={() => setDeadlineDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t('tax.addDeadline')}
+          </Button>
         </CardContent>
       </Card>
 
@@ -143,7 +157,12 @@ export function DeadlinesPaymentsSection({ year, detail, className }: Readonly<D
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">{t('tax.payments')}</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={() => setDialogOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" />
             {t('tax.addPayment')}
           </Button>
@@ -173,6 +192,14 @@ export function DeadlinesPaymentsSection({ year, detail, className }: Readonly<D
               </Button>
             </div>
           ))}
+          <Button
+            variant="outline"
+            className="w-full sm:hidden"
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t('tax.addPayment')}
+          </Button>
         </CardContent>
       </Card>
 

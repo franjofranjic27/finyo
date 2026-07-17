@@ -79,12 +79,14 @@ export function PerformanceChart() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t('investments.performance.title')}</CardTitle>
-        <div className="flex gap-1">
+        {/* Scrolls horizontally on narrow phones instead of squeezing the chips. */}
+        <div className="flex min-w-0 gap-1 overflow-x-auto">
           {RANGES.map((range) => (
             <Button
               key={range.months}
               variant={months === range.months ? 'default' : 'outline'}
               size="sm"
+              className="shrink-0"
               onClick={() => setMonths(range.months)}
             >
               {t(range.labelKey)}

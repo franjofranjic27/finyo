@@ -94,7 +94,8 @@ describe('DeadlinesPaymentsSection', () => {
     const user = userEvent.setup();
     renderWithProviders(<DeadlinesPaymentsSection year={2025} detail={detail} />);
 
-    await user.click(screen.getByRole('button', { name: /Add Payment/ }));
+    // The add button exists twice (header on sm+, full-width on mobile).
+    await user.click(screen.getAllByRole('button', { name: /Add Payment/ })[0]);
     await user.type(screen.getByLabelText('Amount (CHF)'), '2000');
     await user.type(screen.getByLabelText('Label'), 'Q2');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -117,7 +118,8 @@ describe('DeadlinesPaymentsSection', () => {
     const user = userEvent.setup();
     renderWithProviders(<DeadlinesPaymentsSection year={2025} detail={detail} />);
 
-    await user.click(screen.getByRole('button', { name: /Add deadline/ }));
+    // The add button exists twice (header on sm+, full-width on mobile).
+    await user.click(screen.getAllByRole('button', { name: /Add deadline/ })[0]);
     await user.type(screen.getByLabelText('Description'), 'Provisional invoice');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 

@@ -295,14 +295,16 @@ export function CalculatorTab() {
             )}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button onClick={() => mutate()} disabled={isPending}>
+          {/* Mobile: stacked full-width actions; from sm on the previous inline row. */}
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button className="w-full sm:w-auto" onClick={() => mutate()} disabled={isPending}>
               <Calculator className="mr-2 h-4 w-4" />
               {isPending ? t('common.loading') : t('tax.calculate')}
             </Button>
             {selectedScenario ? (
               <Button
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={updateScenario.isPending}
                 onClick={() => updateScenario.mutate(selectedScenario)}
               >
@@ -311,7 +313,11 @@ export function CalculatorTab() {
                   : t('pillar3.scenarios.update')}
               </Button>
             ) : (
-              <Button variant="outline" onClick={() => setSavePanelOpen(true)}>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setSavePanelOpen(true)}
+              >
                 {t('pillar3.scenarios.save')}
               </Button>
             )}

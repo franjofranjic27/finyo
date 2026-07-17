@@ -85,7 +85,9 @@ export function FactsheetCard({ position }: Readonly<{ position: PositionDetail 
         />
 
         {hasFile && position.factsheet && (
-          <div className="flex items-center gap-3 rounded-md border p-3">
+          // flex-wrap lets the action buttons drop onto their own full-width row on phones;
+          // from sm they keep their auto width and sit inline exactly as before.
+          <div className="flex flex-wrap items-center gap-3 rounded-md border p-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-secondary">
               <FileText className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             </span>
@@ -96,10 +98,11 @@ export function FactsheetCard({ position }: Readonly<{ position: PositionDetail 
                 {formatDate(position.factsheet.uploadedAt, i18n.language)}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex w-full shrink-0 items-center gap-1 sm:w-auto">
               <Button
                 variant="ghost"
                 size="sm"
+                className="flex-1 border border-border sm:flex-none sm:border-0"
                 onClick={() => view.mutate()}
                 disabled={view.isPending}
               >
@@ -108,6 +111,7 @@ export function FactsheetCard({ position }: Readonly<{ position: PositionDetail 
               <Button
                 variant="ghost"
                 size="sm"
+                className="flex-1 border border-border sm:flex-none sm:border-0"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={upload.isPending}
               >

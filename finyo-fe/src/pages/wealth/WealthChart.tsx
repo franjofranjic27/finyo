@@ -80,48 +80,51 @@ export function WealthChart({ overview }: Readonly<{ overview: WealthOverview }>
       buildForecast(overview),
     );
     content = (
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis
-            dataKey="date"
-            tickFormatter={formatTick}
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-          />
-          <Tooltip
-            formatter={(value: number) => formatCHF(value)}
-            labelFormatter={(label: string) => formatDate(label, i18n.language)}
-            contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Area
-            type="monotone"
-            dataKey="history"
-            name={t('wealth.chart.history')}
-            stroke={LINE_COLOUR}
-            strokeWidth={2}
-            fill={LINE_COLOUR}
-            fillOpacity={0.15}
-          />
-          <Line
-            type="monotone"
-            dataKey="forecast"
-            name={t('wealth.chart.forecast')}
-            stroke={LINE_COLOUR}
-            strokeWidth={2}
-            strokeDasharray="4 5"
-            dot={false}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
+      // Compact chart height on mobile, unchanged 260px from lg up.
+      <div className="h-52 lg:h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatTick}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+            />
+            <Tooltip
+              formatter={(value: number) => formatCHF(value)}
+              labelFormatter={(label: string) => formatDate(label, i18n.language)}
+              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area
+              type="monotone"
+              dataKey="history"
+              name={t('wealth.chart.history')}
+              stroke={LINE_COLOUR}
+              strokeWidth={2}
+              fill={LINE_COLOUR}
+              fillOpacity={0.15}
+            />
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              name={t('wealth.chart.forecast')}
+              stroke={LINE_COLOUR}
+              strokeWidth={2}
+              strokeDasharray="4 5"
+              dot={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 

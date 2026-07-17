@@ -51,6 +51,19 @@ function renderCards(items: PaymentCard[] = cards) {
   );
 }
 
+/**
+ * The card renders a mobile list and a desktop table in parallel (CSS-only
+ * visibility) — resolve the table row of a card through its name cell.
+ */
+function tableRowByText(text: string): HTMLElement {
+  const row = screen
+    .getAllByText(text)
+    .map((element) => element.closest('tr'))
+    .find((element) => element !== null);
+  if (!row) throw new Error(`no table row containing “${text}”`);
+  return row;
+}
+
 describe('PaymentCardsCard', () => {
   beforeEach(() => {
     vi.mocked(accountsApi.deleteCard).mockResolvedValue(undefined);
@@ -59,7 +72,7 @@ describe('PaymentCardsCard', () => {
   it('renders the card rows with scope label and linked account', () => {
     renderCards();
 
-    const row = screen.getByText('Debit Mastercard').closest('tr') as HTMLElement;
+    const row = tableRowByText('Debit Mastercard');
     const cells = within(row).getAllByRole('cell');
     expect(within(cells[0]).getByText('Business')).toBeInTheDocument();
     expect(cells[1]).toHaveTextContent('Mastercard');
@@ -71,7 +84,7 @@ describe('PaymentCardsCard', () => {
   it('falls back to a dash when a card has no linked account', () => {
     renderCards();
 
-    const row = screen.getByText('Debit V PAY').closest('tr') as HTMLElement;
+    const row = tableRowByText('Debit V PAY');
     const cells = within(row).getAllByRole('cell');
     expect(cells[2]).toHaveTextContent('—');
   });
