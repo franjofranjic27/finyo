@@ -48,14 +48,32 @@ mount dirs and running the platform's `onboard.sh` (reloads Caddy, syncs the
 realm, reloads Prometheus — no restarts):
 
 ```bash
-# on the VPS
-cp deploy/sites/finyo.caddy       /opt/platform/caddy/sites/finyo.caddy
-cp deploy/finyo.yml               /opt/platform/prometheus/targets/finyo.yml
-cp keycloak/finyo-realm.prod.json /opt/platform/keycloak/import/finyo-realm.json
+# on the VPS, from ~/finyo
+cp deploy/sites/finyo.caddy /opt/platform/caddy/sites/finyo.caddy
+cp deploy/finyo.yml         /opt/platform/prometheus/targets/finyo.yml
+
+# The realm MUST be resolved first. finyo-realm.prod.json carries ${FINYO_DOMAIN}
+# in redirectUris, webOrigins and post.logout.redirect.uris, and nothing on the
+# platform substitutes it: the shared Keycloak has no FINYO_DOMAIN in its env, and
+# keycloak-config-cli runs with substitution off. Copied raw, the literal string
+# lands in the client and every login dies with "Invalid parameter: redirect_uri" —
+# while the sync still reports success.
+set -a; . .env.prod; set +a
+sed "s|\${FINYO_DOMAIN}|${FINYO_DOMAIN}|g" keycloak/finyo-realm.prod.json > /tmp/finyo-realm.json
+grep -c FINYO_DOMAIN /tmp/finyo-realm.json   # MUST print 0 — if not, stop here
+cp /tmp/finyo-realm.json /opt/platform/keycloak/import/finyo-realm.json
+
 ~/vps-platform/deploy/lib/onboard.sh finyo
 
 # then bring up be/fe (env-file carries FINYO_DOMAIN, AUTH_DOMAIN, DB/versions)
 docker compose -p finyo -f compose.prod.yml --env-file .env.prod up -d
+```
+
+Verify the client survived — this must answer `302`, not `400`:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://${AUTH_DOMAIN}/realms/finyo/protocol/openid-connect/auth?client_id=finyo-ui&redirect_uri=https%3A%2F%2F${FINYO_DOMAIN}%2F&response_type=code&scope=openid"
 ```
 
 These artifacts change rarely, so this is a **deliberate step on infra change**,
