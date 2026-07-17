@@ -26,7 +26,8 @@ class HeldInstruments implements HeldIsinsQuery, HeldCurrenciesQuery {
     @Override
     public List<CurrencyCode> findForeign() {
         return instrumentRepository.findDistinctCurrencies().stream()
-                .filter(currency -> !currency.isChf())
+                .map(CurrencyCode::ofNullable)
+                .filter(currency -> currency != null && !currency.isChf())
                 .toList();
     }
 }
