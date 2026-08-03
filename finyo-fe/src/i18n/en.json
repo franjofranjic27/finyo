@@ -857,7 +857,30 @@
     }
   },
   "profile": {
+    "sections": {
+      "person": "Person",
+      "address": "Address",
+      "contact": "Contact",
+      "preferences": "Preferences"
+    },
+    "salutation": {
+      "label": "Salutation",
+      "none": "Not specified",
+      "mr": "Mr",
+      "ms": "Ms"
+    },
+    "firstName": "First name",
+    "lastName": "Last name",
     "birthDate": "Date of birth",
+    "nationality": "Nationality",
+    "street": "Street and no.",
+    "postalCode": "Postal code",
+    "city": "City",
+    "municipality": "Municipality of residence",
+    "email": "Email",
+    "emailManagedHint": "The email address is managed via your account.",
+    "phone": "Phone",
+    "defaultCurrency": "Default currency",
     "derivedInfo": "Age: {{age}} · Years to retirement (65): {{years}}",
     "retirementYear": "Retirement in {{year}}",
     "theme": {
@@ -896,7 +919,6 @@
     "title": "Settings",
     "tabs": {
       "profile": "Profile",
-      "preferences": "Appearance",
       "accounts": "Accounts",
       "categories": "Categories"
     },

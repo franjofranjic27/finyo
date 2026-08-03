@@ -99,11 +99,15 @@ describe('OnboardingPage', () => {
 
     // Skip still sends the live preferences — the PUT would otherwise reset them.
     await waitFor(() =>
-      expect(profileApi.update).toHaveBeenCalledWith('test-token', {
-        preferredLanguage: 'en',
-        theme: 'SYSTEM',
-        onboardingCompleted: true,
-      }),
+      expect(profileApi.update).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({
+          preferredLanguage: 'en',
+          theme: 'SYSTEM',
+          defaultCurrency: 'CHF',
+          onboardingCompleted: true,
+        }),
+      ),
     );
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
     expect(screen.queryByText('Welcome to finyo')).not.toBeInTheDocument();
@@ -127,14 +131,17 @@ describe('OnboardingPage', () => {
     await user.click(screen.getByRole('button', { name: 'Finish' }));
 
     await waitFor(() =>
-      expect(profileApi.update).toHaveBeenCalledWith('test-token', {
-        birthDate: '1990-05-01',
-        civilStatus: 'SINGLE',
-        churchAffiliation: 'NONE',
-        preferredLanguage: 'en',
-        theme: 'SYSTEM',
-        onboardingCompleted: true,
-      }),
+      expect(profileApi.update).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({
+          birthDate: '1990-05-01',
+          civilStatus: 'SINGLE',
+          churchAffiliation: 'NONE',
+          preferredLanguage: 'en',
+          theme: 'SYSTEM',
+          onboardingCompleted: true,
+        }),
+      ),
     );
     await waitFor(() =>
       expect(salaryApi.update).toHaveBeenCalledWith('test-token', {
@@ -173,6 +180,43 @@ describe('OnboardingPage', () => {
     expect(salaryApi.get).not.toHaveBeenCalled();
     expect(salaryApi.update).not.toHaveBeenCalled();
     expect(await screen.findByText('dashboard page')).toBeInTheDocument();
+  });
+
+  it('carries the stored master data through the finish PUT instead of wiping it', async () => {
+    // Regression: the PUT is a full replace — a profile saved before the
+    // wizard runs (name, address, currency) must survive finish/skip.
+    let currentProfile = emptyUserProfile({
+      firstName: 'Anna',
+      lastName: 'Muster',
+      street: 'Musterstrasse 12',
+      cantonCode: 'SG',
+      defaultCurrency: 'EUR',
+    });
+    vi.mocked(profileApi.get).mockImplementation(() => Promise.resolve(currentProfile));
+    vi.mocked(profileApi.update).mockImplementation(() => {
+      currentProfile = userProfile();
+      return Promise.resolve(currentProfile);
+    });
+    const user = userEvent.setup();
+    renderOnboarding();
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Finish' }));
+
+    await waitFor(() =>
+      expect(profileApi.update).toHaveBeenCalledWith(
+        'test-token',
+        expect.objectContaining({
+          firstName: 'Anna',
+          lastName: 'Muster',
+          street: 'Musterstrasse 12',
+          cantonCode: 'SG',
+          defaultCurrency: 'EUR',
+          onboardingCompleted: true,
+        }),
+      ),
+    );
   });
 
   it('applies the theme live from the preferences step', async () => {

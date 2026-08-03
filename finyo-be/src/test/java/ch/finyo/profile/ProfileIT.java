@@ -45,8 +45,8 @@ class ProfileIT extends BaseIntegrationTest {
         userProfileRepository.deleteAll();
     }
 
-    private String profileBody(String birthDate, String civilStatus, String churchAffiliation,
-                               String preferredLanguage, String theme, Boolean onboardingCompleted) {
+    private Map<String, Object> baseBody(String birthDate, String civilStatus, String churchAffiliation,
+                                         String preferredLanguage, String theme, Boolean onboardingCompleted) {
         Map<String, Object> body = new HashMap<>();
         body.put("birthDate", birthDate);
         body.put("civilStatus", civilStatus);
@@ -54,11 +54,30 @@ class ProfileIT extends BaseIntegrationTest {
         body.put("preferredLanguage", preferredLanguage);
         body.put("theme", theme);
         body.put("onboardingCompleted", onboardingCompleted);
-        return objectMapper.writeValueAsString(body);
+        return body;
     }
 
+    private String profileBody(String birthDate, String civilStatus, String churchAffiliation,
+                               String preferredLanguage, String theme, Boolean onboardingCompleted) {
+        return objectMapper.writeValueAsString(
+                baseBody(birthDate, civilStatus, churchAffiliation, preferredLanguage, theme, onboardingCompleted));
+    }
+
+    /** Complete field set including person, address, contact and default currency. */
     private String referenceBody() {
-        return profileBody(BIRTH_DATE.toString(), "MARRIED", "NONE", "de", "DARK", true);
+        Map<String, Object> body = baseBody(BIRTH_DATE.toString(), "MARRIED", "NONE", "de", "DARK", true);
+        body.put("salutation", "MS");
+        body.put("firstName", "Anna");
+        body.put("lastName", "Muster");
+        body.put("nationality", "Schweiz");
+        body.put("street", "Musterstrasse 12");
+        body.put("postalCode", "9000");
+        body.put("city", "St. Gallen");
+        body.put("municipality", "St. Gallen");
+        body.put("cantonCode", "SG");
+        body.put("phone", "+41 79 123 45 67");
+        body.put("defaultCurrency", "EUR");
+        return objectMapper.writeValueAsString(body);
     }
 
     private JsonNode getProfile(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor user) throws Exception {
@@ -75,8 +94,15 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(json.get("birthDate").isNull()).isTrue();
         assertThat(json.get("civilStatus").isNull()).isTrue();
         assertThat(json.get("churchAffiliation").isNull()).isTrue();
+        assertThat(json.get("salutation").isNull()).isTrue();
+        assertThat(json.get("firstName").isNull()).isTrue();
+        assertThat(json.get("lastName").isNull()).isTrue();
+        assertThat(json.get("street").isNull()).isTrue();
+        assertThat(json.get("cantonCode").isNull()).isTrue();
+        assertThat(json.get("phone").isNull()).isTrue();
         assertThat(json.get("preferredLanguage").isNull()).isTrue();
         assertThat(json.get("theme").asText()).isEqualTo("SYSTEM");
+        assertThat(json.get("defaultCurrency").asText()).isEqualTo("CHF");
         assertThat(json.get("onboardingCompleted").asBoolean()).isFalse();
         assertThat(json.get("age").isNull()).isTrue();
         assertThat(json.get("yearsToRetirement").isNull()).isTrue();
@@ -96,8 +122,19 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(json.get("birthDate").asText()).isEqualTo("1990-04-15");
         assertThat(json.get("civilStatus").asText()).isEqualTo("MARRIED");
         assertThat(json.get("churchAffiliation").asText()).isEqualTo("NONE");
+        assertThat(json.get("salutation").asText()).isEqualTo("MS");
+        assertThat(json.get("firstName").asText()).isEqualTo("Anna");
+        assertThat(json.get("lastName").asText()).isEqualTo("Muster");
+        assertThat(json.get("nationality").asText()).isEqualTo("Schweiz");
+        assertThat(json.get("street").asText()).isEqualTo("Musterstrasse 12");
+        assertThat(json.get("postalCode").asText()).isEqualTo("9000");
+        assertThat(json.get("city").asText()).isEqualTo("St. Gallen");
+        assertThat(json.get("municipality").asText()).isEqualTo("St. Gallen");
+        assertThat(json.get("cantonCode").asText()).isEqualTo("SG");
+        assertThat(json.get("phone").asText()).isEqualTo("+41 79 123 45 67");
         assertThat(json.get("preferredLanguage").asText()).isEqualTo("de");
         assertThat(json.get("theme").asText()).isEqualTo("DARK");
+        assertThat(json.get("defaultCurrency").asText()).isEqualTo("EUR");
         assertThat(json.get("onboardingCompleted").asBoolean()).isTrue();
 
         int expectedAge = Period.between(BIRTH_DATE, LocalDate.now(SwissTime.ZONE)).getYears();
@@ -105,7 +142,8 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(json.get("yearsToRetirement").asInt()).isEqualTo(65 - expectedAge);
         assertThat(json.get("retirementYear").asInt()).isEqualTo(2055);
 
-        // second PUT updates the same row; null onboardingCompleted preserves the flag
+        // second PUT updates the same row; null onboardingCompleted preserves the
+        // flag, omitted master data is cleared and the currency falls back to CHF
         mockMvc.perform(put("/api/v1/profile").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(profileBody(BIRTH_DATE.toString(), "SINGLE", "PROTESTANT", "en", "LIGHT", null)))
@@ -116,6 +154,9 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(updated.get("civilStatus").asText()).isEqualTo("SINGLE");
         assertThat(updated.get("preferredLanguage").asText()).isEqualTo("en");
         assertThat(updated.get("theme").asText()).isEqualTo("LIGHT");
+        assertThat(updated.get("firstName").isNull()).isTrue();
+        assertThat(updated.get("street").isNull()).isTrue();
+        assertThat(updated.get("defaultCurrency").asText()).isEqualTo("CHF");
         assertThat(updated.get("onboardingCompleted").asBoolean()).isTrue();
     }
 
@@ -173,10 +214,46 @@ class ProfileIT extends BaseIntegrationTest {
         assertThat(json.get("birthDate").asText()).isEqualTo("1990-04-15");
         assertThat(json.get("civilStatus").asText()).isEqualTo("MARRIED");
         assertThat(json.get("churchAffiliation").asText()).isEqualTo("NONE");
+        assertThat(json.get("firstName").asText()).isEqualTo("Anna");
+        assertThat(json.get("street").asText()).isEqualTo("Musterstrasse 12");
+        assertThat(json.get("cantonCode").asText()).isEqualTo("SG");
         assertThat(json.get("preferredLanguage").asText()).isEqualTo("de");
         assertThat(json.get("theme").asText()).isEqualTo("DARK");
+        assertThat(json.get("defaultCurrency").asText()).isEqualTo("EUR");
         assertThat(json.get("onboardingCompleted").asBoolean()).isTrue();
         assertThat(userProfileRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void patching_the_default_currency_preserves_the_master_data_and_the_other_preferences() throws Exception {
+        mockMvc.perform(put("/api/v1/profile").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(referenceBody()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultCurrency\":\"USD\"}"))
+                .andExpect(status().isOk());
+
+        JsonNode json = getProfile(asUser());
+        assertThat(json.get("defaultCurrency").asText()).isEqualTo("USD");
+        assertThat(json.get("theme").asText()).isEqualTo("DARK");
+        assertThat(json.get("preferredLanguage").asText()).isEqualTo("de");
+        assertThat(json.get("firstName").asText()).isEqualTo("Anna");
+        assertThat(json.get("street").asText()).isEqualTo("Musterstrasse 12");
+        assertThat(json.get("onboardingCompleted").asBoolean()).isTrue();
+        assertThat(userProfileRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void patching_preferences_with_an_invalid_currency_code_returns_400() throws Exception {
+        mockMvc.perform(patch("/api/v1/profile/preferences").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"defaultCurrency\":\"chf1\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userProfileRepository.count()).isZero();
     }
 
     @Test
