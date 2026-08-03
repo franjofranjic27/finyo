@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { profileApi } from '@/api/profile';
 import { renderWithProviders } from '@/test/test-utils';
@@ -77,6 +78,28 @@ describe('Header', () => {
     expect(profileApi.updatePreferences).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
     expect(profileApi.update).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Light Mode' })).toBeInTheDocument();
+  });
+
+  it('navigates to the settings page via the avatar dropdown', async () => {
+    function LocationProbe() {
+      const { pathname } = useLocation();
+      return <span data-testid="pathname">{pathname}</span>;
+    }
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <Header />
+        <LocationProbe />
+      </>,
+      { route: '/dashboard' },
+    );
+
+    await user.click(screen.getByText('AN'));
+    // the language toggle lives in the header itself, not in the dropdown
+    expect(screen.queryByRole('menuitem', { name: /Language/ })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('menuitem', { name: 'Settings' }));
+
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/settings');
   });
 
   it('logs out via the avatar dropdown', async () => {
