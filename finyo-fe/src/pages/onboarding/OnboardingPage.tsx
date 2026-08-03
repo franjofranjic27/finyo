@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/auth/useAuth';
 import { useTheme } from '@/hooks/useTheme';
-import { profileApi, PROFILE_QUERY_KEY } from '@/api/profile';
+import { profileApi, PROFILE_QUERY_KEY, toUserProfileInput } from '@/api/profile';
 import type { PreferredLanguage, Theme, UserProfile } from '@/api/profile';
 import { salaryApi } from '@/api/salary';
 import { StepBasics } from './StepBasics';
@@ -43,6 +43,16 @@ export function OnboardingPage() {
   // Language and theme are applied live in StepPreferences; read them back here.
   const language: PreferredLanguage = i18n.language === 'de' ? 'de' : 'en';
 
+  // The PUT below is a full replace: spread the stored profile first so
+  // fields the wizard does not edit (name, address, contact, currency)
+  // survive finish/skip instead of being wiped.
+  const { data: storedProfile } = useQuery({
+    queryKey: PROFILE_QUERY_KEY,
+    queryFn: () => profileApi.get(token),
+    enabled: !!token,
+  });
+  const storedInput = storedProfile ? toUserProfileInput(storedProfile) : {};
+
   const goToDashboard = (profile: UserProfile) => {
     // Seed the cache with the PUT response BEFORE navigating — otherwise the
     // OnboardingGate still sees the stale onboardingCompleted=false and loops.
@@ -57,6 +67,7 @@ export function OnboardingPage() {
   const skip = useMutation({
     mutationFn: () =>
       profileApi.update(token, {
+        ...storedInput,
         preferredLanguage: language,
         theme: theme.toUpperCase() as Theme,
         onboardingCompleted: true,
@@ -67,6 +78,7 @@ export function OnboardingPage() {
   const finish = useMutation({
     mutationFn: async () => {
       const profile = await profileApi.update(token, {
+        ...storedInput,
         birthDate: basics.birthDate || null,
         civilStatus: basics.civilStatus,
         churchAffiliation: basics.churchAffiliation,

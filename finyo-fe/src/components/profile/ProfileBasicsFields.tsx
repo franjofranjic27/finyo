@@ -29,14 +29,23 @@ export interface ProfileBasicsValues {
 interface ProfileBasicsFieldsProps {
   values: ProfileBasicsValues;
   onChange: (patch: Partial<ProfileBasicsValues>) => void;
+  /**
+   * Wrapper class; the settings form passes `contents` so the three fields
+   * participate directly in its responsive grid.
+   */
+  className?: string;
 }
 
 /** Birth date, civil status and church affiliation — shared by onboarding and settings. */
-export function ProfileBasicsFields({ values, onChange }: Readonly<ProfileBasicsFieldsProps>) {
+export function ProfileBasicsFields({
+  values,
+  onChange,
+  className = 'space-y-4',
+}: Readonly<ProfileBasicsFieldsProps>) {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
+    <div className={className}>
       <div className="space-y-2">
         <Label htmlFor="profile-birthDate">{t('profile.birthDate')}</Label>
         <Input

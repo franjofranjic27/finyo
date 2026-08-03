@@ -21,7 +21,6 @@ import { accountsApi } from '@/api/accounts';
 import { apiRequest } from '@/api/client';
 import { formatCHF } from '@/lib/formatters';
 import { ProfileTab } from './settings/ProfileTab';
-import { PreferencesTab } from './settings/PreferencesTab';
 import type { Account, Category, CreateAccountRequest } from '@/types';
 
 const ACCOUNT_TYPES: Account['type'][] = [
@@ -449,15 +448,11 @@ export function Settings() {
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">{t('settings.tabs.profile')}</TabsTrigger>
-          <TabsTrigger value="preferences">{t('settings.tabs.preferences')}</TabsTrigger>
           <TabsTrigger value="accounts">{t('settings.tabs.accounts')}</TabsTrigger>
           <TabsTrigger value="categories">{t('settings.tabs.categories')}</TabsTrigger>
         </TabsList>
         <TabsContent value="profile" className="mt-4">
           <ProfileTab />
-        </TabsContent>
-        <TabsContent value="preferences" className="mt-4">
-          <PreferencesTab />
         </TabsContent>
         <TabsContent value="accounts" className="mt-4">
           <AccountsTab token={token} />

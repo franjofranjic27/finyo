@@ -20,6 +20,7 @@ import type { Pillar3Result, TaxCivilStatus } from '@/api/tax';
 import { pillar3Api } from '@/api/pillar3';
 import type { Pillar3Product, Pillar3Scenario, Pillar3ScenarioInputs } from '@/api/pillar3';
 import { PROFILE_QUERY_KEY, profileApi } from '@/api/profile';
+import { CANTONS } from '@/lib/cantons';
 import { formatCHF } from '@/lib/formatters';
 import {
   chartAxisProps,
@@ -33,12 +34,6 @@ import { ProductSearchCombobox } from './ProductSearchCombobox';
 import { ScenarioActionsMenu } from './ScenarioActionsMenu';
 import { ScenarioBar } from './ScenarioBar';
 import { ScenarioSavePanel } from './ScenarioSavePanel';
-
-const CANTONS = [
-  'AG','AI','AR','BE','BL','BS','FR','GE','GL','GR',
-  'JU','LU','NE','NW','OW','SG','SH','SO','SZ','TG',
-  'TI','UR','VD','VS','ZG','ZH',
-];
 
 const CIVIL_STATUS_OPTIONS: { value: TaxCivilStatus; labelKey: string }[] = [
   { value: 'SINGLE', labelKey: 'tax.civilStatus.single' },

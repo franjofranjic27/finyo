@@ -24,13 +24,8 @@ import type {
   TaxYearInputs,
 } from '@/api/tax';
 import { useWealthOverview } from '@/hooks/financeQueries';
+import { CANTONS } from '@/lib/cantons';
 import { formatCHF } from '@/lib/formatters';
-
-const CANTONS = [
-  'AG','AI','AR','BE','BL','BS','FR','GE','GL','GR',
-  'JU','LU','NE','NW','OW','SG','SH','SO','SZ','TG',
-  'TI','UR','VD','VS','ZG','ZH',
-];
 
 const CIVIL_STATUS_OPTIONS: { value: TaxCivilStatus; labelKey: string }[] = [
   { value: 'SINGLE', labelKey: 'tax.civilStatus.single' },

@@ -857,7 +857,30 @@
     }
   },
   "profile": {
+    "sections": {
+      "person": "Person",
+      "address": "Adresse",
+      "contact": "Kontakt",
+      "preferences": "Präferenzen"
+    },
+    "salutation": {
+      "label": "Anrede",
+      "none": "Keine Angabe",
+      "mr": "Herr",
+      "ms": "Frau"
+    },
+    "firstName": "Vorname",
+    "lastName": "Nachname",
     "birthDate": "Geburtsdatum",
+    "nationality": "Nationalität",
+    "street": "Strasse und Nr.",
+    "postalCode": "PLZ",
+    "city": "Ort",
+    "municipality": "Wohngemeinde",
+    "email": "E-Mail",
+    "emailManagedHint": "Die E-Mail-Adresse wird über dein Konto verwaltet.",
+    "phone": "Telefon",
+    "defaultCurrency": "Standardwährung",
     "derivedInfo": "Alter: {{age}} · Jahre bis Pensionierung (65): {{years}}",
     "retirementYear": "Pensionierung im Jahr {{year}}",
     "theme": {
@@ -896,7 +919,6 @@
     "title": "Einstellungen",
     "tabs": {
       "profile": "Profil",
-      "preferences": "Darstellung",
       "accounts": "Konten",
       "categories": "Kategorien"
     },

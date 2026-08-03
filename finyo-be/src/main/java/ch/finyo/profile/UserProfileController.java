@@ -32,9 +32,10 @@ public class UserProfileController {
 
     @PutMapping
     @Operation(summary = "Create or replace the user profile (upsert)",
-            description = "Full replace of the master data: birthDate, civilStatus, churchAffiliation, "
-                    + "preferredLanguage and theme are overwritten with the request values, null clearing "
-                    + "the stored value. A null onboardingCompleted preserves the stored flag. "
+            description = "Full replace of the master data: person, address, contact, preferredLanguage, "
+                    + "theme and defaultCurrency are overwritten with the request values, null clearing "
+                    + "the stored value (theme falls back to SYSTEM, defaultCurrency to CHF). "
+                    + "A null onboardingCompleted preserves the stored flag. "
                     + "Do NOT use this for partial preference updates — "
                     + "use PATCH /api/v1/profile/preferences instead.")
     @ApiResponse(responseCode = "200", description = "User profile saved")
@@ -46,7 +47,7 @@ public class UserProfileController {
     }
 
     @PatchMapping("/preferences")
-    @Operation(summary = "Update the UI preferences (theme, language)",
+    @Operation(summary = "Update the UI preferences (theme, language, default currency)",
             description = "Partial update: only the non-null fields are applied, the master data and the "
                     + "onboarding flag stay untouched. At least one preference must be provided.")
     @ApiResponse(responseCode = "200", description = "Preferences saved")

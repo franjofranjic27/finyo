@@ -82,6 +82,11 @@ describe('Settings', () => {
     renderWithProviders(<Settings />);
 
     expect(await screen.findByLabelText('Date of birth')).toHaveValue('1990-05-01');
+    expect(screen.getByLabelText('First name')).toHaveValue('Anna');
+    expect(screen.getByLabelText('Last name')).toHaveValue('Muster');
+    expect(screen.getByLabelText('Street and no.')).toHaveValue('Musterstrasse 12');
+    expect(screen.getByLabelText('Postal code')).toHaveValue('9000');
+    expect(screen.getByLabelText('Phone')).toHaveValue('+41 79 123 45 67');
     expect(screen.getByText('Age: 36 · Years to retirement (65): 29 · Retirement in 2055'))
       .toBeInTheDocument();
     expect(profileApi.get).toHaveBeenCalledWith('test-token');
@@ -94,29 +99,81 @@ describe('Settings', () => {
 
     // Date inputs do not support per-key typing; set the value directly.
     fireEvent.change(birthDate, { target: { value: '1985-03-15' } });
+    const municipality = screen.getByLabelText('Municipality of residence');
+    await user.clear(municipality);
+    await user.type(municipality, 'Gossau');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    // the PUT is a full replace — the stored preferences must be resent, not dropped
+    // the PUT is a full replace — every master-data field AND the stored
+    // preferences (language, theme, currency) must be resent, not dropped
     expect(profileApi.update).toHaveBeenCalledWith('test-token', {
+      salutation: 'MS',
+      firstName: 'Anna',
+      lastName: 'Muster',
       birthDate: '1985-03-15',
       civilStatus: 'SINGLE',
       churchAffiliation: 'NONE',
+      nationality: 'Schweiz',
+      street: 'Musterstrasse 12',
+      postalCode: '9000',
+      city: 'St. Gallen',
+      municipality: 'Gossau',
+      cantonCode: 'SG',
+      phone: '+41 79 123 45 67',
       preferredLanguage: 'en',
       theme: 'SYSTEM',
+      defaultCurrency: 'CHF',
     });
     expect(await screen.findByText('Saved')).toBeInTheDocument();
   });
 
-  it('patches theme changes from the preferences tab without touching the master data', async () => {
+  it('disables saving while the first or last name is empty', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Settings />);
+    const firstName = await screen.findByLabelText('First name');
 
-    await user.click(screen.getByRole('tab', { name: 'Appearance' }));
+    await user.clear(firstName);
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(profileApi.update).not.toHaveBeenCalled();
+  });
+
+  it('patches theme changes from the profile tab without touching the master data', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    await screen.findByLabelText('Date of birth');
+
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(profileApi.updatePreferences).toHaveBeenCalledWith('test-token', { theme: 'DARK' });
     expect(profileApi.update).not.toHaveBeenCalled();
     expect(document.documentElement).toHaveClass('dark');
+  });
+
+  it('patches the default currency on change instead of a full-replace PUT', async () => {
+    vi.mocked(profileApi.updatePreferences).mockResolvedValue(
+      userProfile({ defaultCurrency: 'EUR' }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    await screen.findByLabelText('Date of birth');
+
+    await user.click(screen.getByRole('combobox', { name: 'Default currency' }));
+    await user.click(await screen.findByRole('option', { name: 'EUR' }));
+
+    expect(profileApi.updatePreferences).toHaveBeenCalledWith('test-token', {
+      defaultCurrency: 'EUR',
+    });
+    expect(profileApi.update).not.toHaveBeenCalled();
+  });
+
+  it('shows the email from the auth account as read-only', async () => {
+    renderWithProviders(<Settings />);
+
+    const email = await screen.findByLabelText('Email');
+    expect(email).toBeDisabled();
+    expect(screen.getByText('The email address is managed via your account.'))
+      .toBeInTheDocument();
   });
 
   it('shows the accounts tab with existing accounts', async () => {

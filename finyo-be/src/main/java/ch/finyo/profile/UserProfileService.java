@@ -1,6 +1,7 @@
 package ch.finyo.profile;
 
 import ch.finyo.common.SwissTime;
+import ch.finyo.common.money.CurrencyCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,11 +52,22 @@ public class UserProfileService {
         var profile = UserProfile.builder()
                 .id(existingId)
                 .userId(userId)
+                .salutation(request.salutation())
+                .firstName(request.firstName())
+                .lastName(request.lastName())
                 .birthDate(request.birthDate())
                 .civilStatus(request.civilStatus())
                 .churchAffiliation(request.churchAffiliation())
+                .nationality(request.nationality())
+                .street(request.street())
+                .postalCode(request.postalCode())
+                .city(request.city())
+                .municipality(request.municipality())
+                .cantonCode(request.cantonCode())
+                .phone(request.phone())
                 .preferredLanguage(request.preferredLanguage())
                 .theme(request.theme() != null ? request.theme() : Theme.SYSTEM)
+                .defaultCurrency(defaultCurrencyOrChf(request.defaultCurrency()))
                 .onboardingCompleted(onboardingCompleted)
                 .build();
 
@@ -87,10 +99,18 @@ public class UserProfileService {
         if (patch.preferredLanguage() != null) {
             builder.preferredLanguage(patch.preferredLanguage());
         }
+        if (patch.defaultCurrency() != null) {
+            builder.defaultCurrency(new CurrencyCode(patch.defaultCurrency()));
+        }
 
         UserProfile saved = userProfileRepository.save(builder.build());
         log.info("Updated profile preferences id={} for user={}", saved.getId(), userId);
         return UserProfileResponse.from(saved, LocalDate.now(SwissTime.ZONE));
+    }
+
+    /** Mirrors the theme handling: an absent preference falls back to the column default. */
+    private static CurrencyCode defaultCurrencyOrChf(String defaultCurrency) {
+        return defaultCurrency != null ? new CurrencyCode(defaultCurrency) : CurrencyCode.CHF;
     }
 
     private static void validateBirthDate(LocalDate birthDate) {

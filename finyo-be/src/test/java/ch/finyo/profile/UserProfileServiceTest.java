@@ -1,5 +1,6 @@
 package ch.finyo.profile;
 
+import ch.finyo.common.money.CurrencyCode;
 import ch.finyo.tax.ChurchAffiliation;
 import ch.finyo.tax.TaxCivilStatus;
 import org.junit.jupiter.api.Test;
@@ -47,23 +48,51 @@ class UserProfileServiceTest {
         return UserProfile.builder()
                 .id(id)
                 .userId(USER_ID)
+                .salutation(Salutation.MS)
+                .firstName("Anna")
+                .lastName("Muster")
                 .birthDate(LocalDate.of(1990, 4, 15))
                 .civilStatus(TaxCivilStatus.MARRIED)
                 .churchAffiliation(ChurchAffiliation.NONE)
+                .nationality("Schweiz")
+                .street("Musterstrasse 12")
+                .postalCode("9000")
+                .city("St. Gallen")
+                .municipality("St. Gallen")
+                .cantonCode("SG")
+                .phone("+41 79 123 45 67")
                 .preferredLanguage("de")
                 .theme(Theme.DARK)
+                .defaultCurrency(new CurrencyCode("EUR"))
                 .onboardingCompleted(onboardingCompleted)
                 .build();
     }
 
     private UserProfileRequest referenceRequest(Boolean onboardingCompleted) {
         return new UserProfileRequest(
+                Salutation.MS,
+                "Anna",
+                "Muster",
                 LocalDate.of(1990, 4, 15),
                 TaxCivilStatus.MARRIED,
                 ChurchAffiliation.NONE,
+                "Schweiz",
+                "Musterstrasse 12",
+                "9000",
+                "St. Gallen",
+                "St. Gallen",
+                "SG",
+                "+41 79 123 45 67",
                 "de",
                 Theme.DARK,
+                "EUR",
                 onboardingCompleted);
+    }
+
+    /** All-null request except the birth date — the minimal PUT payload. */
+    private UserProfileRequest emptyRequest(LocalDate birthDate) {
+        return new UserProfileRequest(null, null, null, birthDate, null, null,
+                null, null, null, null, null, null, null, null, null, null, null);
     }
 
     // =========================================================================
@@ -79,8 +108,14 @@ class UserProfileServiceTest {
         assertThat(response.birthDate()).isNull();
         assertThat(response.civilStatus()).isNull();
         assertThat(response.churchAffiliation()).isNull();
+        assertThat(response.salutation()).isNull();
+        assertThat(response.firstName()).isNull();
+        assertThat(response.lastName()).isNull();
+        assertThat(response.street()).isNull();
+        assertThat(response.cantonCode()).isNull();
         assertThat(response.preferredLanguage()).isNull();
         assertThat(response.theme()).isEqualTo(Theme.SYSTEM);
+        assertThat(response.defaultCurrency()).isEqualTo("CHF");
         assertThat(response.onboardingCompleted()).isFalse();
         assertThat(response.age()).isNull();
         assertThat(response.yearsToRetirement()).isNull();
@@ -123,6 +158,27 @@ class UserProfileServiceTest {
     }
 
     @Test
+    void upsert_round_trips_the_person_address_and_contact_fields() {
+        given(userProfileRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
+        given(userProfileRepository.save(any(UserProfile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfileResponse response = userProfileService.upsert(referenceRequest(true), USER_ID);
+
+        assertThat(response.salutation()).isEqualTo(Salutation.MS);
+        assertThat(response.firstName()).isEqualTo("Anna");
+        assertThat(response.lastName()).isEqualTo("Muster");
+        assertThat(response.nationality()).isEqualTo("Schweiz");
+        assertThat(response.street()).isEqualTo("Musterstrasse 12");
+        assertThat(response.postalCode()).isEqualTo("9000");
+        assertThat(response.city()).isEqualTo("St. Gallen");
+        assertThat(response.municipality()).isEqualTo("St. Gallen");
+        assertThat(response.cantonCode()).isEqualTo("SG");
+        assertThat(response.phone()).isEqualTo("+41 79 123 45 67");
+        assertThat(response.defaultCurrency()).isEqualTo("EUR");
+    }
+
+    @Test
     void upsert_reuses_the_existing_row_id_on_subsequent_puts() {
         UUID existingId = UUID.randomUUID();
         given(userProfileRepository.findByUserId(USER_ID))
@@ -152,8 +208,7 @@ class UserProfileServiceTest {
 
     @Test
     void upsert_with_a_birth_date_before_1900_is_rejected() {
-        UserProfileRequest request = new UserProfileRequest(
-                LocalDate.of(1899, 12, 31), null, null, null, null, null);
+        UserProfileRequest request = emptyRequest(LocalDate.of(1899, 12, 31));
 
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> userProfileService.upsert(request, USER_ID))
@@ -163,15 +218,15 @@ class UserProfileServiceTest {
     }
 
     @Test
-    void upsert_with_null_theme_falls_back_to_system() {
+    void upsert_with_null_theme_and_currency_falls_back_to_system_and_chf() {
         given(userProfileRepository.findByUserId(USER_ID)).willReturn(Optional.empty());
         given(userProfileRepository.save(any(UserProfile.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        UserProfileRequest request = new UserProfileRequest(null, null, null, null, null, null);
-        UserProfileResponse response = userProfileService.upsert(request, USER_ID);
+        UserProfileResponse response = userProfileService.upsert(emptyRequest(null), USER_ID);
 
         assertThat(response.theme()).isEqualTo(Theme.SYSTEM);
+        assertThat(response.defaultCurrency()).isEqualTo("CHF");
         assertThat(response.onboardingCompleted()).isFalse();
     }
 
@@ -188,15 +243,36 @@ class UserProfileServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         UserProfileResponse response = userProfileService.updatePreferences(
-                new PreferencesPatchRequest(Theme.LIGHT, null), USER_ID);
+                new PreferencesPatchRequest(Theme.LIGHT, null, null), USER_ID);
 
         assertThat(response.theme()).isEqualTo(Theme.LIGHT);
         assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 4, 15));
         assertThat(response.civilStatus()).isEqualTo(TaxCivilStatus.MARRIED);
         assertThat(response.churchAffiliation()).isEqualTo(ChurchAffiliation.NONE);
+        assertThat(response.firstName()).isEqualTo("Anna");
+        assertThat(response.street()).isEqualTo("Musterstrasse 12");
         assertThat(response.preferredLanguage()).isEqualTo("de");
+        assertThat(response.defaultCurrency()).isEqualTo("EUR");
         assertThat(response.onboardingCompleted()).isTrue();
         then(userProfileRepository).should().save(argThat(p -> existingId.equals(p.getId())));
+    }
+
+    @Test
+    void update_preferences_applies_only_the_default_currency_and_preserves_the_rest() {
+        given(userProfileRepository.findByUserId(USER_ID))
+                .willReturn(Optional.of(referenceProfile(UUID.randomUUID(), true)));
+        given(userProfileRepository.save(any(UserProfile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        UserProfileResponse response = userProfileService.updatePreferences(
+                new PreferencesPatchRequest(null, null, "USD"), USER_ID);
+
+        assertThat(response.defaultCurrency()).isEqualTo("USD");
+        assertThat(response.theme()).isEqualTo(Theme.DARK);
+        assertThat(response.preferredLanguage()).isEqualTo("de");
+        assertThat(response.firstName()).isEqualTo("Anna");
+        assertThat(response.cantonCode()).isEqualTo("SG");
+        assertThat(response.onboardingCompleted()).isTrue();
     }
 
     @Test
@@ -207,7 +283,7 @@ class UserProfileServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         UserProfileResponse response = userProfileService.updatePreferences(
-                new PreferencesPatchRequest(null, "en"), USER_ID);
+                new PreferencesPatchRequest(null, "en", null), USER_ID);
 
         assertThat(response.preferredLanguage()).isEqualTo("en");
         assertThat(response.theme()).isEqualTo(Theme.DARK);
@@ -222,11 +298,12 @@ class UserProfileServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         UserProfileResponse response = userProfileService.updatePreferences(
-                new PreferencesPatchRequest(Theme.DARK, null), USER_ID);
+                new PreferencesPatchRequest(Theme.DARK, null, null), USER_ID);
 
         assertThat(response.theme()).isEqualTo(Theme.DARK);
         assertThat(response.birthDate()).isNull();
         assertThat(response.preferredLanguage()).isNull();
+        assertThat(response.defaultCurrency()).isEqualTo("CHF");
         assertThat(response.onboardingCompleted()).isFalse();
         then(userProfileRepository).should()
                 .save(argThat(p -> p.getId() == null && USER_ID.equals(p.getUserId())));
@@ -236,7 +313,7 @@ class UserProfileServiceTest {
     void update_preferences_with_an_all_null_patch_is_rejected() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> userProfileService.updatePreferences(
-                        new PreferencesPatchRequest(null, null), USER_ID))
+                        new PreferencesPatchRequest(null, null, null), USER_ID))
                 .withMessage("at least one preference must be provided");
 
         then(userProfileRepository).should(never()).save(any());
