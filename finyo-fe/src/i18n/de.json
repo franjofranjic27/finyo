@@ -599,7 +599,7 @@
       "deleteLabel": "Fixkosten entfernen",
       "createTitle": "Fixkosten hinzufügen",
       "editTitle": "Fixkosten bearbeiten",
-      "amount": "Betrag",
+      "amount": "Betrag (CHF)",
       "amountHint": "Betrag pro Zahlintervall",
       "submitCreate": "Hinzufügen",
       "submitEdit": "Speichern"
@@ -949,7 +949,8 @@
     "darkMode": "Dunkelmodus",
     "lightMode": "Hellmodus",
     "language": "Sprache",
-    "toggleMenu": "Menü umschalten"
+    "toggleMenu": "Menü umschalten",
+    "createOption": "«{{value}}» erstellen"
   },
   "auth": {
     "redirecting": "Anmeldung wird geladen …",

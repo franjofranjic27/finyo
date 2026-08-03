@@ -98,7 +98,7 @@ describe('FixedCostsCard', () => {
     await user.click(screen.getByRole('button', { name: 'Add fixed cost' }));
     await user.type(screen.getByLabelText('Name'), 'Netflix');
     await user.type(screen.getByLabelText('Category'), 'Entertainment');
-    await user.type(screen.getByLabelText('Amount'), '18.90');
+    await user.type(screen.getByLabelText('Amount (CHF)'), '18.90');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() =>
@@ -120,7 +120,7 @@ describe('FixedCostsCard', () => {
     renderWithProviders(<FixedCostsCard list={fixedCostList()} />);
 
     await user.click(screen.getAllByRole('button', { name: 'Edit fixed cost' })[0]);
-    const amountInput = screen.getByLabelText('Amount');
+    const amountInput = screen.getByLabelText('Amount (CHF)');
     expect(amountInput).toHaveValue(205);
     await user.clear(amountInput);
     await user.type(amountInput, '210');
