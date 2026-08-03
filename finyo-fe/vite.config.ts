@@ -2,10 +2,44 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      // 'script' emits /registerSW.js as its own file — an inline registration
+      // snippet would be blocked by the CSP (script-src 'self').
+      injectRegister: 'script',
+      manifest: {
+        name: 'finyo',
+        short_name: 'finyo',
+        description: 'Personal finance planner',
+        display: 'standalone',
+        start_url: '/',
+        // zinc tokens from src/index.css: light background / dark primary
+        background_color: '#ffffff',
+        theme_color: '#18181b',
+        icons: [
+          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        // config.js is rewritten at container start (docker/40-runtime-config.sh)
+        // and must never be served from the precache. theme-init.js is static,
+        // but stays network-only too: both are pre-bundle bootstrap scripts and
+        // the network is kept the single source of truth for them.
+        globIgnores: ['config.js', 'theme-init.js'],
+        navigateFallbackDenylist: [/^\/api\//, /^\/auth\//],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
