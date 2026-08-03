@@ -84,10 +84,13 @@ export function BucketFormDialog({ bucket, onClose }: Readonly<BucketFormDialogP
           </div>
           <div className="space-y-2">
             <Label>{t('wealth.form.source')}</Label>
-            <div className="flex gap-1">
+            {/* Stacked full-width buttons — the labels are too long for one row
+                inside the sm:max-w-md dialog and must never overflow it. */}
+            <div className="grid gap-1">
               <Button
                 variant={source === 'MANUAL' ? 'default' : 'outline'}
                 size="sm"
+                className="w-full justify-start"
                 onClick={() => setSource('MANUAL')}
               >
                 {t('wealth.form.sourceManual')}
@@ -95,6 +98,7 @@ export function BucketFormDialog({ bucket, onClose }: Readonly<BucketFormDialogP
               <Button
                 variant={source === 'PORTFOLIO' ? 'default' : 'outline'}
                 size="sm"
+                className="w-full justify-start"
                 onClick={() => setSource('PORTFOLIO')}
               >
                 {t('wealth.form.sourcePortfolio')}
@@ -102,6 +106,7 @@ export function BucketFormDialog({ bucket, onClose }: Readonly<BucketFormDialogP
               <Button
                 variant={source === 'PILLAR3' ? 'default' : 'outline'}
                 size="sm"
+                className="w-full justify-start"
                 onClick={() => setSource('PILLAR3')}
               >
                 {t('wealth.form.sourcePillar3')}
