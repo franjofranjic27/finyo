@@ -115,6 +115,22 @@ class FxRateSyncJobTest {
     }
 
     @Test
+    void syncs_explicitly_named_currencies_without_asking_who_holds_what() {
+        // The catch-up path: the currencies come from a transaction that may not have committed
+        // yet, so the held-currencies query must not be consulted — it would not see them.
+        given(repository.countByCurrencyAndRateType("EUR", FxRateType.MID)).willReturn(500L);
+        StubProvider frankfurter = new StubProvider("frankfurter", FxRateType.MID);
+        frankfurter.latest = SourceResult.found(rate(LocalDate.of(2026, 7, 14)));
+        givenTheRunnerExecutesTheWork();
+
+        job(frankfurter).run(List.of(EUR));
+
+        then(writer).should(times(1)).store(any());
+        then(heldCurrencies).shouldHaveNoInteractions();
+        assertThat(recordedRun.getItemsProcessed()).isEqualTo(1);
+    }
+
+    @Test
     void hands_its_work_to_the_runner_rather_than_running_unguarded() {
         given(heldCurrencies.findForeign()).willReturn(List.of());
         givenTheRunnerExecutesTheWork();

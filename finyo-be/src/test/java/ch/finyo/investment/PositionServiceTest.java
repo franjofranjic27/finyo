@@ -3,6 +3,7 @@ package ch.finyo.investment;
 import ch.finyo.common.ResourceNotFoundException;
 import ch.finyo.common.SourceResult;
 import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.fx.FxRateCatchUp;
 import ch.finyo.marketdata.MarketDataService;
 import ch.finyo.marketdata.spi.DataSource;
 import ch.finyo.marketdata.spi.SecurityReference;
@@ -24,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +81,9 @@ class PositionServiceTest {
 
     @Mock
     private InstrumentFactory instrumentFactory;
+
+    @Mock
+    private FxRateCatchUp fxRateCatchUp;
 
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -236,6 +241,79 @@ class PositionServiceTest {
             positionService.create(request(null, ISIN, VALOR, "10", "80.00", null), USER_ID);
 
             then(instrumentFactory).should().lookup(ISIN, VALOR);
+        }
+    }
+
+    // =========================================================================
+    // fx catch-up for the imported currencies
+    // =========================================================================
+
+    @Nested
+    @DisplayName("fx catch-up")
+    class FxCatchUp {
+
+        @Test
+        void hands_the_instruments_currency_to_the_fx_catch_up_after_the_save() {
+            // The port decides whether a fetch is needed; this service only reports what
+            // currency was just resolved so a first USD position gets a CHF value today,
+            // not after the next nightly sync.
+            Instrument existing = instrumentBuilder().currency(new CurrencyCode("USD")).build();
+            stubNoProviderKnowsTheSecurity();
+            given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, ISIN))
+                    .willReturn(Optional.of(existing));
+            stubNoExistingPosition();
+            stubPositionSaveEchoesArgument();
+
+            positionService.create(request(null, ISIN, VALOR, "10", "80.00", null), USER_ID);
+
+            then(fxRateCatchUp).should().ensureRates(Set.of(new CurrencyCode("USD")));
+        }
+
+        @Test
+        void never_notifies_the_fx_catch_up_when_the_currency_is_unknown() {
+            // The echo factory creates instruments without a currency — nothing to report.
+            stubNoProviderKnowsTheSecurity();
+            given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, ISIN))
+                    .willReturn(Optional.empty());
+            stubInstrumentFactoryEchoesRequestFields();
+            stubInstrumentSaveEchoesArgument();
+            stubNoExistingPosition();
+            stubPositionSaveEchoesArgument();
+
+            positionService.create(request(null, ISIN, null, "10", "80.00", null), USER_ID);
+
+            then(fxRateCatchUp).shouldHaveNoInteractions();
+        }
+
+        @Test
+        void bulk_import_notifies_the_fx_catch_up_once_with_the_deduplicated_currencies() {
+            // N rows over K currencies must trigger exactly ONE catch-up carrying the K distinct
+            // currencies — per-row triggers would race each other for the fx sync lock and lose.
+            Instrument usdA = instrumentBuilder().id(UUID.randomUUID()).isin("US0378331005")
+                    .currency(new CurrencyCode("USD")).build();
+            Instrument usdB = instrumentBuilder().id(UUID.randomUUID()).isin("US5949181045")
+                    .currency(new CurrencyCode("USD")).build();
+            Instrument eur = instrumentBuilder().id(UUID.randomUUID()).isin("IE00B4L5Y983")
+                    .currency(new CurrencyCode("EUR")).build();
+            stubNoProviderKnowsTheSecurity();
+            given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, "US0378331005"))
+                    .willReturn(Optional.of(usdA));
+            given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, "US5949181045"))
+                    .willReturn(Optional.of(usdB));
+            given(instrumentRepository.findFirstByUserIdAndIsinIgnoreCase(USER_ID, "IE00B4L5Y983"))
+                    .willReturn(Optional.of(eur));
+            given(positionRepository.findByUserIdAndInstrumentId(any(), any()))
+                    .willReturn(Optional.empty());
+            stubPositionSaveEchoesArgument();
+
+            positionService.createBulk(new PositionBulkRequest(List.of(
+                    request("Apple", "US0378331005", null, "10", "100.00", null),
+                    request("Microsoft", "US5949181045", null, "5", "300.00", null),
+                    request("iShares", "IE00B4L5Y983", null, "2", "20.00", null))), USER_ID);
+
+            then(fxRateCatchUp).should(times(1)).ensureRates(any());
+            then(fxRateCatchUp).should().ensureRates(
+                    Set.of(new CurrencyCode("USD"), new CurrencyCode("EUR")));
         }
     }
 

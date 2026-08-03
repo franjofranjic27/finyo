@@ -57,11 +57,23 @@ public class FxRateSyncJob implements SyncJob {
     @Override
     @Scheduled(cron = "0 15 17 * * *", zone = "Europe/Zurich")
     public SyncRun run() {
-        return syncRunner.run(JOB_NAME, this::sync);
+        return syncRunner.run(JOB_NAME, () -> sync(heldCurrencies.findForeign()));
     }
 
-    private int sync() {
-        List<CurrencyCode> currencies = heldCurrencies.findForeign();
+    /**
+     * The same work for explicitly named currencies, used by {@link FxRateCatchUpService} when
+     * positions in never-seen currencies are created. The currencies are passed in rather than
+     * read from {@code heldCurrencies} because the trigger may fire while the creating
+     * transaction is still open — the new instruments are not visible to another connection yet,
+     * so a re-query here would quietly find nothing. A list rather than one currency so a bulk
+     * import's whole batch lands in a single run: one lock acquisition, one {@code sync_run} row,
+     * and no later currency losing the lock to an earlier one's three-year backfill.
+     */
+    public SyncRun run(List<CurrencyCode> currencies) {
+        return syncRunner.run(JOB_NAME, () -> sync(currencies));
+    }
+
+    private int sync(List<CurrencyCode> currencies) {
         if (currencies.isEmpty()) {
             log.info("No foreign-currency instruments — nothing to convert");
             return 0;

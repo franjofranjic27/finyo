@@ -1,6 +1,8 @@
 package ch.finyo.investment;
 
 import ch.finyo.common.ResourceNotFoundException;
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.fx.FxRateCatchUp;
 import ch.finyo.marketdata.MarketDataService;
 import ch.finyo.marketdata.spi.DataSource;
 import ch.finyo.marketdata.spi.SecurityReference;
@@ -17,8 +19,10 @@ import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -32,6 +36,7 @@ public class PositionService {
     private final InstrumentRepository instrumentRepository;
     private final MarketDataService marketData;
     private final InstrumentFactory instrumentFactory;
+    private final FxRateCatchUp fxRateCatchUp;
     private final TransactionTemplate bulkRowTransaction;
     private final TransactionTemplate singleRowTransaction;
 
@@ -39,11 +44,13 @@ public class PositionService {
                            InstrumentRepository instrumentRepository,
                            MarketDataService marketData,
                            InstrumentFactory instrumentFactory,
+                           FxRateCatchUp fxRateCatchUp,
                            PlatformTransactionManager transactionManager) {
         this.positionRepository = positionRepository;
         this.instrumentRepository = instrumentRepository;
         this.marketData = marketData;
         this.instrumentFactory = instrumentFactory;
+        this.fxRateCatchUp = fxRateCatchUp;
         // REQUIRES_NEW per bulk row: a failing row rolls back only itself,
         // already imported rows stay committed (fault-tolerant import contract).
         this.bulkRowTransaction = new TransactionTemplate(transactionManager);
@@ -63,7 +70,12 @@ public class PositionService {
         validate(request);
         SourceResult<SecurityReference> lookup = instrumentFactory.lookup(request.isin(), request.valor());
         fetchInitialPrice(request.isin());
-        return singleRowTransaction.execute(_ -> doCreate(request, lookup, userId));
+        CreatedPosition created = singleRowTransaction.execute(_ -> doCreate(request, lookup, userId));
+        // After the save, fire-and-forget: a first position in a never-held foreign currency
+        // would otherwise show no CHF value until the nightly fx sync. Only enqueues — the
+        // fetch runs on its own thread and can neither slow down nor fail this creation.
+        notifyFxCatchUp(created.currency() == null ? Set.of() : Set.of(created.currency()));
+        return created.response();
     }
 
     /**
@@ -78,19 +90,26 @@ public class PositionService {
         List<String> errors = new ArrayList<>();
 
         List<PositionRequest> rows = request.positions();
+        Set<CurrencyCode> importedCurrencies = new LinkedHashSet<>();
         for (int i = 0; i < rows.size(); i++) {
             PositionRequest row = rows.get(i);
             try {
                 validate(row);
                 SourceResult<SecurityReference> lookup = instrumentFactory.lookup(row.isin(), row.valor());
                 fetchInitialPrice(row.isin());
-                bulkRowTransaction.executeWithoutResult(_ -> doCreate(row, lookup, userId));
+                CreatedPosition created = bulkRowTransaction.execute(_ -> doCreate(row, lookup, userId));
+                if (created.currency() != null) {
+                    importedCurrencies.add(created.currency());
+                }
                 imported++;
             } catch (RuntimeException e) {
                 log.warn("Bulk import row {} failed for user={}: {}", i + 1, userId, e.getMessage());
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
             }
         }
+        // Once for the whole batch, deduplicated — not per row: a 100-row CSV in two currencies
+        // must trigger at most one catch-up, not 100 threads racing for the fx sync lock.
+        notifyFxCatchUp(importedCurrencies);
 
         log.info("Bulk import finished for user={}: imported={} failed={}", userId, imported, errors.size());
         return new BulkImportResultResponse(imported, errors.size(), List.copyOf(errors));
@@ -119,7 +138,7 @@ public class PositionService {
     }
 
     /** Shared create path, running inside a transaction. Every network call already happened. */
-    private PositionResponse doCreate(PositionRequest request, SourceResult<SecurityReference> lookup, String userId) {
+    private CreatedPosition doCreate(PositionRequest request, SourceResult<SecurityReference> lookup, String userId) {
         log.info("Creating position isin={} valor={} for user={}", request.isin(), request.valor(), userId);
 
         Instrument instrument = resolveOrCreateInstrument(request, lookup, userId);
@@ -127,7 +146,21 @@ public class PositionService {
 
         Position saved = mergeOrCreatePosition(request, instrument.getId(), userId);
         log.info("Created/merged position id={} instrument={} for user={}", saved.getId(), instrument.getId(), userId);
-        return PositionResponse.from(saved, instrument);
+        return new CreatedPosition(PositionResponse.from(saved, instrument), instrument.getCurrency());
+    }
+
+    /**
+     * What a create leaves behind: the API response plus the instrument's currency, which the
+     * response deliberately does not carry — the callers need it to tell the fx module what was
+     * just imported, after their transaction is done.
+     */
+    private record CreatedPosition(PositionResponse response, CurrencyCode currency) {}
+
+    /** Hands the freshly imported currencies to the fx catch-up. Only enqueues; never throws. */
+    private void notifyFxCatchUp(Set<CurrencyCode> currencies) {
+        if (!currencies.isEmpty()) {
+            fxRateCatchUp.ensureRates(currencies);
+        }
     }
 
     /** Bean Validation only covers the single-create path; bulk rows must report these rules per row. */
