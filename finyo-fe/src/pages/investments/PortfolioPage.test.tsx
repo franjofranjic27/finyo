@@ -53,6 +53,13 @@ describe('PortfolioPage', () => {
     expect(screen.getByText('Allocation')).toBeInTheDocument();
     expect(screen.getByText('Performance')).toBeInTheDocument();
     expect(portfolioApi.getPortfolio).toHaveBeenCalledWith('test-token');
+
+    // Section order: KPI tiles, charts, add-position card, positions table.
+    const charts = screen.getByText('Allocation');
+    const addCard = screen.getByText('Add Security');
+    expect(
+      charts.compareDocumentPosition(addCard) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('shows an error message when the portfolio cannot be loaded', async () => {
