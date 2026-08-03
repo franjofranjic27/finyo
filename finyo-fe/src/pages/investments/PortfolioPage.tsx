@@ -46,12 +46,12 @@ export function PortfolioPage() {
       {portfolio && (
         <>
           <KpiTiles portfolio={portfolio} />
-          <AddPositionCard />
-          <PositionsTable positions={portfolio.positions} />
           <div className="grid gap-4 lg:grid-cols-2">
             <AllocationDonut positions={portfolio.positions} />
             <PerformanceChart />
           </div>
+          <AddPositionCard />
+          <PositionsTable positions={portfolio.positions} />
         </>
       )}
     </div>

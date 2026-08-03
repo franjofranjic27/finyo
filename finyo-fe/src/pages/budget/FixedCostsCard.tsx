@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, X } from 'lucide-react';
@@ -115,6 +115,18 @@ export function FixedCostsCard({ list }: Readonly<{ list: FixedCostList }>) {
   // `item: null` → create; `item: FixedCost` → edit; mount the dialog fresh per open.
   const [dialog, setDialog] = useState<{ item: FixedCost | null } | null>(null);
 
+  // Distinct existing categories feed the creatable combobox in the dialog.
+  const categories = useMemo(
+    () => [
+      ...new Set(
+        list.items
+          .map((item) => item.category)
+          .filter((category): category is string => Boolean(category)),
+      ),
+    ],
+    [list.items],
+  );
+
   const deleteFixedCost = useMutation({
     mutationFn: (id: string) => budgetApi.deleteFixedCost(token, id),
     onSuccess: () => {
@@ -221,7 +233,13 @@ export function FixedCostsCard({ list }: Readonly<{ list: FixedCostList }>) {
         )}
       </CardContent>
 
-      {dialog && <FixedCostDialog fixedCost={dialog.item} onClose={() => setDialog(null)} />}
+      {dialog && (
+        <FixedCostDialog
+          fixedCost={dialog.item}
+          categories={categories}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </Card>
   );
 }

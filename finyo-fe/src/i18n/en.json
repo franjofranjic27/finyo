@@ -599,7 +599,7 @@
       "deleteLabel": "Remove fixed cost",
       "createTitle": "Add fixed cost",
       "editTitle": "Edit fixed cost",
-      "amount": "Amount",
+      "amount": "Amount (CHF)",
       "amountHint": "Amount per billing interval",
       "submitCreate": "Add",
       "submitEdit": "Save"
@@ -949,7 +949,8 @@
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
     "language": "Language",
-    "toggleMenu": "Toggle menu"
+    "toggleMenu": "Toggle menu",
+    "createOption": "Create “{{value}}”"
   },
   "auth": {
     "redirecting": "Signing you in …",

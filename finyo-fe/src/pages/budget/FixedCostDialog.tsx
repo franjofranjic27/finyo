@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,11 +18,19 @@ import type { FixedCost, FixedCostInput, PaymentInterval } from '@/api/budget';
 interface FixedCostDialogProps {
   /** `null` creates a new fixed cost, otherwise the given one is edited. */
   fixedCost: FixedCost | null;
+  /** Distinct existing category values, offered as combobox suggestions. */
+  categories: readonly string[];
   onClose: () => void;
 }
 
+/** Truncates free-typed amounts to two decimals (CHF has no smaller unit). */
+function clampToTwoDecimals(raw: string): string {
+  const [whole, decimals] = raw.split('.');
+  return decimals && decimals.length > 2 ? `${whole}.${decimals.slice(0, 2)}` : raw;
+}
+
 /** Create/edit dialog for a fixed cost — mount fresh per open. */
-export function FixedCostDialog({ fixedCost, onClose }: Readonly<FixedCostDialogProps>) {
+export function FixedCostDialog({ fixedCost, categories, onClose }: Readonly<FixedCostDialogProps>) {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const token = accessToken ?? '';
@@ -77,10 +86,12 @@ export function FixedCostDialog({ fixedCost, onClose }: Readonly<FixedCostDialog
           </div>
           <div className="space-y-2">
             <Label htmlFor="fixed-cost-category">{t('budget.fixedCosts.category')}</Label>
-            <Input
+            <Combobox
               id="fixed-cost-category"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onValueChange={setCategory}
+              options={categories}
+              formatCreateLabel={(typedValue) => t('common.createOption', { value: typedValue })}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -101,14 +112,24 @@ export function FixedCostDialog({ fixedCost, onClose }: Readonly<FixedCostDialog
             </div>
             <div className="space-y-2">
               <Label htmlFor="fixed-cost-amount">{t('budget.fixedCosts.amount')}</Label>
-              <Input
-                id="fixed-cost-amount"
-                type="number"
-                min={0}
-                step={0.01}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+              {/* CHF prefix inside the field; the right edge keeps the number spinner free */}
+              <div className="relative">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                >
+                  CHF
+                </span>
+                <Input
+                  id="fixed-cost-amount"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="pl-12"
+                  value={amount}
+                  onChange={(e) => setAmount(clampToTwoDecimals(e.target.value))}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">{t('budget.fixedCosts.amountHint')}</p>
             </div>
           </div>

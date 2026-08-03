@@ -1,4 +1,5 @@
-import { Sun, Moon, LogOut, User } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export function Header() {
   const { user, accessToken, logout } = useAuth();
   const token = accessToken ?? '';
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Fire-and-forget persistence: preferences apply locally either way, a
   // failed PATCH is silently ignored (the profile sync re-applies on next load).
@@ -46,10 +48,6 @@ export function Header() {
     const next = isDark ? 'light' : 'dark';
     setTheme(next);
     persistPreference.mutate({ theme: next === 'dark' ? 'DARK' : 'LIGHT' });
-  };
-
-  const toggleLanguage = () => {
-    changeLanguage(i18n.language === 'en' ? 'de' : 'en');
   };
 
   return (
@@ -110,9 +108,9 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={toggleLanguage}>
-              <User className="mr-2 h-4 w-4" />
-              {t('common.language')}: {i18n.language.toUpperCase()}
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-4 w-4" />
+              {t('nav.settings')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
