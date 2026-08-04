@@ -35,10 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Integration tests for /api/v1/wealth.
  *
- * PORTFOLIO buckets are backed by positions created with a name only plus a
- * currentPrice override so the SIX client is never invoked (established
- * PortfolioIT pattern). A position named "… Fund" is classified as FUND by
- * the AssetClassifier heuristic.
+ * The overview's auto rows are backed by real module data: positions created
+ * with a name only plus a currentPrice override so the SIX client is never
+ * invoked (established PortfolioIT pattern — a position named "… Fund" is
+ * classified as FUND by the AssetClassifier heuristic), and a default pillar
+ * 3a scenario saved through its own endpoint.
  */
 class WealthIT extends BaseIntegrationTest {
 
@@ -93,24 +94,8 @@ class WealthIT extends BaseIntegrationTest {
         return objectMapper.writeValueAsString(body);
     }
 
-    private String portfolioBucketBody(String name, List<String> assetClasses) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", name);
-        body.put("source", "PORTFOLIO");
-        if (assetClasses != null) {
-            body.put("assetClasses", assetClasses);
-        }
-        return objectMapper.writeValueAsString(body);
-    }
-
-    private String pillar3BucketBody(String name, String manualBalance) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", name);
-        body.put("source", "PILLAR3");
-        if (manualBalance != null) {
-            body.put("manualBalance", manualBalance);
-        }
-        return objectMapper.writeValueAsString(body);
+    private String bucketBodyWithSource(String name, String source) {
+        return objectMapper.writeValueAsString(Map.of("name", name, "source", source));
     }
 
     /** Saves a default pillar 3a scenario for the primary test user. */
@@ -149,14 +134,13 @@ class WealthIT extends BaseIntegrationTest {
     }
 
     // -------------------------------------------------------------------------
-    // Overview, snapshot upsert & history
+    // Overview: auto rows, snapshot upsert & history
     // -------------------------------------------------------------------------
 
     @Test
-    void overview_aggregates_manual_and_portfolio_buckets_and_upserts_todays_snapshot() throws Exception {
+    void overview_prepends_the_auto_portfolio_row_and_upserts_todays_snapshot() throws Exception {
         createBucket(manualBucketBody("Cash", "5000", "100"));
         createFundPosition("Broker Fund", "10", "110"); // classified as FUND -> value 1100
-        createBucket(portfolioBucketBody("Investments", List.of("FUND")));
 
         int remainingMonths = WealthOverviewService.monthsRemaining(LocalDate.now(SwissTime.ZONE));
         double cashForecast = 5000 + 100.0 * remainingMonths;
@@ -164,28 +148,33 @@ class WealthIT extends BaseIntegrationTest {
         String response = mockMvc.perform(get("/api/v1/wealth").with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.buckets.length()", is(2)))
-                .andExpect(jsonPath("$.buckets[0].name", is("Cash")))
-                .andExpect(jsonPath("$.buckets[0].source", is("MANUAL")))
-                .andExpect(jsonPath("$.buckets[0].balance", is(5000.0)))
-                .andExpect(jsonPath("$.buckets[0].sharePct", is(81.97)))
-                .andExpect(jsonPath("$.buckets[0].monthlyRate", is(100.0)))
-                .andExpect(jsonPath("$.buckets[0].forecastYearEnd", is(cashForecast)))
-                .andExpect(jsonPath("$.buckets[1].name", is("Investments")))
-                .andExpect(jsonPath("$.buckets[1].source", is("PORTFOLIO")))
-                .andExpect(jsonPath("$.buckets[1].assetClasses[0]", is("FUND")))
-                .andExpect(jsonPath("$.buckets[1].balance", is(1100.0)))
-                .andExpect(jsonPath("$.buckets[1].sharePct", is(18.03)))
+                .andExpect(jsonPath("$.buckets[0].id", is("auto-portfolio")))
+                .andExpect(jsonPath("$.buckets[0].name", is("Portfolio")))
+                .andExpect(jsonPath("$.buckets[0].source", is("PORTFOLIO")))
+                .andExpect(jsonPath("$.buckets[0].auto", is(true)))
+                .andExpect(jsonPath("$.buckets[0].balance", is(1100.0)))
+                .andExpect(jsonPath("$.buckets[0].sharePct", is(18.03)))
+                .andExpect(jsonPath("$.buckets[0].forecastYearEnd", is(1100.0)))
+                .andExpect(jsonPath("$.buckets[1].name", is("Cash")))
+                .andExpect(jsonPath("$.buckets[1].source", is("MANUAL")))
+                .andExpect(jsonPath("$.buckets[1].auto", is(false)))
+                .andExpect(jsonPath("$.buckets[1].balance", is(5000.0)))
+                .andExpect(jsonPath("$.buckets[1].sharePct", is(81.97)))
+                .andExpect(jsonPath("$.buckets[1].monthlyRate", is(100.0)))
+                .andExpect(jsonPath("$.buckets[1].forecastYearEnd", is(cashForecast)))
                 .andExpect(jsonPath("$.total", is(6100.0)))
                 .andExpect(jsonPath("$.totalMonthlyRate", is(100.0)))
                 .andExpect(jsonPath("$.totalForecastYearEnd", is(cashForecast + 1100.0)))
                 .andReturn().getResponse().getContentAsString();
 
-        // no snapshot existed before today -> ytd comparison is not available yet
         JsonNode tree = objectMapper.readTree(response);
+        // no derivable deposit for the portfolio row
+        assertThat(tree.path("buckets").get(0).path("monthlyRate").isNull()).isTrue();
+        // no snapshot existed before today -> ytd comparison is not available yet
         assertThat(tree.path("ytdChange").isNull() || tree.path("ytdChange").isMissingNode()).isTrue();
         assertThat(tree.path("ytdChangePct").isNull() || tree.path("ytdChangePct").isMissingNode()).isTrue();
 
-        // exactly one snapshot for today, carrying the aggregated total
+        // exactly one snapshot for today, carrying the aggregated total incl. the auto row
         LocalDate today = LocalDate.now(SwissTime.ZONE);
         assertThat(netWorthSnapshotRepository.count()).isEqualTo(1);
         NetWorthSnapshot snapshot = netWorthSnapshotRepository.findAll().getFirst();
@@ -203,6 +192,41 @@ class WealthIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.points.length()", is(1)))
                 .andExpect(jsonPath("$.points[0].date", is(today.toString())))
                 .andExpect(jsonPath("$.points[0].total", is(6100.0)));
+    }
+
+    @Test
+    void default_scenario_appears_as_auto_pillar3_row_with_a_derived_monthly_rate() throws Exception {
+        createDefaultPillar3Scenario("25000");
+
+        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets.length()", is(1)))
+                .andExpect(jsonPath("$.buckets[0].id", is("auto-pillar3")))
+                .andExpect(jsonPath("$.buckets[0].name", is("Säule 3a")))
+                .andExpect(jsonPath("$.buckets[0].source", is("PILLAR3")))
+                .andExpect(jsonPath("$.buckets[0].auto", is(true)))
+                .andExpect(jsonPath("$.buckets[0].balance", is(25000.0)))
+                // 7258 / 12 = 604.83 (HALF_UP)
+                .andExpect(jsonPath("$.buckets[0].monthlyRate", is(604.83)))
+                .andExpect(jsonPath("$.total", is(25000.0)))
+                .andExpect(jsonPath("$.totalMonthlyRate", is(604.83)));
+
+        // the scenario belongs to the primary user only
+        mockMvc.perform(get("/api/v1/wealth").with(asOtherUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets.length()", is(0)))
+                .andExpect(jsonPath("$.total", is(0)));
+    }
+
+    @Test
+    void overview_without_any_data_returns_zero_totals_and_no_snapshot() throws Exception {
+        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buckets.length()", is(0)))
+                .andExpect(jsonPath("$.total", is(0)))
+                .andExpect(jsonPath("$.totalMonthlyRate", is(0)))
+                .andExpect(jsonPath("$.totalForecastYearEnd", is(0)));
+        assertThat(netWorthSnapshotRepository.count()).isZero();
     }
 
     @Test
@@ -224,78 +248,54 @@ class WealthIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.ytdChangePct", is(25.0)));
     }
 
-    @Test
-    void overview_without_buckets_returns_zero_totals() throws Exception {
-        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.buckets.length()", is(0)))
-                .andExpect(jsonPath("$.total", is(0)))
-                .andExpect(jsonPath("$.totalMonthlyRate", is(0)))
-                .andExpect(jsonPath("$.totalForecastYearEnd", is(0)));
-        assertThat(netWorthSnapshotRepository.count()).isZero();
-    }
-
     // -------------------------------------------------------------------------
-    // PILLAR3 buckets
+    // MANUAL-only rule for bucket writes
     // -------------------------------------------------------------------------
 
     @Test
-    void pillar3_bucket_takes_its_balance_from_the_default_scenario() throws Exception {
-        createDefaultPillar3Scenario("25000");
-
+    void portfolio_source_is_rejected_on_create() throws Exception {
         mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(pillar3BucketBody("Säule 3a", null)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name", is("Säule 3a")))
-                .andExpect(jsonPath("$.source", is("PILLAR3")))
-                .andExpect(jsonPath("$.manualBalance").doesNotExist())
-                .andExpect(jsonPath("$.assetClasses.length()", is(0)));
-
-        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.buckets.length()", is(1)))
-                .andExpect(jsonPath("$.buckets[0].source", is("PILLAR3")))
-                .andExpect(jsonPath("$.buckets[0].balance", is(25000.0)))
-                .andExpect(jsonPath("$.total", is(25000.0)));
-
-        // the scenario belongs to the primary user only
-        mockMvc.perform(get("/api/v1/wealth").with(asOtherUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.buckets.length()", is(0)))
-                .andExpect(jsonPath("$.total", is(0)));
-    }
-
-    @Test
-    void pillar3_bucket_without_a_default_scenario_has_zero_balance() throws Exception {
-        createBucket(pillar3BucketBody("Säule 3a", null));
-
-        mockMvc.perform(get("/api/v1/wealth").with(asUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.buckets[0].balance", is(0)))
-                .andExpect(jsonPath("$.total", is(0)));
-    }
-
-    @Test
-    void pillar3_bucket_with_a_manual_balance_is_rejected() throws Exception {
-        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(pillar3BucketBody("Säule 3a", "100")))
+                        .content(bucketBodyWithSource("Broker", "PORTFOLIO")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title", is("Bad Request")))
-                .andExpect(jsonPath("$.detail", containsString("manualBalance")));
+                .andExpect(jsonPath("$.detail", containsString("Only MANUAL wealth buckets")));
     }
 
     @Test
-    void second_pillar3_bucket_is_rejected() throws Exception {
-        createBucket(pillar3BucketBody("Säule 3a", null));
+    void pillar3_source_is_rejected_on_create() throws Exception {
+        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bucketBodyWithSource("Säule 3a", "PILLAR3")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title", is("Bad Request")))
+                .andExpect(jsonPath("$.detail", containsString("Only MANUAL wealth buckets")));
+    }
+
+    @Test
+    void non_manual_source_is_rejected_on_update() throws Exception {
+        UUID id = createBucket(manualBucketBody("Cash", "5000", null));
+
+        mockMvc.perform(put("/api/v1/wealth/buckets/{id}", id).with(asUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bucketBodyWithSource("Cash", "PORTFOLIO")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("Only MANUAL wealth buckets")));
+    }
+
+    @Test
+    void manual_bucket_with_asset_classes_is_rejected() throws Exception {
+        Map<String, Object> body = Map.of(
+                "name", "Cash",
+                "source", "MANUAL",
+                "manualBalance", "100",
+                "assetClasses", List.of("ETF"));
 
         mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(pillar3BucketBody("Säule 3a II", null)))
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title", is("Bad Request")))
-                .andExpect(jsonPath("$.detail", containsString("PILLAR3 wealth bucket already exists")));
+                .andExpect(jsonPath("$.detail", containsString("assetClasses")));
     }
 
     // -------------------------------------------------------------------------
@@ -347,29 +347,6 @@ class WealthIT extends BaseIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title", is("Bad Request")))
                 .andExpect(jsonPath("$.detail", containsString("manualBalance")));
-    }
-
-    @Test
-    void portfolio_bucket_without_asset_classes_is_rejected() throws Exception {
-        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioBucketBody("Broker", null)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title", is("Bad Request")))
-                .andExpect(jsonPath("$.detail", containsString("assetClasses")));
-    }
-
-    @Test
-    void asset_class_linked_to_another_bucket_is_rejected() throws Exception {
-        createBucket(portfolioBucketBody("Broker", List.of("ETF", "STOCK")));
-
-        mockMvc.perform(post("/api/v1/wealth/buckets").with(asUser())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(portfolioBucketBody("Second Broker", List.of("STOCK"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title", is("Bad Request")))
-                .andExpect(jsonPath("$.detail", containsString("STOCK")))
-                .andExpect(jsonPath("$.detail", containsString("Broker")));
     }
 
     @Test

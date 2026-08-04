@@ -11,10 +11,10 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Request to create or update a wealth bucket. Source-dependent presence rules
- * (manualBalance required iff MANUAL, assetClasses required non-empty iff
- * PORTFOLIO, both forbidden for PILLAR3) are validated in the service to
- * produce precise error messages.
+ * Request to create or update a wealth bucket. Only MANUAL buckets can be
+ * saved (portfolio and pillar 3a rows are synthesized in the overview); the
+ * service validates the source, the required manualBalance and that no asset
+ * classes are sent, producing precise error messages for retired clients.
  */
 public record WealthBucketRequest(
         @NotBlank @Size(max = 100) String name,

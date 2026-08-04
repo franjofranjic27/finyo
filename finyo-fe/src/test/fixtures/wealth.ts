@@ -13,42 +13,55 @@ export function wealthBucket(
     monthlyRate: 500,
     forecastYearEnd: 7000,
     sortOrder: 0,
+    auto: false,
     ...overrides,
   };
+}
+
+/** The read-only portfolio row the backend synthesizes from the investments module. */
+export function autoPortfolioBucket(overrides: Partial<WealthBucket> = {}): WealthBucket {
+  return wealthBucket({
+    id: 'auto-portfolio',
+    name: 'Portfolio',
+    note: null,
+    source: 'PORTFOLIO',
+    auto: true,
+    balance: 77_000,
+    sharePct: 77.2,
+    monthlyRate: null,
+    forecastYearEnd: 77_000,
+    sortOrder: -2,
+    ...overrides,
+  });
+}
+
+/** The read-only pillar 3a row derived from the default scenario. */
+export function autoPillar3Bucket(overrides: Partial<WealthBucket> = {}): WealthBucket {
+  return wealthBucket({
+    id: 'auto-pillar3',
+    name: 'Säule 3a',
+    note: null,
+    source: 'PILLAR3',
+    auto: true,
+    balance: 18_219,
+    sharePct: 18.3,
+    monthlyRate: 604.83,
+    forecastYearEnd: 21_243.15,
+    sortOrder: -1,
+    ...overrides,
+  });
 }
 
 export function wealthOverview(overrides: Partial<WealthOverview> = {}): WealthOverview {
   return {
     buckets: [
+      autoPortfolioBucket(),
+      autoPillar3Bucket(),
       wealthBucket({ id: 'b1' }),
-      wealthBucket({
-        id: 'b2',
-        name: 'Wertschriftendepot',
-        note: 'Raiffeisen · ETF & Aktien',
-        source: 'PORTFOLIO',
-        assetClasses: ['ETF', 'FUND', 'STOCK', 'BOND'],
-        balance: 77_000,
-        sharePct: 77.2,
-        monthlyRate: 600,
-        forecastYearEnd: 80_000,
-        sortOrder: 1,
-      }),
-      wealthBucket({
-        id: 'b3',
-        name: 'Krypto',
-        note: 'Swissquote · BTC',
-        source: 'PORTFOLIO',
-        assetClasses: ['CRYPTO'],
-        balance: 5277.38,
-        sharePct: 5.3,
-        monthlyRate: 0,
-        forecastYearEnd: 5277.38,
-        sortOrder: 2,
-      }),
     ],
     total: 99_719,
-    totalMonthlyRate: 1600,
-    totalForecastYearEnd: 107_719,
+    totalMonthlyRate: 1104.83,
+    totalForecastYearEnd: 105_243.15,
     ytdChange: 12_340,
     ytdChangePct: 14.1,
     asOf: '2026-07-11',

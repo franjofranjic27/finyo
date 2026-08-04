@@ -5,6 +5,7 @@ import type { AssetClass } from './portfolio';
 export type WealthSource = 'MANUAL' | 'PORTFOLIO' | 'PILLAR3';
 
 export interface WealthBucket {
+  /** UUID for manual buckets; 'auto-portfolio' / 'auto-pillar3' for auto rows. */
   id: string;
   name: string;
   note: string | null;
@@ -12,9 +13,12 @@ export interface WealthBucket {
   assetClasses: AssetClass[];
   balance: number;
   sharePct: number;
-  monthlyRate: number;
+  /** null when no deposit can be derived (e.g. the auto portfolio row) */
+  monthlyRate: number | null;
   forecastYearEnd: number;
   sortOrder: number;
+  /** true for the read-only rows mirrored live from portfolio / pillar 3a */
+  auto: boolean;
 }
 
 export interface WealthOverview {
@@ -37,12 +41,12 @@ export interface WealthHistory {
   points: WealthHistoryPoint[];
 }
 
+/** Only manual pots can be written; the auto rows are synthesized by the backend. */
 export interface WealthBucketInput {
   name: string;
   note?: string;
-  source: WealthSource;
+  source: 'MANUAL';
   manualBalance?: number;
-  assetClasses?: AssetClass[];
   monthlyRate?: number;
   sortOrder?: number;
 }

@@ -8,6 +8,7 @@ import {
   formatTooltipCHF,
 } from '@/components/charts/chartStyle';
 import type { WealthBucket, WealthOverview } from '@/api/wealth';
+import { bucketDisplayName } from '@/pages/wealth/bucketDisplayName';
 import { useWealthOverview } from '@/hooks/financeQueries';
 import { amountColour, formatCHF, formatPercent } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
@@ -40,7 +41,7 @@ function AllocationChart({ buckets }: Readonly<{ buckets: WealthBucket[] }>) {
   const { t } = useTranslation();
   const chartData = buckets.map((bucket) => ({
     id: bucket.id,
-    name: bucket.name,
+    name: bucketDisplayName(bucket, t),
     value: bucket.balance,
   }));
 
@@ -81,7 +82,7 @@ function AllocationChart({ buckets }: Readonly<{ buckets: WealthBucket[] }>) {
                 style={{ backgroundColor: bucketColour(index) }}
                 aria-hidden="true"
               />
-              <span className="min-w-0 truncate">{bucket.name}</span>
+              <span className="min-w-0 truncate">{bucketDisplayName(bucket, t)}</span>
               <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
                 {formatPercent(bucket.sharePct)}
               </span>

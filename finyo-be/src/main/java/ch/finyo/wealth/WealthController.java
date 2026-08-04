@@ -21,7 +21,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/wealth")
 @RequiredArgsConstructor
 @Validated
-@Tag(name = "Wealth", description = "Net-worth overview across manual and portfolio-backed wealth buckets")
+@Tag(name = "Wealth", description = "Net-worth overview across manual buckets plus the auto-mirrored "
+        + "portfolio and pillar 3a rows")
 public class WealthController {
 
     private final WealthOverviewService overviewService;
@@ -30,8 +31,9 @@ public class WealthController {
 
     @GetMapping
     @Operation(summary = "Get the net-worth overview",
-            description = "Resolves all bucket balances (PORTFOLIO buckets live from the investment portfolio), "
-                    + "computes shares and year-end forecasts and upserts today's net-worth snapshot.")
+            description = "Synthesizes the read-only auto rows (investment portfolio, default pillar 3a "
+                    + "scenario), appends the manual buckets, computes shares and year-end forecasts and "
+                    + "upserts today's net-worth snapshot.")
     @ApiResponse(responseCode = "200", description = "Overview returned successfully")
     public ResponseEntity<WealthOverviewResponse> getOverview() {
         String userId = userContextProvider.getUserId();
@@ -52,7 +54,9 @@ public class WealthController {
     }
 
     @PostMapping("/buckets")
-    @Operation(summary = "Create a wealth bucket")
+    @Operation(summary = "Create a manual wealth bucket",
+            description = "Only MANUAL buckets can be created; portfolio and pillar 3a rows appear "
+                    + "automatically in the overview.")
     @ApiResponse(responseCode = "201", description = "Wealth bucket created")
     @ApiResponse(responseCode = "400", description = "Validation failed")
     public ResponseEntity<WealthBucketResponse> create(@Valid @RequestBody WealthBucketRequest request) {

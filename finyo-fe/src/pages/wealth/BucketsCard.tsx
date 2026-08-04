@@ -11,6 +11,7 @@ import type { WealthBucket, WealthOverview, WealthSource } from '@/api/wealth';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { BucketFormDialog } from './BucketFormDialog';
+import { bucketDisplayName } from './bucketDisplayName';
 
 function SourceBadge({ source }: Readonly<{ source: WealthSource }>) {
   const { t } = useTranslation();
@@ -22,6 +23,21 @@ function SourceBadge({ source }: Readonly<{ source: WealthSource }>) {
     return <Badge variant="secondary">{t('wealth.buckets.sourcePillar3')}</Badge>;
   }
   return <Badge variant="outline">{t('wealth.buckets.sourceManual')}</Badge>;
+}
+
+/** Subtle marker for the read-only rows mirrored live from their module. */
+function AutoBadge() {
+  const { t } = useTranslation();
+
+  return (
+    <Badge
+      variant="outline"
+      className="text-muted-foreground"
+      title={t('wealth.buckets.autoBadgeHint')}
+    >
+      {t('wealth.buckets.autoBadge')}
+    </Badge>
+  );
 }
 
 interface BucketItemProps {
@@ -74,7 +90,7 @@ function BucketListItem({ bucket, index, onEdit, onRemove, removing }: Readonly<
           aria-hidden="true"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{bucket.name}</p>
+          <p className="truncate text-sm font-medium">{bucketDisplayName(bucket, t)}</p>
           {bucket.note && (
             <p className="truncate text-xs text-muted-foreground">{bucket.note}</p>
           )}
@@ -86,23 +102,28 @@ function BucketListItem({ bucket, index, onEdit, onRemove, removing }: Readonly<
       </div>
       <div className="mt-1 flex items-center gap-2 pl-4 text-xs text-muted-foreground">
         <SourceBadge source={bucket.source} />
+        {bucket.auto && <AutoBadge />}
         <span className="shrink-0 tabular-nums">
-          {bucket.monthlyRate === 0
+          {!bucket.monthlyRate
             ? '—'
             : t('wealth.buckets.monthlyRateShort', { amount: `+${formatCHF(bucket.monthlyRate)}` })}
         </span>
         <span className="min-w-0 truncate tabular-nums">
           {t('wealth.buckets.forecastShort', { amount: formatCHF(bucket.forecastYearEnd) })}
         </span>
-        <span className="ml-auto shrink-0">
-          <BucketActions bucket={bucket} onEdit={onEdit} onRemove={onRemove} removing={removing} />
-        </span>
+        {!bucket.auto && (
+          <span className="ml-auto shrink-0">
+            <BucketActions bucket={bucket} onEdit={onEdit} onRemove={onRemove} removing={removing} />
+          </span>
+        )}
       </div>
     </li>
   );
 }
 
 function BucketRow({ bucket, index, onEdit, onRemove, removing }: Readonly<BucketItemProps>) {
+  const { t } = useTranslation();
+
   return (
     <tr className="border-b border-border">
       <td className="py-2 pr-4">
@@ -113,7 +134,7 @@ function BucketRow({ bucket, index, onEdit, onRemove, removing }: Readonly<Bucke
             aria-hidden="true"
           />
           <div className="min-w-0">
-            <p className="truncate font-medium">{bucket.name}</p>
+            <p className="truncate font-medium">{bucketDisplayName(bucket, t)}</p>
             {bucket.note && (
               <p className="truncate text-xs text-muted-foreground">{bucket.note}</p>
             )}
@@ -121,16 +142,21 @@ function BucketRow({ bucket, index, onEdit, onRemove, removing }: Readonly<Bucke
         </div>
       </td>
       <td className="py-2 pr-4">
-        <SourceBadge source={bucket.source} />
+        <span className="inline-flex items-center gap-1">
+          <SourceBadge source={bucket.source} />
+          {bucket.auto && <AutoBadge />}
+        </span>
       </td>
       <td className="py-2 pr-4 text-right font-medium tabular-nums">{formatCHF(bucket.balance)}</td>
       <td className="py-2 pr-4 text-right tabular-nums">{formatPercent(bucket.sharePct)}</td>
       <td className="py-2 pr-4 text-right tabular-nums">
-        {bucket.monthlyRate === 0 ? '—' : formatCHF(bucket.monthlyRate)}
+        {!bucket.monthlyRate ? '—' : formatCHF(bucket.monthlyRate)}
       </td>
       <td className="py-2 pr-4 text-right tabular-nums">{formatCHF(bucket.forecastYearEnd)}</td>
       <td className="py-2 text-right">
-        <BucketActions bucket={bucket} onEdit={onEdit} onRemove={onRemove} removing={removing} />
+        {!bucket.auto && (
+          <BucketActions bucket={bucket} onEdit={onEdit} onRemove={onRemove} removing={removing} />
+        )}
       </td>
     </tr>
   );
