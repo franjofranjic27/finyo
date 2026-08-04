@@ -189,6 +189,10 @@
     "allocation": {
       "title": "Allokation",
       "positions": "Positionen",
+      "groups": "Gruppen",
+      "viewGroups": "Gruppen",
+      "viewPositions": "Alle Positionen",
+      "backToGroups": "Zurück zu den Gruppen",
       "empty": "Noch keine Positionen für die Allokation vorhanden"
     },
     "performance": {

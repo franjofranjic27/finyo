@@ -12,44 +12,20 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/auth/useAuth';
-import { portfolioApi, ASSET_CLASSES } from '@/api/portfolio';
-import type { AssetClass, PortfolioPosition } from '@/api/portfolio';
+import { portfolioApi } from '@/api/portfolio';
+import type { PortfolioPosition } from '@/api/portfolio';
 import { formatCHF, formatPercent, formatDate, amountColour } from '@/lib/formatters';
 import { formatHolding } from './priceFormat';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { displayName } from './positionName';
+import { groupByAssetClass } from './assetClassGroups';
+import type { AssetClassGroup } from './assetClassGroups';
 import { EditPositionDialog } from './EditPositionDialog';
 import { PriceSourceBadge } from './PriceSourceBadge';
 import { isUnremarkablePrice, usePriceProvenanceText } from './priceProvenance';
 
-interface AssetClassGroup {
-  assetClass: AssetClass;
-  positions: PortfolioPosition[];
-  value: number;
-  sharePct: number;
-}
-
 /** A dash for a CHF figure a position does not have — its currency has no stored rate yet. */
 const NO_VALUE = '—';
-
-/**
- * Groups positions by asset class in display order, dropping empty groups. The group value is in
- * CHF — it sums valueChf, so an unconverted position (no rate yet) contributes nothing rather than
- * adding its foreign face value to a franc total.
- */
-function groupByAssetClass(positions: PortfolioPosition[]): AssetClassGroup[] {
-  const totalValue = positions.reduce((sum, position) => sum + (position.valueChf ?? 0), 0);
-  return ASSET_CLASSES.map((assetClass) => {
-    const items = positions.filter((position) => position.assetClass === assetClass);
-    const value = items.reduce((sum, position) => sum + (position.valueChf ?? 0), 0);
-    return {
-      assetClass,
-      positions: items,
-      value,
-      sharePct: totalValue > 0 ? (value / totalValue) * 100 : 0,
-    };
-  }).filter((group) => group.positions.length > 0);
-}
 
 function GroupHeaderContent({ group }: Readonly<{ group: AssetClassGroup }>) {
   const { t } = useTranslation();
