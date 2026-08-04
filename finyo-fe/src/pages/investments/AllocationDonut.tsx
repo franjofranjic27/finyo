@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { AssetClass, PortfolioPosition } from '@/api/portfolio';
 import { formatCHF, formatPercent } from '@/lib/formatters';
-import { chartTooltipStyle, formatTooltipCHF } from '@/components/charts/chartStyle';
+import {
+  chartTooltipItemStyle,
+  chartTooltipStyle,
+  formatTooltipCHF,
+} from '@/components/charts/chartStyle';
 import { CHART_COLOURS } from '@/lib/chartColours';
 import { displayName } from './positionName';
 import { groupByAssetClass } from './assetClassGroups';
@@ -83,7 +87,11 @@ function DonutChart({ slices, centreCount, centreLabel, onSliceClick }: Readonly
         >
           {centreLabel}
         </text>
-        <Tooltip formatter={formatTooltipCHF} contentStyle={chartTooltipStyle} />
+        <Tooltip
+          formatter={formatTooltipCHF}
+          contentStyle={chartTooltipStyle}
+          itemStyle={chartTooltipItemStyle}
+        />
       </PieChart>
     </ResponsiveContainer>
   );

@@ -3,7 +3,11 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardEmptyState } from '@/components/CardEmptyState';
-import { chartTooltipStyle, formatTooltipCHF } from '@/components/charts/chartStyle';
+import {
+  chartTooltipItemStyle,
+  chartTooltipStyle,
+  formatTooltipCHF,
+} from '@/components/charts/chartStyle';
 import type { RangeCategoryBreakdown } from '@/api/analytics';
 import { useMonthCategoryBreakdown } from '@/hooks/financeQueries';
 import { CHART_COLOURS } from '@/lib/chartColours';
@@ -77,7 +81,11 @@ function SpendingDonut({ slices }: Readonly<{ slices: Slice[] }>) {
               <Cell key={slice.id} fill={slice.colour} />
             ))}
           </Pie>
-          <Tooltip formatter={formatTooltipCHF} contentStyle={chartTooltipStyle} />
+          <Tooltip
+            formatter={formatTooltipCHF}
+            contentStyle={chartTooltipStyle}
+            itemStyle={chartTooltipItemStyle}
+          />
         </PieChart>
       </ResponsiveContainer>
 
