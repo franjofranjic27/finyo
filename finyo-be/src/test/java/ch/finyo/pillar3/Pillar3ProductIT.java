@@ -1,6 +1,10 @@
 package ch.finyo.pillar3;
 
 import ch.finyo.BaseIntegrationTest;
+import ch.finyo.common.money.CurrencyCode;
+import ch.finyo.marketdata.InstrumentPrice;
+import ch.finyo.marketdata.InstrumentPriceRepository;
+import ch.finyo.marketdata.spi.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +14,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,6 +55,9 @@ class Pillar3ProductIT extends BaseIntegrationTest {
 
     @Autowired
     private Pillar3ProductRepository productRepository;
+
+    @Autowired
+    private InstrumentPriceRepository instrumentPriceRepository;
 
     @BeforeEach
     void cleanProducts() {
@@ -140,6 +151,76 @@ class Pillar3ProductIT extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", is(1)))
                 .andExpect(jsonPath("$[0].isin", is("CH0111111115")));
+    }
+
+    // =========================================================================
+    // Price history: GET /api/v1/pillar3/products/{id}/price-history
+    // =========================================================================
+
+    private void storeClose(String isin, String close, LocalDate date) {
+        instrumentPriceRepository.save(InstrumentPrice.builder()
+                .isin(isin)
+                .priceDate(date)
+                .close(new BigDecimal(close))
+                .currency(new CurrencyCode("CHF"))
+                .source(DataSource.SIX)
+                .retrievedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                .build());
+    }
+
+    @Test
+    void price_history_returns_the_stored_closes_oldest_first_with_the_currency() throws Exception {
+        Pillar3Product fund = saveProduct("Vitainvest 100", "CH0333333336", "100", "0.50", true, 0);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        // stored out of order on purpose — the endpoint has to return them oldest first
+        storeClose("CH0333333336", "142.00", today.minusDays(1));
+        storeClose("CH0333333336", "140.00", today.minusDays(2));
+        storeClose("CH0333333336", "145.10", today);
+
+        mockMvc.perform(get(PRODUCTS_URL + "/{id}/price-history", fund.getId()).with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isin", is("CH0333333336")))
+                .andExpect(jsonPath("$.currency", is("CHF")))
+                .andExpect(jsonPath("$.points.length()", is(3)))
+                .andExpect(jsonPath("$.points[0].date", is(today.minusDays(2).toString())))
+                .andExpect(jsonPath("$.points[0].close", is(140.0)))
+                .andExpect(jsonPath("$.points[1].date", is(today.minusDays(1).toString())))
+                .andExpect(jsonPath("$.points[2].date", is(today.toString())))
+                .andExpect(jsonPath("$.points[2].close", is(145.1)));
+    }
+
+    @Test
+    void price_history_of_an_unlisted_fund_is_empty_rather_than_an_error() throws Exception {
+        // No stored closes and no providers in the test profile: the response is empty and the
+        // fire-and-forget backfill the request triggers stores nothing.
+        Pillar3Product fund = saveProduct("Unlisted 3a Fund", "CH0444444444", "45", "0.45", true, 0);
+
+        mockMvc.perform(get(PRODUCTS_URL + "/{id}/price-history", fund.getId()).with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isin", is("CH0444444444")))
+                .andExpect(jsonPath("$.currency", nullValue()))
+                .andExpect(jsonPath("$.points.length()", is(0)));
+    }
+
+    @Test
+    void price_history_resolves_a_deactivated_product_too() throws Exception {
+        // Saved scenarios keep referencing deactivated products, so the detail view must resolve.
+        Pillar3Product fund = saveProduct("Retired Fund", "CH0555555553", "45", "0.45", false, 0);
+        storeClose("CH0555555553", "101.00", LocalDate.now(ZoneOffset.UTC));
+
+        mockMvc.perform(get(PRODUCTS_URL + "/{id}/price-history", fund.getId()).with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points.length()", is(1)))
+                .andExpect(jsonPath("$.points[0].close", is(101.0)));
+    }
+
+    @Test
+    void price_history_of_an_unknown_product_returns_404_naming_the_id() throws Exception {
+        UUID unknownId = UUID.randomUUID();
+
+        mockMvc.perform(get(PRODUCTS_URL + "/{id}/price-history", unknownId).with(asUser()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail", containsString(unknownId.toString())));
     }
 
     // =========================================================================

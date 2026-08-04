@@ -6,6 +6,14 @@ export interface ScenarioChipItem {
   isDefault: boolean;
   /** Optional secondary metric rendered next to the name. */
   detail?: string;
+  /**
+   * When set, the detail metric becomes its own button inside the chip that
+   * fires this callback instead of selecting the scenario (e.g. to open a
+   * product detail dialog). Only honoured when `detail` is present.
+   */
+  onDetailClick?: () => void;
+  /** Accessible name for the detail button; falls back to the visible detail text. */
+  detailAriaLabel?: string;
 }
 
 /** Props contract for the slice-specific scenario bars built on ScenarioChipBar. */
@@ -33,6 +41,9 @@ interface ScenarioChipBarProps {
   className?: string;
 }
 
+const CHIP_SHAPE =
+  'inline-flex shrink-0 items-center whitespace-nowrap rounded-full border bg-card text-[13px] font-medium transition-colors sm:whitespace-normal';
+
 /**
  * Pill-chip bar shared by the scenario slices: one chip per saved scenario
  * (star marks the default) plus a dashed "new scenario" chip.
@@ -58,42 +69,15 @@ export function ScenarioChipBar({
       <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      {items.map((item) => {
-        const active = item.id === selectedId;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onSelect(active ? null : item.id)}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border bg-card px-3.5 py-1.5 text-[13px] font-medium transition-colors sm:whitespace-normal',
-              active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-secondary',
-            )}
-          >
-            {item.isDefault && (
-              <span
-                aria-hidden="true"
-                className={cn('text-xs', active ? 'text-primary-foreground' : 'text-amber-500')}
-              >
-                ★
-              </span>
-            )}
-            <span>{item.name}</span>
-            {item.detail !== undefined && (
-              <span
-                className={cn(
-                  'text-[11px] tabular-nums',
-                  detailClassName,
-                  active ? 'text-primary-foreground opacity-70' : 'text-muted-foreground',
-                )}
-              >
-                {item.detail}
-              </span>
-            )}
-          </button>
-        );
-      })}
+      {items.map((item) => (
+        <ScenarioChip
+          key={item.id}
+          item={item}
+          active={item.id === selectedId}
+          onSelect={onSelect}
+          detailClassName={detailClassName}
+        />
+      ))}
       <button
         type="button"
         onClick={onNew}
@@ -103,5 +87,77 @@ export function ScenarioChipBar({
         + {newLabel}
       </button>
     </div>
+  );
+}
+
+interface ScenarioChipProps {
+  item: ScenarioChipItem;
+  active: boolean;
+  onSelect: (id: string | null) => void;
+  detailClassName?: string;
+}
+
+function ScenarioChip({ item, active, onSelect, detailClassName }: Readonly<ScenarioChipProps>) {
+  const activeClasses = active
+    ? 'border-primary bg-primary text-primary-foreground'
+    : 'hover:bg-secondary';
+  const star = item.isDefault && (
+    <span
+      aria-hidden="true"
+      className={cn('text-xs', active ? 'text-primary-foreground' : 'text-amber-500')}
+    >
+      ★
+    </span>
+  );
+  const detail = item.detail !== undefined && (
+    <span
+      className={cn(
+        'text-[11px] tabular-nums',
+        detailClassName,
+        active ? 'text-primary-foreground opacity-70' : 'text-muted-foreground',
+      )}
+    >
+      {item.detail}
+    </span>
+  );
+
+  // An interactive detail must not live inside the select button (nested
+  // buttons are invalid HTML), so such a chip splits into a pill-styled group
+  // holding two sibling buttons: select (star + name) and detail.
+  if (item.onDetailClick && item.detail !== undefined) {
+    return (
+      <div className={cn(CHIP_SHAPE, activeClasses)}>
+        <button
+          type="button"
+          aria-pressed={active}
+          onClick={() => onSelect(active ? null : item.id)}
+          className="inline-flex items-center gap-2 py-1.5 pl-3.5"
+        >
+          {star}
+          <span>{item.name}</span>
+        </button>
+        <button
+          type="button"
+          aria-label={item.detailAriaLabel ?? item.detail}
+          onClick={item.onDetailClick}
+          className="inline-flex items-center py-1.5 pl-2 pr-3.5 underline-offset-2 hover:underline"
+        >
+          {detail}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={() => onSelect(active ? null : item.id)}
+      className={cn(CHIP_SHAPE, 'gap-2 px-3.5 py-1.5', activeClasses)}
+    >
+      {star}
+      <span>{item.name}</span>
+      {detail}
+    </button>
   );
 }

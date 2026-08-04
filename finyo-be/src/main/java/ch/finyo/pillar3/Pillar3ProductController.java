@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -26,6 +28,7 @@ public class Pillar3ProductController {
 
     private final Pillar3ProductService productService;
     private final Pillar3CompareService compareService;
+    private final Pillar3ProductPriceHistoryService priceHistoryService;
     private final UserContextProvider userContextProvider;
 
     @GetMapping
@@ -37,6 +40,20 @@ public class Pillar3ProductController {
         String userId = userContextProvider.getUserId();
         log.info("GET /api/v1/pillar3/products user={} search={}", userId, search);
         return ResponseEntity.ok(productService.getActive(search));
+    }
+
+    @GetMapping("/{id}/price-history")
+    @Operation(summary = "Daily closing prices for a pillar 3a product's fund",
+            description = "Stored market prices for the product's ISIN, oldest first, for the last three "
+                    + "years. Read-only; when nothing is stored yet a one-off backfill is triggered in the "
+                    + "background — unlisted 3a funds legitimately stay empty. Inactive products resolve too, "
+                    + "because saved scenarios keep referencing them.")
+    @ApiResponse(responseCode = "200", description = "Price history returned")
+    @ApiResponse(responseCode = "404", description = "Product not found")
+    public ResponseEntity<Pillar3PriceHistoryResponse> getPriceHistory(@PathVariable UUID id) {
+        String userId = userContextProvider.getUserId();
+        log.info("GET /api/v1/pillar3/products/{}/price-history user={}", id, userId);
+        return ResponseEntity.ok(priceHistoryService.getPriceHistory(id));
     }
 
     @PostMapping("/compare")

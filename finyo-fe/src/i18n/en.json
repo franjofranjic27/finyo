@@ -520,6 +520,16 @@
       "colTaxSaving": "Annual Tax Saving",
       "colNetAfterTax": "Net After Payout Tax",
       "chartTitle": "Balance Growth"
+    },
+    "productDetail": {
+      "open": "Show details for {{name}}",
+      "provider": "Provider",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "equity": "Equity share",
+      "ter": "TER",
+      "expectedReturn": "Expected return",
+      "netReturn": "Net return"
     }
   },
   "budget": {
