@@ -18,6 +18,13 @@ describe('formatCHF', () => {
     expect(formatCHF('99.9')).toBe('CHF 99.90');
   });
 
+  it('renders an em dash for nullish values instead of throwing', () => {
+    // A stale PWA shell can feed nulls from a newer API — one dashed cell,
+    // never a crashed page.
+    expect(formatCHF(null)).toBe('\u2014');
+    expect(formatCHF(undefined)).toBe('\u2014');
+  });
+
   it('falls back to CHF 0.00 for invalid input', () => {
     expect(formatCHF('not-a-number')).toBe('CHF 0.00');
   });

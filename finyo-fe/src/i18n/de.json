@@ -992,5 +992,10 @@
     "accessDeniedTitle": "Zugriff verweigert",
     "accessDeniedText": "Dein Konto hat nicht die erforderliche Rolle, um finyo zu verwenden. Bitte wende dich an den Administrator.",
     "logout": "Abmelden"
+  },
+  "errorBoundary": {
+    "title": "Etwas ist schiefgelaufen",
+    "hint": "Die Seite ist auf einen unerwarteten Fehler gestossen. Neu laden behebt das meist — besonders direkt nach einem App-Update.",
+    "reload": "Neu laden"
   }
 }

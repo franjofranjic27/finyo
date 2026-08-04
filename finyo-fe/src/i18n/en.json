@@ -992,5 +992,10 @@
     "accessDeniedTitle": "Access denied",
     "accessDeniedText": "Your account does not have the required role to use finyo. Please contact the administrator.",
     "logout": "Log out"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "hint": "The page hit an unexpected error. Reloading usually fixes it — especially right after an app update.",
+    "reload": "Reload"
   }
 }
