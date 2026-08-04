@@ -10,6 +10,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import type { TaxResultResponse, TaxScenario, TaxYearInputs } from '@/api/tax';
+import { chartTooltipItemStyle, chartTooltipStyle } from '@/components/charts/chartStyle';
 import { formatCHF, formatPercent } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
@@ -224,7 +225,8 @@ export function TaxResultSection({
               </Pie>
               <Tooltip
                 formatter={(v: number) => formatCHF(v)}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                contentStyle={chartTooltipStyle}
+                itemStyle={chartTooltipItemStyle}
               />
               <Legend formatter={renderLegendText} />
             </PieChart>

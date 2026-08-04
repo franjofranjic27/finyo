@@ -24,6 +24,13 @@ export const chartTooltipStyle: CSSProperties = {
   border: '1px solid hsl(var(--border))',
 };
 
+// Pie tooltips need this: their payload carries no series colour, so recharts falls back
+// to #000 item text — invisible on the dark card background. Line/bar tooltips keep the
+// series colour and stay readable without it.
+export const chartTooltipItemStyle: CSSProperties = {
+  color: 'hsl(var(--foreground))',
+};
+
 // Module scope: recharts re-renders formatter results, nested components would remount.
 export const renderLegendText = (value: string) => (
   <span style={{ color: 'hsl(var(--foreground))', fontSize: 12 }}>{value}</span>

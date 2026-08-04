@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardEmptyState } from '@/components/CardEmptyState';
 import {
+  chartTooltipItemStyle,
   chartTooltipStyle,
   formatTooltipCHF,
 } from '@/components/charts/chartStyle';
@@ -62,7 +63,11 @@ function AllocationChart({ buckets }: Readonly<{ buckets: WealthBucket[] }>) {
               <Cell key={entry.id} fill={bucketColour(index)} />
             ))}
           </Pie>
-          <Tooltip formatter={formatTooltipCHF} contentStyle={chartTooltipStyle} />
+          <Tooltip
+            formatter={formatTooltipCHF}
+            contentStyle={chartTooltipStyle}
+            itemStyle={chartTooltipItemStyle}
+          />
         </PieChart>
       </ResponsiveContainer>
 
