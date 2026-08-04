@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import type { PriceHistory } from './positionDetail';
 import type { Pillar3Result, TaxCivilStatus } from './tax';
 
 export interface Pillar3Product {
@@ -100,6 +101,14 @@ export const pillar3Api = {
       {},
       token,
     ),
+
+  /**
+   * Stored daily closes for the product's fund (3-year window, oldest first).
+   * Empty points are normal: unlisted 3a funds have no market data, and a
+   * listed fund fills in the background after the first view.
+   */
+  getProductPriceHistory: (token: string, productId: string) =>
+    apiRequest<PriceHistory>(`/pillar3/products/${productId}/price-history`, {}, token),
 
   compare: (token: string, data: Pillar3CompareRequest) =>
     apiRequest<Pillar3CompareResponse>(

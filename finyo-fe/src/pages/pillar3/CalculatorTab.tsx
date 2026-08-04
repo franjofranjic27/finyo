@@ -30,6 +30,7 @@ import {
   formatTooltipCHF,
   renderLegendText,
 } from '@/components/charts/chartStyle';
+import { ProductDetailDialog } from './ProductDetailDialog';
 import { ProductSearchCombobox } from './ProductSearchCombobox';
 import { ScenarioActionsMenu } from './ScenarioActionsMenu';
 import { ScenarioBar } from './ScenarioBar';
@@ -59,6 +60,8 @@ export function CalculatorTab() {
   const [canton, setCanton] = useState('SG');
   const [civilStatus, setCivilStatus] = useState<TaxCivilStatus>('SINGLE');
   const [selectedProduct, setSelectedProduct] = useState<Pillar3Product | null>(null);
+  // Product whose detail dialog is open; null = closed. Mounted fresh per open.
+  const [detailProduct, setDetailProduct] = useState<Pillar3Product | null>(null);
 
   // Null = no scenario chip active, show the fresh calculation result.
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
@@ -127,29 +130,29 @@ export function CalculatorTab() {
     setReturnPct(String(product.netReturnPct));
   };
 
-  const applyScenario = useCallback(
-    (scenario: Pillar3Scenario) => {
-      const { inputs } = scenario;
-      setBalance(String(inputs.currentBalance));
-      setContribution(String(inputs.annualContribution));
-      setReturnPct(String(scenario.effectiveReturnPercent));
-      setYears(String(inputs.yearsToRetirement));
-      setYearsTouched(true);
-      setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
-      if (inputs.cantonCode) setCanton(inputs.cantonCode);
-      if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
-      // The product may have been deleted since the scenario was saved.
-      setSelectedProduct(products?.find((p) => p.id === inputs.productId) ?? null);
-    },
-    [products],
-  );
+  const applyScenario = useCallback((scenario: Pillar3Scenario) => {
+    const { inputs } = scenario;
+    setBalance(String(inputs.currentBalance));
+    setContribution(String(inputs.annualContribution));
+    setReturnPct(String(scenario.effectiveReturnPercent));
+    setYears(String(inputs.yearsToRetirement));
+    setYearsTouched(true);
+    setIncome(inputs.grossEmploymentIncome != null ? String(inputs.grossEmploymentIncome) : '');
+    if (inputs.cantonCode) setCanton(inputs.cantonCode);
+    if (inputs.civilStatus) setCivilStatus(inputs.civilStatus);
+    // The scenario response carries the server-resolved product (null when the
+    // return was manual or the product was deleted) — authoritative, unlike a
+    // lookup in the active-only catalog, which silently loses deactivated or
+    // not-yet-loaded products.
+    setSelectedProduct(scenario.product);
+  }, []);
 
-  // Preselect the default scenario once both lists are loaded (the product
-  // resolution in applyScenario needs the catalog). Scheduled via a timer
-  // because effects must not set state synchronously; the one-shot guard is
-  // set in the same callback, so a deliberate deselection stays untouched.
+  // Preselect the default scenario once the scenario list is loaded.
+  // Scheduled via a timer because effects must not set state synchronously;
+  // the one-shot guard is set in the same callback, so a deliberate
+  // deselection stays untouched.
   useEffect(() => {
-    if (defaultApplied || !scenarios || !products) return undefined;
+    if (defaultApplied || !scenarios) return undefined;
     const timer = setTimeout(() => {
       setDefaultApplied(true);
       const preselect = scenarios.find((s) => s.isDefault);
@@ -158,7 +161,7 @@ export function CalculatorTab() {
       applyScenario(preselect);
     });
     return () => clearTimeout(timer);
-  }, [defaultApplied, scenarios, products, applyScenario]);
+  }, [defaultApplied, scenarios, applyScenario]);
 
   const selectScenario = (scenarioId: string | null) => {
     setSelectedScenarioId(scenarioId);
@@ -273,10 +276,17 @@ export function CalculatorTab() {
             />
             {selectedProduct && (
               <span className="inline-flex items-center gap-2 rounded-full border bg-secondary py-1 pl-3.5 pr-1.5 text-[13px] font-medium">
-                <span className="max-w-64 truncate">{selectedProduct.name}</span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {selectedProduct.provider} · {selectedProduct.netReturnPct.toFixed(1)} %
-                </span>
+                <button
+                  type="button"
+                  className="inline-flex min-w-0 items-center gap-2 underline-offset-2 hover:underline"
+                  aria-label={t('pillar3.productDetail.open', { name: selectedProduct.name })}
+                  onClick={() => setDetailProduct(selectedProduct)}
+                >
+                  <span className="max-w-64 truncate">{selectedProduct.name}</span>
+                  <span className="truncate text-[11px] text-muted-foreground">
+                    {selectedProduct.provider} · {selectedProduct.netReturnPct.toFixed(1)} %
+                  </span>
+                </button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -341,7 +351,13 @@ export function CalculatorTab() {
         selectedScenarioId={selectedScenarioId}
         onSelect={selectScenario}
         onAdd={() => setSavePanelOpen(true)}
+        // Opens the detail dialog only — it must not select the scenario.
+        onProductDetail={(scenario) => setDetailProduct(scenario.product)}
       />
+
+      {detailProduct && (
+        <ProductDetailDialog product={detailProduct} onClose={() => setDetailProduct(null)} />
+      )}
 
       {isPending && <Skeleton className="h-96 w-full" />}
       {displayedResult && (

@@ -520,6 +520,16 @@
       "colTaxSaving": "Jährl. Steuerersparnis",
       "colNetAfterTax": "Netto nach Bezugssteuer",
       "chartTitle": "Guthabenentwicklung"
+    },
+    "productDetail": {
+      "open": "Details zu {{name}} anzeigen",
+      "provider": "Anbieter",
+      "isin": "ISIN",
+      "valor": "Valor",
+      "equity": "Aktienanteil",
+      "ter": "TER",
+      "expectedReturn": "Erwartete Rendite",
+      "netReturn": "Nettorendite"
     }
   },
   "budget": {

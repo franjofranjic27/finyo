@@ -38,6 +38,7 @@ vi.mock('@/api/tax', () => ({
 vi.mock('@/api/pillar3', () => ({
   pillar3Api: {
     getProducts: vi.fn(),
+    getProductPriceHistory: vi.fn(),
     getScenarios: vi.fn(),
     createScenario: vi.fn(),
     updateScenario: vi.fn(),
@@ -84,10 +85,26 @@ const savedScenario = pillar3Scenario({
   calculation: pillar3Result({ projectedBalanceAtRetirement: 111_000 }),
 });
 
+// A scenario whose product is linked but absent from the active catalog
+// (getProducts stays mocked to []): the prefill must come from the scenario
+// response itself, not from a catalog lookup.
+const fundScenario = pillar3Scenario({
+  id: 's3',
+  name: 'Fund plan',
+  effectiveReturnPercent: 3.0,
+  product: pillar3Product({ id: 'p9', name: 'Zeta Fund', provider: 'Zeta AG' }),
+  inputs: pillar3ScenarioInputs({ productId: 'p9' }),
+});
+
 // vi.restoreAllMocks in the global afterEach wipes implementations, so the
 // query defaults have to be re-established before every test.
 beforeEach(() => {
   vi.mocked(pillar3Api.getProducts).mockResolvedValue([]);
+  vi.mocked(pillar3Api.getProductPriceHistory).mockResolvedValue({
+    isin: 'CH0000000001',
+    currency: null,
+    points: [],
+  });
   vi.mocked(pillar3Api.getScenarios).mockResolvedValue([]);
   vi.mocked(profileApi.get).mockResolvedValue(emptyUserProfile());
 });
@@ -194,6 +211,41 @@ describe('CalculatorTab', () => {
     expect(screen.getByDisplayValue('4.2')).toBeInTheDocument();
     expect(screen.getByDisplayValue('25')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Scenario actions' })).toBeInTheDocument();
+  });
+
+  it('prefills the linked product from the scenario response even when the catalog is empty', async () => {
+    // getProducts stays [] (default): a deactivated or not-yet-loaded product
+    // must still prefill, because the scenario carries the resolved product.
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([fundScenario]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(await screen.findByRole('button', { name: /Fund plan/ }));
+
+    expect(await screen.findByRole('button', { name: 'Remove product' })).toBeInTheDocument();
+    expect(screen.getByText('Zeta AG · 3.0 %')).toBeInTheDocument();
+    // The return rate stays locked to the linked product.
+    expect(screen.getByDisplayValue('3')).toBeDisabled();
+  });
+
+  it('opens the product detail dialog from the chip badge without selecting the scenario', async () => {
+    vi.mocked(pillar3Api.getScenarios).mockResolvedValue([fundScenario]);
+    const user = userEvent.setup();
+    renderWithProviders(<CalculatorTab />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Show details for Zeta Fund' }),
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Zeta Fund' })).toBeInTheDocument();
+    expect(pillar3Api.getProductPriceHistory).toHaveBeenCalledWith('test-token', 'p9');
+    expect(await screen.findByText('No price data yet')).toBeInTheDocument();
+    // The badge click must not act as a scenario selection. The open dialog
+    // makes the page behind it inert, so the chip is queried as hidden.
+    expect(screen.getByRole('button', { name: /Fund plan/, hidden: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('clears the scenario selection when a fresh calculation runs', async () => {
