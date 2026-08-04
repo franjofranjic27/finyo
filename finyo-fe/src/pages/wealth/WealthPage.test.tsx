@@ -48,18 +48,28 @@ describe('WealthPage', () => {
     expect(screen.getByText("+CHF 12'340.00")).toBeInTheDocument();
     expect(screen.getByText('Monthly savings rate')).toBeInTheDocument();
 
-    // Buckets render twice: once as mobile list rows, once as the desktop table.
+    // Rows render twice: once as mobile list rows, once as the desktop table.
     expect(screen.getAllByText('Sparen')).toHaveLength(2);
-    expect(screen.getAllByText('Wertschriftendepot')).toHaveLength(2);
-    expect(screen.getAllByText('Krypto')).toHaveLength(2);
+    // Auto rows use the localized name (2×) next to the source badge (2×).
     expect(screen.getAllByText('Portfolio')).toHaveLength(4);
+    expect(screen.getAllByText('Pillar 3a')).toHaveLength(4);
+    expect(screen.getAllByText('Automatic')).toHaveLength(4);
     expect(screen.getAllByText('manual')).toHaveLength(2);
-    // Krypto has no monthly rate → dash instead of CHF 0.00 (list row + table row).
+    // The portfolio row has no derivable deposit → dash (list row + table row).
     expect(screen.getAllByText('—')).toHaveLength(2);
 
     expect(screen.getByText('History & forecast')).toBeInTheDocument();
     expect(wealthApi.getOverview).toHaveBeenCalledWith('test-token');
     expect(wealthApi.getHistory).toHaveBeenCalledWith('test-token', 12);
+  });
+
+  it('renders auto rows read-only — edit and delete exist only for manual pots', async () => {
+    renderWithProviders(<WealthPage />);
+    await screen.findAllByText('Sparen');
+
+    // One manual bucket rendered twice (mobile + table) → exactly two of each action.
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Remove bucket' })).toHaveLength(2);
   });
 
   it('shows the empty states for buckets and chart', async () => {
@@ -75,6 +85,19 @@ describe('WealthPage', () => {
         'Not enough data yet — the history grows with every visit of this overview',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('does not show the bucket empty state when only auto rows exist', async () => {
+    const overview = wealthOverview();
+    vi.mocked(wealthApi.getOverview).mockResolvedValue(
+      wealthOverview({ buckets: overview.buckets.filter((bucket) => bucket.auto) }),
+    );
+    renderWithProviders(<WealthPage />);
+
+    expect(await screen.findAllByText('Portfolio')).toHaveLength(4);
+    expect(
+      screen.queryByText('No buckets yet — create your first wealth bucket'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an error message when the overview cannot be loaded', async () => {
@@ -119,41 +142,6 @@ describe('WealthPage', () => {
       source: 'MANUAL',
       manualBalance: 2500,
       monthlyRate: 200,
-    });
-  });
-
-  it('toggles the source-specific fields and submits asset classes for portfolio buckets', async () => {
-    vi.mocked(wealthApi.createBucket).mockResolvedValue({
-      id: 'new',
-      name: 'Depot',
-      note: null,
-      source: 'PORTFOLIO',
-      assetClasses: ['ETF'],
-      manualBalance: null,
-      monthlyRate: 0,
-      sortOrder: 0,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<WealthPage />);
-    await screen.findAllByText('Sparen');
-
-    await user.click(screen.getByRole('button', { name: 'Add bucket' }));
-    // MANUAL is the default: balance visible, asset classes hidden.
-    expect(screen.getByLabelText('Balance')).toBeInTheDocument();
-    expect(screen.queryByText('Asset classes')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'From portfolio (asset classes)' }));
-    expect(screen.queryByLabelText('Balance')).not.toBeInTheDocument();
-    expect(screen.getByText('Asset classes')).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('Name'), 'Depot');
-    await user.click(screen.getByLabelText('ETF'));
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-
-    expect(wealthApi.createBucket).toHaveBeenCalledWith('test-token', {
-      name: 'Depot',
-      source: 'PORTFOLIO',
-      assetClasses: ['ETF'],
     });
   });
 

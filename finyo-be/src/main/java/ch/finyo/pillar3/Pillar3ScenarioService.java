@@ -26,13 +26,14 @@ public class Pillar3ScenarioService {
 
     /**
      * Thin read port for other modules (currently the wealth overview): the
-     * default scenario's current balance, without the projection recomputation
-     * that {@link #list} performs per scenario.
+     * default scenario's current balance and annual contribution, without the
+     * projection recomputation that {@link #list} performs per scenario.
      */
     @Transactional(readOnly = true)
-    public Optional<BigDecimal> getDefaultCurrentBalance(String userId) {
+    public Optional<Pillar3DefaultScenarioSummary> getDefaultScenarioSummary(String userId) {
         return scenarioRepository.findByUserIdAndIsDefaultTrue(userId)
-                .map(Pillar3Scenario::getCurrentBalance);
+                .map(scenario -> new Pillar3DefaultScenarioSummary(
+                        scenario.getCurrentBalance(), scenario.getAnnualContribution()));
     }
 
     @Transactional(readOnly = true)
@@ -46,11 +47,11 @@ public class Pillar3ScenarioService {
 
     /**
      * Creates a new scenario. The user's first scenario is always persisted as
-     * the default, regardless of the request flag — this makes the wealth
-     * PILLAR3 bucket (WealthOverviewService reads the default scenario's
-     * balance via {@link #getDefaultCurrentBalance}) non-empty as soon as the
-     * user saves any scenario. Afterwards the default is only assigned on
-     * explicit request or switched via {@link #setDefault}.
+     * the default, regardless of the request flag — this makes the auto-mirrored
+     * pillar 3a row of the wealth overview (WealthOverviewService reads the
+     * default scenario via {@link #getDefaultScenarioSummary}) appear as soon
+     * as the user saves any scenario. Afterwards the default is only assigned
+     * on explicit request or switched via {@link #setDefault}.
      */
     @Transactional
     public Pillar3ScenarioResponse create(Pillar3ScenarioRequest request, String userId) {

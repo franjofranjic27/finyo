@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { BucketFormDialog } from './BucketFormDialog';
 import { wealthApi } from '@/api/wealth';
 import { renderWithProviders } from '@/test/test-utils';
+import { wealthBucket } from '@/test/fixtures/wealth';
 
 vi.mock('@/auth/useAuth', () => ({
   useAuth: () => ({
@@ -26,52 +27,22 @@ vi.mock('@/api/wealth', () => ({
 }));
 
 describe('BucketFormDialog', () => {
-  it('offers all three sources and shows the live hint for pillar 3a', async () => {
-    const user = userEvent.setup();
+  it('shows only the manual fields — sources are no longer selectable', () => {
     renderWithProviders(<BucketFormDialog bucket={null} onClose={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: 'Maintained manually' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Note (e.g. bank/depot)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Balance')).toBeInTheDocument();
+    expect(screen.getByLabelText('Monthly deposit')).toBeInTheDocument();
+    // The source picker is gone: portfolio and pillar 3a rows appear automatically.
+    expect(screen.queryByText('Source')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'From portfolio (asset classes)' }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Pillar 3a (default scenario)' }));
-
-    expect(
-      screen.getByText('The balance is taken live from your default pillar 3a scenario'),
-    ).toBeInTheDocument();
-    // no balance or asset-class inputs for a pillar 3a bucket
-    expect(screen.queryByLabelText('Balance')).not.toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Maintained manually' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Asset classes')).not.toBeInTheDocument();
   });
 
-  it('sends neither manualBalance nor assetClasses for a pillar 3a bucket', async () => {
-    vi.mocked(wealthApi.createBucket).mockResolvedValue({
-      id: 'b1',
-      name: 'Säule 3a',
-      note: null,
-      source: 'PILLAR3',
-      assetClasses: [],
-      manualBalance: null,
-      monthlyRate: 0,
-      sortOrder: 0,
-    });
-    const user = userEvent.setup();
-    renderWithProviders(<BucketFormDialog bucket={null} onClose={vi.fn()} />);
-
-    await user.type(screen.getByLabelText('Name'), 'Säule 3a');
-    await user.click(screen.getByRole('button', { name: 'Pillar 3a (default scenario)' }));
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-
-    await waitFor(() => expect(wealthApi.createBucket).toHaveBeenCalledTimes(1));
-    const [token, payload] = vi.mocked(wealthApi.createBucket).mock.calls[0];
-    expect(token).toBe('test-token');
-    expect(payload).toMatchObject({ name: 'Säule 3a', source: 'PILLAR3' });
-    expect(payload.manualBalance).toBeUndefined();
-    expect(payload.assetClasses).toBeUndefined();
-  });
-
-  it('keeps the manual balance in the payload for a manual bucket', async () => {
+  it('creates a manual pot with balance and monthly deposit', async () => {
     vi.mocked(wealthApi.createBucket).mockResolvedValue({
       id: 'b1',
       name: 'Cash',
@@ -79,7 +50,7 @@ describe('BucketFormDialog', () => {
       source: 'MANUAL',
       assetClasses: [],
       manualBalance: 5000,
-      monthlyRate: 0,
+      monthlyRate: 200,
       sortOrder: 0,
     });
     const user = userEvent.setup();
@@ -87,13 +58,50 @@ describe('BucketFormDialog', () => {
 
     await user.type(screen.getByLabelText('Name'), 'Cash');
     await user.type(screen.getByLabelText('Balance'), '5000');
+    await user.type(screen.getByLabelText('Monthly deposit'), '200');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() =>
-      expect(wealthApi.createBucket).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({ name: 'Cash', source: 'MANUAL', manualBalance: 5000 }),
-      ),
+      expect(wealthApi.createBucket).toHaveBeenCalledWith('test-token', {
+        name: 'Cash',
+        source: 'MANUAL',
+        manualBalance: 5000,
+        monthlyRate: 200,
+      }),
+    );
+  });
+
+  it('prefills the fields from the edited pot and submits an update', async () => {
+    vi.mocked(wealthApi.updateBucket).mockResolvedValue({
+      id: 'b1',
+      name: 'Sparen',
+      note: 'Raiffeisen Sparkonto',
+      source: 'MANUAL',
+      assetClasses: [],
+      manualBalance: 4500,
+      monthlyRate: 500,
+      sortOrder: 0,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <BucketFormDialog bucket={wealthBucket({ id: 'b1' })} onClose={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Sparen');
+    expect(screen.getByLabelText('Balance')).toHaveValue(4500);
+    expect(screen.getByLabelText('Monthly deposit')).toHaveValue(500);
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(wealthApi.updateBucket).toHaveBeenCalledWith('test-token', 'b1', {
+        name: 'Sparen',
+        note: 'Raiffeisen Sparkonto',
+        source: 'MANUAL',
+        manualBalance: 4500,
+        monthlyRate: 500,
+        sortOrder: 0,
+      }),
     );
   });
 });

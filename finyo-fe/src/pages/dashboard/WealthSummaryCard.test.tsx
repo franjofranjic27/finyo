@@ -30,8 +30,11 @@ describe('WealthSummaryCard', () => {
     expect(screen.getByText(/\+14\.1%/)).toBeInTheDocument();
 
     expect(screen.getByText('Sparen')).toBeInTheDocument();
-    expect(screen.getByText('Wertschriftendepot')).toBeInTheDocument();
-    expect(screen.getByText('Krypto')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio')).toBeInTheDocument();
+    // Auto rows render localized: the EN test locale must show the EN name,
+    // not the backend's German default string.
+    expect(screen.getByText('Pillar 3a')).toBeInTheDocument();
+    expect(screen.queryByText('Säule 3a')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('donut-legend-item')).toHaveLength(3);
     expect(screen.getByText("CHF 77'000.00")).toBeInTheDocument();
     expect(screen.getByText('77.2%')).toBeInTheDocument();

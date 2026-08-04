@@ -15,9 +15,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * A slice of the user's total net worth. MANUAL buckets carry a hand-maintained
- * balance; PORTFOLIO buckets are valued live from the investment portfolio via
- * their linked asset classes (stored as a comma-separated list of enum names).
+ * A manually maintained slice of the user's total net worth. Since the
+ * auto-mirrored overview rows (portfolio, pillar 3a) are synthesized live and
+ * never persisted, only MANUAL rows exist in this table (enforced by a CHECK
+ * constraint since V38); the source and asset_classes columns remain for the
+ * historical schema.
  */
 @Entity
 @Table(name = "wealth_bucket")
