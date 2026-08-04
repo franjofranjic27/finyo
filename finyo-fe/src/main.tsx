@@ -7,6 +7,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { RequireRole } from './auth/RequireRole';
 import { OnboardingGate } from './auth/OnboardingGate';
 import { ThemeProvider } from './hooks/useTheme';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { AppLayout } from './components/layout/AppLayout';
 import { OnboardingPage } from './pages/onboarding/OnboardingPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
@@ -35,7 +36,8 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <BrowserRouter>
@@ -74,8 +76,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               </OnboardingGate>
             </RequireAuth>
           </BrowserRouter>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   </React.StrictMode>
 );
